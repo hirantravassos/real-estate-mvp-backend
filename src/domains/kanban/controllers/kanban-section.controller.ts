@@ -1,24 +1,24 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Delete,
   Body,
+  Controller,
+  Delete,
+  Get,
   Param,
+  Patch,
+  Post,
   Put,
 } from '@nestjs/common';
 import * as SharedDecorators from '../../../shared/decorators/current-user.decorator';
 import { CurrentUser } from '../../../shared/decorators/current-user.decorator';
 import {
-  SeedDefaultSectionsUseCase,
   ManageSectionsUseCase,
+  SeedDefaultSectionsUseCase,
 } from '../use-cases';
 import {
   CreateKanbanSectionDto,
-  UpdateKanbanSectionDto,
-  ReorderSectionsDto,
   KanbanSectionResponseDto,
+  ReorderSectionsDto,
+  UpdateKanbanSectionDto,
 } from '../dtos';
 
 @Controller('kanban-sections')
@@ -26,7 +26,7 @@ export class KanbanSectionController {
   constructor(
     private readonly seedDefaultSections: SeedDefaultSectionsUseCase,
     private readonly manageSections: ManageSectionsUseCase,
-  ) { }
+  ) {}
 
   @Get()
   async list(

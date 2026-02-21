@@ -11,15 +11,11 @@ import {
 import * as SharedDecorators from '../../../shared/decorators/current-user.decorator';
 import { CurrentUser } from '../../../shared/decorators/current-user.decorator';
 import { ManageVisitUseCase } from '../use-cases';
-import {
-  CreateVisitDto,
-  UpdateVisitDto,
-  VisitResponseDto,
-} from '../dtos';
+import { CreateVisitDto, UpdateVisitDto, VisitResponseDto } from '../dtos';
 
 @Controller('visits')
 export class VisitController {
-  constructor(private readonly manageVisit: ManageVisitUseCase) { }
+  constructor(private readonly manageVisit: ManageVisitUseCase) {}
 
   @Get()
   async list(

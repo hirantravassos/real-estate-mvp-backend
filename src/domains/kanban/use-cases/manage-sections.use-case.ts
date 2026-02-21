@@ -1,13 +1,13 @@
 import {
+  ForbiddenException,
   Injectable,
   NotFoundException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { KanbanSectionRepository } from '../repositories';
 import {
   CreateKanbanSectionDto,
-  UpdateKanbanSectionDto,
   KanbanSectionResponseDto,
+  UpdateKanbanSectionDto,
 } from '../dtos';
 import { KanbanSection } from '../entities';
 import { KanbanSectionMapper } from '../mappers';
@@ -16,11 +16,11 @@ import { KanbanSectionMapper } from '../mappers';
 export class ManageSectionsUseCase {
   constructor(
     private readonly kanbanSectionRepository: KanbanSectionRepository,
-  ) { }
+  ) {}
 
   async listSections(userId: string): Promise<KanbanSectionResponseDto[]> {
     const sections = await this.kanbanSectionRepository.findAllByUserId(userId);
-    return sections.map(KanbanSectionMapper.toResponseDto);
+    return sections.map((item) => KanbanSectionMapper.toResponseDto(item));
   }
 
   async createSection(
@@ -73,7 +73,7 @@ export class ManageSectionsUseCase {
     }
 
     const saved = await this.kanbanSectionRepository.saveMany(reordered);
-    return saved.map(KanbanSectionMapper.toResponseDto);
+    return saved.map((item) => KanbanSectionMapper.toResponseDto(item));
   }
 
   private async findOwnedSection(

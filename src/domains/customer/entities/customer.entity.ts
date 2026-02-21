@@ -38,8 +38,23 @@ export class Customer extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   comments!: string | null;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
-  budget!: number | null;
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    nullable: true,
+    name: 'min_budget',
+  })
+  minBudget!: number | null;
+
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    nullable: true,
+    name: 'max_budget',
+  })
+  maxBudget!: number | null;
 
   /* ============================================================ */
 
@@ -50,7 +65,10 @@ export class Customer extends BaseEntity {
   @JoinColumn({ name: 'user_id' })
   readonly user?: User;
 
-  @ManyToOne(() => KanbanSection, { onDelete: 'SET NULL', nullable: true })
+  @ManyToOne(() => KanbanSection, {
+    onDelete: 'SET NULL',
+    nullable: true,
+  })
   @JoinColumn({ name: 'kanban_section_id' })
   readonly kanbanSection?: KanbanSection;
 }

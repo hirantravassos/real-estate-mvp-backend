@@ -1,4 +1,10 @@
-import { IsString, IsOptional, IsDateString, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsDateString,
+  MaxLength,
+  IsNumber,
+} from 'class-validator';
 
 export class CreateVisitDto {
   @IsString({ message: 'ID do cliente é obrigatório' })
@@ -45,4 +51,12 @@ export class UpdateVisitDto {
   @IsOptional()
   @IsDateString()
   readonly endAt?: string;
+
+  @IsOptional()
+  @IsString()
+  readonly feedback?: string;
+
+  @IsOptional()
+  @IsNumber()
+  readonly rating?: number;
 }

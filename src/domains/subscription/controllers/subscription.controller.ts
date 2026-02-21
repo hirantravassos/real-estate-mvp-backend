@@ -1,9 +1,10 @@
-import { Controller, Post, Get, Body } from '@nestjs/common';
+import { Body, Controller, Get, Post } from '@nestjs/common';
 import * as SharedDecorators from '../../../shared/decorators/current-user.decorator';
 import { CurrentUser } from '../../../shared/decorators/current-user.decorator';
 import {
   ActivateSubscriptionUseCase,
   CheckSubscriptionUseCase,
+  CreatePixSubscriptionUseCase,
 } from '../use-cases';
 import { SubscriptionResponseDto } from '../dtos';
 
@@ -16,7 +17,13 @@ export class SubscriptionController {
   constructor(
     private readonly activateSubscription: ActivateSubscriptionUseCase,
     private readonly checkSubscription: CheckSubscriptionUseCase,
-  ) { }
+    private readonly createPixSubscription: CreatePixSubscriptionUseCase,
+  ) {}
+
+  @Post('checkout-pix')
+  async checkoutPix(@CurrentUser() user: SharedDecorators.AuthenticatedUser) {
+    return this.createPixSubscription.execute(user.userId);
+  }
 
   @Post('activate')
   async activate(
@@ -29,7 +36,10 @@ export class SubscriptionController {
   @Get('status')
   async getStatus(
     @CurrentUser() user: SharedDecorators.AuthenticatedUser,
-  ): Promise<{ isActive: boolean; subscription: SubscriptionResponseDto | null }> {
+  ): Promise<{
+    isActive: boolean;
+    subscription: SubscriptionResponseDto | null;
+  }> {
     const subscription = await this.checkSubscription.execute(user.userId);
     return {
       isActive: subscription !== null,

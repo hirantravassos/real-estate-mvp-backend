@@ -21,7 +21,6 @@ export class UpdateKanbanSectionDto {
   readonly color?: string;
 }
 
-
 export class ReorderSectionsDto {
   readonly sectionIds!: string[];
 }

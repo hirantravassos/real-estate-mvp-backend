@@ -9,7 +9,7 @@ async function bootstrap(): Promise<void> {
   app.setGlobalPrefix('api');
 
   app.enableCors({
-    origin: process.env.APP_CORS_ORIGIN || 'http://localhost:3000',
+    origin: process.env.APP_CORS_ORIGIN?.split(',') || 'http://localhost:3000',
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
   });
@@ -28,9 +28,9 @@ async function bootstrap(): Promise<void> {
   app.useGlobalFilters(new GlobalExceptionFilter());
 
   const port = parseInt(process.env.APP_PORT || '3001', 10);
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 
-  console.log(`🚀 Backend running on http://localhost:${port}/api`);
+  console.log(`🚀 Backend running on http://192.168.x.x:${port}`);
 }
 
 bootstrap();

@@ -14,6 +14,7 @@ import { KanbanModule } from './domains/kanban/kanban.module';
 import { CustomerModule } from './domains/customer/customer.module';
 import { CustomerHistoryModule } from './domains/customer-history/customer-history.module';
 import { VisitModule } from './domains/visit/visit.module';
+import { WhatsAppModule } from './domains/whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { VisitModule } from './domains/visit/visit.module';
     CustomerModule,
     CustomerHistoryModule,
     VisitModule,
+    WhatsAppModule,
   ],
   providers: [
     {

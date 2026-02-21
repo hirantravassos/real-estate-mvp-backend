@@ -21,15 +21,16 @@ const DEFAULT_SECTIONS: readonly DefaultSection[] = [
 export class SeedDefaultSectionsUseCase {
   constructor(
     private readonly kanbanSectionRepository: KanbanSectionRepository,
-  ) { }
+  ) {}
 
   async execute(userId: string): Promise<KanbanSectionResponseDto[]> {
     const existingCount =
       await this.kanbanSectionRepository.countByUserId(userId);
 
     if (existingCount > 0) {
-      const existing = await this.kanbanSectionRepository.findAllByUserId(userId);
-      return existing.map(KanbanSectionMapper.toResponseDto);
+      const existing =
+        await this.kanbanSectionRepository.findAllByUserId(userId);
+      return existing.map((item) => KanbanSectionMapper.toResponseDto(item));
     }
 
     const createdSections: KanbanSectionResponseDto[] = [];

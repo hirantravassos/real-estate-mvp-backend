@@ -47,6 +47,10 @@ export class CustomerRepository {
     return this.repository.save(customer);
   }
 
+  async saveMany(customers: Customer[]): Promise<Customer[]> {
+    return this.repository.save(customers);
+  }
+
   async remove(customer: Customer): Promise<void> {
     await this.repository.remove(customer);
   }

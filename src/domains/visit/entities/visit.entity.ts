@@ -28,6 +28,12 @@ export class Visit extends BaseEntity {
   @Column({ type: 'datetime', name: 'end_at' })
   endAt!: Date;
 
+  @Column({ type: 'text', nullable: true })
+  feedback!: string | null;
+
+  @Column({ type: 'int', nullable: true })
+  rating!: number | null;
+
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   readonly user?: User;

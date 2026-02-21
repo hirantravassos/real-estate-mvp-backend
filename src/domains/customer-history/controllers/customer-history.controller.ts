@@ -14,7 +14,7 @@ export class CustomerHistoryController {
   constructor(
     private readonly recordHistory: RecordHistoryUseCase,
     private readonly listHistory: ListHistoryUseCase,
-  ) { }
+  ) {}
 
   @Get()
   async list(

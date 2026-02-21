@@ -19,7 +19,7 @@ import {
 
 @Controller('customers')
 export class CustomerController {
-  constructor(private readonly manageCustomer: ManageCustomerUseCase) { }
+  constructor(private readonly manageCustomer: ManageCustomerUseCase) {}
 
   @Get()
   async list(

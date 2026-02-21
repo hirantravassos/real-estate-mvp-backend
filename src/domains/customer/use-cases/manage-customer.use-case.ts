@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CustomerRepository } from '../repositories';
 import {
   CreateCustomerDto,
@@ -11,10 +8,15 @@ import {
 } from '../dtos';
 import { Customer } from '../entities';
 import { CustomerMapper } from '../mappers';
+import { RecordHistoryUseCase } from '../../customer-history/use-cases';
+import { CustomerActionType } from '../../customer-history/entities';
 
 @Injectable()
 export class ManageCustomerUseCase {
-  constructor(private readonly customerRepository: CustomerRepository) { }
+  constructor(
+    private readonly customerRepository: CustomerRepository,
+    private readonly recordHistory: RecordHistoryUseCase,
+  ) {}
 
   async listCustomers(userId: string): Promise<CustomerResponseDto[]> {
     const customers = await this.customerRepository.findAllByUserId(userId);
@@ -43,6 +45,12 @@ export class ManageCustomerUseCase {
       kanbanOrder: orderInSection,
     });
 
+    await this.recordHistory.execute(
+      customer.id,
+      CustomerActionType.CUSTOMER_CREATED,
+      `Cliente criado na etapa: ${dto.kanbanSectionId}`,
+    );
+
     return CustomerMapper.toResponseDto(customer);
   }
 
@@ -54,6 +62,15 @@ export class ManageCustomerUseCase {
     const customer = await this.findOwnedCustomer(userId, customerId);
     const updated = CustomerMapper.updateEntity(customer, dto);
     const saved = await this.customerRepository.save(updated);
+
+    if (dto.minBudget !== undefined || dto.maxBudget !== undefined) {
+      await this.recordHistory.execute(
+        customerId,
+        CustomerActionType.BUDGET_UPDATED,
+        `Orçamento atualizado: ${dto.minBudget ?? '—'} a ${dto.maxBudget ?? '—'}`,
+      );
+    }
+
     return CustomerMapper.toResponseDto(saved);
   }
 
@@ -66,8 +83,18 @@ export class ManageCustomerUseCase {
 
     customer.kanbanSectionId = dto.targetSectionId;
     customer.kanbanOrder = dto.targetOrder;
+    // @ts-expect-error - Clear relation to force FK update
+    customer.kanbanSection = null;
 
     const saved = await this.customerRepository.save(customer);
+
+    await this.recordHistory.execute(
+      customerId,
+      CustomerActionType.STAGE_CHANGED,
+      `Etapa alterada`,
+      { targetSectionId: dto.targetSectionId },
+    );
+
     return CustomerMapper.toResponseDto(saved);
   }
 

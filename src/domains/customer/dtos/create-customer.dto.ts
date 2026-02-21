@@ -27,9 +27,13 @@ export class CreateCustomerDto {
   readonly comments?: string;
 
   @IsOptional()
-  @IsNumber({}, { message: 'Orçamento deve ser um número' })
-  @Min(0, { message: 'Orçamento não pode ser negativo' })
-  readonly budget?: number;
+  @IsNumber({}, { message: 'Orçamento mínimo deve ser um número' })
+  @Min(0, { message: 'Orçamento mínimo não pode ser negativo' })
+  readonly minBudget?: number;
+  @IsOptional()
+  @IsNumber({}, { message: 'Orçamento máximo deve ser um número' })
+  @Min(0, { message: 'Orçamento máximo não pode ser negativo' })
+  readonly maxBudget?: number;
 
   @IsString({ message: 'Seção do kanban é obrigatória' })
   readonly kanbanSectionId!: string;

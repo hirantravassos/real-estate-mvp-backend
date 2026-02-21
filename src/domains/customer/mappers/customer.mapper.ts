@@ -12,7 +12,8 @@ export class CustomerMapper {
       name: dto.name,
       phone: dto.phone,
       comments: dto.comments || null,
-      budget: dto.budget ?? null,
+      minBudget: dto.minBudget ?? null,
+      maxBudget: dto.maxBudget ?? null,
       kanbanSectionId: dto.kanbanSectionId,
     };
   }
@@ -21,8 +22,18 @@ export class CustomerMapper {
     customer.name = dto.name ?? customer.name;
     customer.phone = dto.phone ?? customer.phone;
     customer.comments = dto.comments ?? customer.comments;
-    customer.budget = dto.budget ?? customer.budget;
-    customer.kanbanSectionId = dto.kanbanSectionId ?? customer.kanbanSectionId;
+    customer.minBudget = dto.minBudget ?? customer.minBudget;
+    customer.maxBudget = dto.maxBudget ?? customer.maxBudget;
+
+    if (
+      dto.kanbanSectionId &&
+      customer.kanbanSectionId !== dto.kanbanSectionId
+    ) {
+      customer.kanbanSectionId = dto.kanbanSectionId;
+      // @ts-expect-error - Clear relation to force FK update
+      customer.kanbanSection = null;
+    }
+
     return customer;
   }
 
@@ -32,7 +43,8 @@ export class CustomerMapper {
       name: customer.name,
       phone: customer.phone,
       comments: customer.comments,
-      budget: customer.budget ? Number(customer.budget) : null,
+      minBudget: customer.minBudget ? Number(customer.minBudget) : null,
+      maxBudget: customer.maxBudget ? Number(customer.maxBudget) : null,
       kanbanSectionId: customer.kanbanSectionId,
       kanbanOrder: customer.kanbanOrder,
       createdAt: customer.createdAt.toISOString(),

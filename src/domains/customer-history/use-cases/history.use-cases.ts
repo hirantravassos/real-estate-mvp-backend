@@ -6,7 +6,7 @@ import { CustomerHistoryMapper } from '../mappers';
 
 @Injectable()
 export class RecordHistoryUseCase {
-  constructor(private readonly historyRepository: CustomerHistoryRepository) { }
+  constructor(private readonly historyRepository: CustomerHistoryRepository) {}
 
   async execute(
     customerId: string,
@@ -26,7 +26,7 @@ export class RecordHistoryUseCase {
 
 @Injectable()
 export class ListHistoryUseCase {
-  constructor(private readonly historyRepository: CustomerHistoryRepository) { }
+  constructor(private readonly historyRepository: CustomerHistoryRepository) {}
 
   async execute(customerId: string): Promise<CustomerHistoryResponseDto[]> {
     const history = await this.historyRepository.findByCustomerId(customerId);

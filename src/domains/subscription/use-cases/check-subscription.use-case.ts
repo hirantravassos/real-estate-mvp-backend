@@ -7,7 +7,7 @@ import { SubscriptionMapper } from '../mappers';
 export class CheckSubscriptionUseCase {
   constructor(
     private readonly subscriptionRepository: SubscriptionRepository,
-  ) { }
+  ) {}
 
   async execute(userId: string): Promise<SubscriptionResponseDto | null> {
     const subscription =

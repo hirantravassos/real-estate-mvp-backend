@@ -10,7 +10,7 @@ type PlanName = (typeof AVAILABLE_PLANS)[number];
 export class ActivateSubscriptionUseCase {
   constructor(
     private readonly subscriptionRepository: SubscriptionRepository,
-  ) { }
+  ) {}
 
   async execute(
     userId: string,
