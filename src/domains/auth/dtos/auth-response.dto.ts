@@ -8,6 +8,7 @@ export interface UserResponseDto {
 
 export interface LoginResponseDto {
   readonly accessToken: string;
+  readonly refreshToken?: string;
   readonly requiresMfa: boolean;
   readonly user: UserResponseDto;
 }

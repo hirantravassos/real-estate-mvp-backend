@@ -179,7 +179,7 @@ export class SyncWhatsAppContactsUseCase {
 
       customerEntities.push({
         userId,
-        kanbanSectionId: sectionId,
+        kanbanSectionId: sectionId ?? undefined,
         name: contact.name || contact.normalizedPhone,
         phone: '+' + contact.normalizedPhone,
         kanbanOrder: order,

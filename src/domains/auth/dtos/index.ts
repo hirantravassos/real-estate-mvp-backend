@@ -6,3 +6,4 @@ export type {
   LoginResponseDto,
   MfaResponseDto,
 } from './auth-response.dto';
+export { RefreshTokenDto } from './refresh-token.dto';

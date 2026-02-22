@@ -14,7 +14,12 @@ import * as express from 'express';
 import * as SharedDecorators from '../../../shared/decorators/current-user.decorator';
 import { Public } from '../../../shared/decorators/public.decorator';
 import { CurrentUser } from '../../../shared/decorators/current-user.decorator';
-import { RegisterDto, LoginDto, VerifyMfaDto } from '../dtos';
+import {
+  RegisterDto,
+  LoginDto,
+  VerifyMfaDto,
+  RefreshTokenDto,
+} from '../dtos';
 import type { LoginResponseDto, UserResponseDto } from '../dtos';
 import {
   RegisterUserUseCase,
@@ -22,6 +27,7 @@ import {
   RequestMfaUseCase,
   VerifyMfaUseCase,
   ToggleMfaUseCase,
+  RefreshTokenUseCase,
 } from '../use-cases';
 import { UserMapper } from '../mappers';
 import { UserRepository } from '../repositories';
@@ -35,8 +41,9 @@ export class AuthController {
     private readonly requestMfa: RequestMfaUseCase,
     private readonly verifyMfa: VerifyMfaUseCase,
     private readonly toggleMfa: ToggleMfaUseCase,
+    private readonly refreshToken: RefreshTokenUseCase,
     private readonly userRepository: UserRepository,
-  ) {}
+  ) { }
 
   @Public()
   @Post('register')
@@ -66,6 +73,15 @@ export class AuthController {
     @Body() body: VerifyMfaDto & { userId: string },
   ): Promise<LoginResponseDto> {
     return this.verifyMfa.execute(body.userId, body.token);
+  }
+
+  @Public()
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(
+    @Body() body: RefreshTokenDto,
+  ): Promise<LoginResponseDto> {
+    return this.refreshToken.execute(body.refreshToken);
   }
 
   @Get('me')

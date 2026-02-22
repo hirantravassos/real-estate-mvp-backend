@@ -12,6 +12,7 @@ import {
   RequestMfaUseCase,
   VerifyMfaUseCase,
   ToggleMfaUseCase,
+  RefreshTokenUseCase,
 } from './use-cases';
 import { AuthController } from './controllers';
 
@@ -41,7 +42,8 @@ import { AuthController } from './controllers';
     RequestMfaUseCase,
     VerifyMfaUseCase,
     ToggleMfaUseCase,
+    RefreshTokenUseCase,
   ],
   exports: [UserRepository, JwtModule],
 })
-export class AuthModule {}
+export class AuthModule { }
