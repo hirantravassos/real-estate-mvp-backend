@@ -104,7 +104,14 @@ describe('ManageCustomerUseCase', () => {
         kanbanSection: { id: 'section-1' },
       });
 
-      repository.findByIdAndUserId.mockResolvedValue(existingCustomer);
+      repository.findByIdAndUserId
+        .mockResolvedValueOnce(existingCustomer)
+        .mockResolvedValueOnce({
+          ...existingCustomer,
+          kanbanSectionId: targetSectionId,
+          kanbanOrder: targetOrder,
+          kanbanSection: { id: targetSectionId, displayOrder: 1, name: 'Target', color: '#1890ff', userId },
+        } as any);
       repository.save.mockImplementation((entity) => Promise.resolve(entity));
 
       const result = await useCase.moveCustomerStage(userId, customerId, {
@@ -112,8 +119,7 @@ describe('ManageCustomerUseCase', () => {
         targetOrder,
       });
 
-      expect(result.kanbanSectionId).toBe(targetSectionId);
-      expect(result.kanbanOrder).toBe(targetOrder);
+      expect(result.category?.id).toBe(targetSectionId);
       expect(repository.save).toHaveBeenCalledWith(
         expect.objectContaining({
           kanbanSectionId: targetSectionId,

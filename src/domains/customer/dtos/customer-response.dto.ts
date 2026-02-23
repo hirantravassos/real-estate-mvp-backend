@@ -5,7 +5,12 @@ export class CustomerResponseDto {
   readonly comments!: string | null;
   readonly minBudget!: number | null;
   readonly maxBudget!: number | null;
-  readonly kanbanSectionId!: string | null;
-  readonly kanbanOrder!: number;
+  readonly category!: {
+    id: string;
+    userId: string;
+    name: string;
+    displayOrder: number;
+    color: string;
+  } | null;
   readonly createdAt!: string;
 }

@@ -16,7 +16,7 @@ export class ManageCustomerUseCase {
   constructor(
     private readonly customerRepository: CustomerRepository,
     private readonly recordHistory: RecordHistoryUseCase,
-  ) {}
+  ) { }
 
   async listCustomers(userId: string): Promise<CustomerResponseDto[]> {
     const customers = await this.customerRepository.findAllByUserId(userId);
@@ -45,13 +45,15 @@ export class ManageCustomerUseCase {
       kanbanOrder: orderInSection,
     });
 
+    const reloaded = await this.findOwnedCustomer(userId, customer.id);
+
     await this.recordHistory.execute(
       customer.id,
       CustomerActionType.CUSTOMER_CREATED,
       `Cliente criado na etapa: ${dto.kanbanSectionId}`,
     );
 
-    return CustomerMapper.toResponseDto(customer);
+    return CustomerMapper.toResponseDto(reloaded);
   }
 
   async updateCustomer(
@@ -62,6 +64,7 @@ export class ManageCustomerUseCase {
     const customer = await this.findOwnedCustomer(userId, customerId);
     const updated = CustomerMapper.updateEntity(customer, dto);
     const saved = await this.customerRepository.save(updated);
+    const reloaded = await this.findOwnedCustomer(userId, saved.id);
 
     if (dto.minBudget !== undefined || dto.maxBudget !== undefined) {
       await this.recordHistory.execute(
@@ -71,7 +74,7 @@ export class ManageCustomerUseCase {
       );
     }
 
-    return CustomerMapper.toResponseDto(saved);
+    return CustomerMapper.toResponseDto(reloaded);
   }
 
   async moveCustomerStage(
@@ -87,6 +90,7 @@ export class ManageCustomerUseCase {
     customer.kanbanSection = null;
 
     const saved = await this.customerRepository.save(customer);
+    const reloaded = await this.findOwnedCustomer(userId, saved.id);
 
     await this.recordHistory.execute(
       customerId,
@@ -95,7 +99,7 @@ export class ManageCustomerUseCase {
       { targetSectionId: dto.targetSectionId },
     );
 
-    return CustomerMapper.toResponseDto(saved);
+    return CustomerMapper.toResponseDto(reloaded);
   }
 
   async deleteCustomer(userId: string, customerId: string): Promise<void> {

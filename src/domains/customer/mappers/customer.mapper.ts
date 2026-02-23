@@ -45,8 +45,15 @@ export class CustomerMapper {
       comments: customer.comments,
       minBudget: customer.minBudget ? Number(customer.minBudget) : null,
       maxBudget: customer.maxBudget ? Number(customer.maxBudget) : null,
-      kanbanSectionId: customer.kanbanSectionId,
-      kanbanOrder: customer.kanbanOrder,
+      category: customer.kanbanSection
+        ? {
+          id: customer.kanbanSection.id,
+          userId: customer.kanbanSection.userId,
+          name: customer.kanbanSection.name,
+          displayOrder: customer.kanbanSection.displayOrder,
+          color: customer.kanbanSection.color,
+        }
+        : null,
       createdAt: customer.createdAt.toISOString(),
     };
   }

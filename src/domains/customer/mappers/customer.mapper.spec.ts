@@ -66,6 +66,13 @@ describe('CustomerMapper', () => {
       minBudget: 1500.5,
       maxBudget: 3000.0,
       kanbanSectionId: 'section-1',
+      kanbanSection: {
+        id: 'section-1',
+        userId: 'user-1',
+        name: 'Section',
+        displayOrder: 1,
+        color: '#fff',
+      },
       kanbanOrder: 5,
       createdAt: new Date('2024-01-01T10:00:00Z'),
     });
@@ -79,8 +86,13 @@ describe('CustomerMapper', () => {
       comments: 'Some comments',
       minBudget: 1500.5,
       maxBudget: 3000.0,
-      kanbanSectionId: 'section-1',
-      kanbanOrder: 5,
+      category: {
+        id: 'section-1',
+        userId: 'user-1',
+        name: 'Section',
+        displayOrder: 1,
+        color: '#fff',
+      },
       createdAt: '2024-01-01T10:00:00.000Z',
     });
   });

@@ -8,7 +8,7 @@ export class CustomerRepository {
   constructor(
     @InjectRepository(Customer)
     private readonly repository: Repository<Customer>,
-  ) {}
+  ) { }
 
   async findAllByUserId(userId: string): Promise<Customer[]> {
     return this.repository.find({
@@ -35,6 +35,7 @@ export class CustomerRepository {
     return this.repository.find({
       where: { kanbanSectionId: sectionId, userId },
       order: { kanbanOrder: 'ASC' },
+      relations: ['kanbanSection'],
     });
   }
 
