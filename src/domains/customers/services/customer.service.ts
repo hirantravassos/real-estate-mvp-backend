@@ -3,19 +3,15 @@ import { CustomerRepository } from "../repositories/customer.repository";
 import { CustomerCreateDto } from "../dtos/customer-create.dto";
 import { CustomerMapper } from "../mappers/customer.mapper";
 import { User } from "../../users/entities/user.entity";
-import { PaginationQueryDto } from "../../../shared/types/pagination-query.dto";
-import { Customer } from "../entities/customer.entity";
-import { PaginatedResult } from "../../../shared/types/api-response.types";
+import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
+import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
 
 @Injectable()
 export class CustomerService {
   constructor(private readonly customerRepository: CustomerRepository) {}
 
-  async findAll(
-    user: User,
-    pagination: PaginationQueryDto,
-  ): Promise<PaginatedResult<Customer>> {
-    const [items, total] = await this.customerRepository.findAndCount({
+  async findAll(user: User, pagination: PaginationRequestDto) {
+    const data = await this.customerRepository.findAndCount({
       where: {
         user: { id: user.id },
         active: true,
@@ -27,13 +23,7 @@ export class CustomerService {
       take: pagination.limit,
     });
 
-    return {
-      data: items,
-      total: total,
-      page: pagination.page,
-      limit: pagination.limit,
-      totalPages: Math.ceil(total / pagination.limit),
-    };
+    return PaginationMapper.toDto(data, pagination);
   }
 
   async findOne(user: User, id: string) {

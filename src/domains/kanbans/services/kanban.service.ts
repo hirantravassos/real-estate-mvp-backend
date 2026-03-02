@@ -3,19 +3,15 @@ import { KanbanRepository } from "../repositories/kanban.repository";
 import { KanbanCreateDto } from "../dtos/kanban-create.dto";
 import { KanbanMapper } from "../mappers/kanban.mapper";
 import { User } from "../../users/entities/user.entity";
-import { PaginationQueryDto } from "../../../shared/types/pagination-query.dto";
-import { Kanban } from "../entities/kanban.entity";
-import { PaginatedResult } from "../../../shared/types/api-response.types";
+import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
+import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
 
 @Injectable()
 export class KanbanService {
   constructor(private readonly kanbanRepository: KanbanRepository) {}
 
-  async findAll(
-    user: User,
-    pagination: PaginationQueryDto,
-  ): Promise<PaginatedResult<Kanban>> {
-    const [items, total] = await this.kanbanRepository.findAndCount({
+  async findAll(user: User, pagination: PaginationRequestDto) {
+    const response = await this.kanbanRepository.findAndCount({
       where: {
         user: { id: user.id },
         active: true,
@@ -30,13 +26,7 @@ export class KanbanService {
       take: pagination.limit,
     });
 
-    return {
-      data: items,
-      total: total,
-      page: pagination.page,
-      limit: pagination.limit,
-      totalPages: Math.ceil(total / pagination.limit),
-    };
+    return PaginationMapper.toDto(response, pagination);
   }
 
   async findOne(user: User, id: string) {

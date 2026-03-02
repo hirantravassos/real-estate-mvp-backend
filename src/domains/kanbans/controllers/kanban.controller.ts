@@ -15,7 +15,7 @@ import { KanbanCreateDto } from "../dtos/kanban-create.dto";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { User } from "../../users/entities/user.entity";
 import { KanbanMapper } from "../mappers/kanban.mapper";
-import { PaginationQueryDto } from "../../../shared/types/pagination-query.dto";
+import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 
 @Controller("kanbans")
 @UseGuards(JwtGuard)
@@ -25,7 +25,7 @@ export class KanbanController {
   @Get()
   async findAll(
     @GetUser() user: User,
-    @Query() pagination: PaginationQueryDto,
+    @Query() pagination: PaginationRequestDto,
   ) {
     const result = await this.kanbanService.findAll(user, pagination);
 

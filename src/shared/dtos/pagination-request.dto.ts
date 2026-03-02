@@ -9,7 +9,7 @@ const MAX_LIMIT = 100;
 const MIN_PAGE = 1;
 const MIN_LIMIT = 1;
 
-export class PaginationQueryDto {
+export class PaginationRequestDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt({ message: "Página deve ser um número inteiro" })

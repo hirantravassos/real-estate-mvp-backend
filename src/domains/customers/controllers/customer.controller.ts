@@ -15,7 +15,7 @@ import { CustomerCreateDto } from "../dtos/customer-create.dto";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { User } from "../../users/entities/user.entity";
 import { CustomerMapper } from "../mappers/customer.mapper";
-import { PaginationQueryDto } from "../../../shared/types/pagination-query.dto";
+import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 
 @Controller("customers")
 @UseGuards(JwtGuard)
@@ -25,7 +25,7 @@ export class CustomerController {
   @Get()
   async findAll(
     @GetUser() user: User,
-    @Query() pagination: PaginationQueryDto,
+    @Query() pagination: PaginationRequestDto,
   ) {
     const result = await this.customerService.findAll(user, pagination);
 
