@@ -31,7 +31,12 @@ export class KanbanService {
 
   async findOne(user: User, id: string) {
     return this.kanbanRepository
-      .findOneByOrFail({ id, user: { id: user.id } })
+      .findOneOrFail({
+        where: { id, user: { id: user.id } },
+        relations: {
+          customers: true,
+        },
+      })
       .catch(() => {
         throw new NotFoundException("Kanban not found");
       });

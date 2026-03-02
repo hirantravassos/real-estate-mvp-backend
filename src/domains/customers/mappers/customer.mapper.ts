@@ -1,12 +1,23 @@
 import { CustomerCreateDto } from "../dtos/customer-create.dto";
 import { Customer } from "../entities/customer.entity";
 import { Kanban } from "../../kanbans/entities/kanban.entity";
+import { CustomerComment } from "../entities/customer-comments.entity";
 
 export class CustomerMapper {
   static toEntity(dto: CustomerCreateDto, id?: string) {
     const entity = new Customer();
+    const commentEntity = new CustomerComment();
+    const kanbanEntity = new Kanban();
     entity.name = dto.name;
     entity.phone = dto.phone;
+    if (dto?.kanbanId) {
+      kanbanEntity.id = dto.kanbanId;
+      entity.kanban = kanbanEntity;
+    }
+    if (dto?.comment) {
+      commentEntity.comment = dto.comment;
+      entity.comments = [commentEntity];
+    }
     if (id) entity.id = id;
     return entity;
   }
@@ -17,6 +28,7 @@ export class CustomerMapper {
       name: entity.name,
       phone: entity.phone,
       kanban: entity.kanban,
+      comments: this.toComments(entity.comments),
     };
   }
 
@@ -27,6 +39,7 @@ export class CustomerMapper {
         name: entity.name,
         phone: entity.phone,
         kanban: this.toKanban(entity.kanban),
+        comments: this.toComments(entity.comments),
       };
     });
   }
@@ -39,5 +52,14 @@ export class CustomerMapper {
       name: kanban.name,
       description: kanban.description,
     };
+  }
+
+  private static toComments(comments: CustomerComment[]) {
+    return comments?.map((comment) => {
+      return {
+        id: comment.id,
+        comment: comment.comment,
+      };
+    });
   }
 }

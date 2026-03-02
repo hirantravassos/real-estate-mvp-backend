@@ -52,7 +52,7 @@ export class AuthService {
       return this.generateInternalJwt(user);
     } catch (error) {
       console.error("Error authenticating with Google:", error);
-      throw new UnauthorizedException("Authentication failed");
+      throw new UnauthorizedException("Authentication failed, google expired token");
     }
   }
 

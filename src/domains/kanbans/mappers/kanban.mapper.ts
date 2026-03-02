@@ -1,6 +1,7 @@
 import { KanbanCreateDto } from "../dtos/kanban-create.dto";
 import { Kanban } from "../entities/kanban.entity";
 import { Customer } from "../../customers/entities/customer.entity";
+import { CustomerComment } from "../../customers/entities/customer-comments.entity";
 
 export class KanbanMapper {
   static toEntity(dto: KanbanCreateDto, id?: string) {
@@ -36,6 +37,16 @@ export class KanbanMapper {
         id: entity.id,
         name: entity.name,
         phone: entity.phone,
+        comments: this.toCustomerCommentDto(entity.comments),
+      };
+    });
+  }
+
+  private static toCustomerCommentDto(entities: CustomerComment[]) {
+    return entities?.map((entity) => {
+      return {
+        id: entity.id,
+        comment: entity.comment,
       };
     });
   }

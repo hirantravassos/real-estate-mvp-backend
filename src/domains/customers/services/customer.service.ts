@@ -16,6 +16,10 @@ export class CustomerService {
         user: { id: user.id },
         active: true,
       },
+      relations: {
+        comments: true,
+        kanban: true,
+      },
       order: {
         [pagination.sortBy || "createdAt"]: pagination.sortOrder || "DESC",
       },
@@ -28,7 +32,13 @@ export class CustomerService {
 
   async findOne(user: User, id: string) {
     return this.customerRepository
-      .findOneByOrFail({ id, user: { id: user.id } })
+      .findOneOrFail({
+        where: { id, user: { id: user.id } },
+        relations: {
+          comments: true,
+          kanban: true,
+        },
+      })
       .catch(() => {
         throw new NotFoundException("Customer not found");
       });
