@@ -5,10 +5,10 @@ import {
   HttpException,
   HttpStatus,
   Logger,
-} from '@nestjs/common';
-import { Response } from 'express';
+} from "@nestjs/common";
+import type { Response } from "express";
 
-interface ErrorResponseBody {
+interface ExceptionResponseBody {
   readonly statusCode: number;
   readonly message: string;
   readonly error: string;
@@ -31,19 +31,19 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const message =
       exception instanceof HttpException
         ? exception.message
-        : 'Erro interno do servidor';
+        : "Erro interno do servidor";
 
     if (statusCode === HttpStatus.INTERNAL_SERVER_ERROR) {
       this.logger.error(
-        'Unhandled exception',
+        "Unhandled exception",
         exception instanceof Error ? exception.stack : String(exception),
       );
     }
 
-    const body: ErrorResponseBody = {
+    const body: ExceptionResponseBody = {
       statusCode,
       message,
-      error: HttpStatus[statusCode] || 'Unknown Error',
+      error: HttpStatus[statusCode] ?? "Unknown Error",
       timestamp: new Date().toISOString(),
     };
 

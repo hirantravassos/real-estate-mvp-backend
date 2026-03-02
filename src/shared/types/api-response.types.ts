@@ -1,5 +1,5 @@
 export interface PaginatedResult<T> {
-  readonly data: readonly T[];
+  data: T[];
   readonly total: number;
   readonly page: number;
   readonly limit: number;

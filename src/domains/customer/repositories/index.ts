@@ -1,1 +1,0 @@
-export { CustomerRepository } from './customer.repository';

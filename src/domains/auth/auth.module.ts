@@ -1,47 +1,43 @@
-import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { JwtModule } from '@nestjs/jwt';
-import { PassportModule } from '@nestjs/passport';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { User, MfaToken } from './entities';
-import { UserRepository, MfaTokenRepository } from './repositories';
-import { JwtStrategy, LocalStrategy } from './strategies';
-import {
-  RegisterUserUseCase,
-  LoginUserUseCase,
-  RequestMfaUseCase,
-  VerifyMfaUseCase,
-  ToggleMfaUseCase,
-} from './use-cases';
-import { AuthController } from './controllers';
+import { forwardRef, Module } from "@nestjs/common";
+import { PassportModule } from "@nestjs/passport";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { JwtModule, JwtModuleOptions } from "@nestjs/jwt";
+import { AuthController } from "./controllers/auth.controller";
+import { AuthService } from "./services/auth.service";
+import { UserModule } from "../users/user.module";
+import { User } from "../users/entities/user.entity";
+import { GoogleStrategy } from "./strategies/google.strategy";
+import { JwtStrategy } from "./strategies/jwt.strategy";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, MfaToken]),
-    PassportModule,
+    ConfigModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.getOrThrow<string>('auth.jwtSecret'),
-        signOptions: {
-          expiresIn: `${configService.getOrThrow<number>('auth.jwtExpirationTime')}s`,
-        },
-      }),
+      useFactory: (configService: ConfigService): JwtModuleOptions => {
+        const secret = configService.get<string>("jwt.secret");
+        const expiresIn = configService.get<string>("jwt.expiration");
+
+        if (!secret) {
+          throw new Error("JWT_SECRET is not defined in the environment");
+        }
+
+        return {
+          secret,
+          signOptions: {
+            expiresIn: (expiresIn ?? "60m") as "60m",
+          },
+        };
+      },
     }),
+    PassportModule.register({ session: false }),
+    TypeOrmModule.forFeature([User]),
+    forwardRef(() => UserModule),
   ],
   controllers: [AuthController],
-  providers: [
-    UserRepository,
-    MfaTokenRepository,
-    JwtStrategy,
-    LocalStrategy,
-    RegisterUserUseCase,
-    LoginUserUseCase,
-    RequestMfaUseCase,
-    VerifyMfaUseCase,
-    ToggleMfaUseCase,
-  ],
-  exports: [UserRepository, JwtModule],
+  providers: [AuthService, GoogleStrategy, JwtStrategy],
+  exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

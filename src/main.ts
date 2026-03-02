@@ -1,16 +1,16 @@
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
-import { AppModule } from './app.module';
-import { GlobalExceptionFilter } from './shared/filters';
+import { NestFactory } from "@nestjs/core";
+import { ValidationPipe } from "@nestjs/common";
+import { AppModule } from "./app.module.js";
+import { GlobalExceptionFilter } from "./shared/filters/global-exception.filter.js";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix("api");
 
   app.enableCors({
-    origin: process.env.APP_CORS_ORIGIN || 'http://localhost:3000',
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    origin: process.env.APP_CORS_ORIGIN || "http://localhost:3000",
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true,
   });
 
@@ -27,9 +27,8 @@ async function bootstrap(): Promise<void> {
 
   app.useGlobalFilters(new GlobalExceptionFilter());
 
-  const port = parseInt(process.env.APP_PORT || '3001', 10);
+  const port = parseInt(process.env.APP_PORT || "3001", 10);
   await app.listen(port);
-
   console.log(`🚀 Backend running on http://localhost:${port}/api`);
 }
 

@@ -1,95 +1,13 @@
-import {
-  Controller,
-  Post,
-  Body,
-  UseGuards,
-  Req,
-  Patch,
-  Get,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
-import * as express from 'express';
-import * as SharedDecorators from '../../../shared/decorators/current-user.decorator';
-import { Public } from '../../../shared/decorators/public.decorator';
-import { CurrentUser } from '../../../shared/decorators/current-user.decorator';
-import { RegisterDto, LoginDto, VerifyMfaDto } from '../dtos';
-import type { LoginResponseDto, UserResponseDto } from '../dtos';
-import {
-  RegisterUserUseCase,
-  LoginUserUseCase,
-  RequestMfaUseCase,
-  VerifyMfaUseCase,
-  ToggleMfaUseCase,
-} from '../use-cases';
-import { UserMapper } from '../mappers';
-import { UserRepository } from '../repositories';
-import { User } from '../entities';
+import { Body, Controller, Post } from "@nestjs/common";
+import { AuthService } from "../services/auth.service";
+import { GoogleLoginDto } from "../dtos/google-login.dto";
 
-@Controller('auth')
+@Controller("auth")
 export class AuthController {
-  constructor(
-    private readonly registerUser: RegisterUserUseCase,
-    private readonly loginUser: LoginUserUseCase,
-    private readonly requestMfa: RequestMfaUseCase,
-    private readonly verifyMfa: VerifyMfaUseCase,
-    private readonly toggleMfa: ToggleMfaUseCase,
-    private readonly userRepository: UserRepository,
-  ) {}
+  constructor(private readonly authService: AuthService) {}
 
-  @Public()
-  @Post('register')
-  async register(@Body() registerDto: RegisterDto): Promise<UserResponseDto> {
-    return this.registerUser.execute(registerDto);
-  }
-
-  @Public()
-  @UseGuards(AuthGuard('local'))
-  @Post('login')
-  @HttpCode(HttpStatus.OK)
-  async login(@Req() request: express.Request): Promise<LoginResponseDto> {
-    const user = (request as express.Request & { user: User }).user;
-    const result = await this.loginUser.execute(user);
-
-    if (result.requiresMfa) {
-      await this.requestMfa.execute(user.id, user.email);
-    }
-
-    return result;
-  }
-
-  @Public()
-  @Post('verify-mfa')
-  @HttpCode(HttpStatus.OK)
-  async verifyMfaToken(
-    @Body() body: VerifyMfaDto & { userId: string },
-  ): Promise<LoginResponseDto> {
-    return this.verifyMfa.execute(body.userId, body.token);
-  }
-
-  @Get('me')
-  async getProfile(
-    @CurrentUser() user: SharedDecorators.AuthenticatedUser,
-  ): Promise<UserResponseDto> {
-    const fullUser = await this.userRepository.findById(user.userId);
-    if (!fullUser) {
-      throw new Error('Usuário não encontrado');
-    }
-    return UserMapper.toResponseDto(fullUser);
-  }
-
-  @Patch('mfa/enable')
-  async enableMfa(
-    @CurrentUser() user: SharedDecorators.AuthenticatedUser,
-  ): Promise<UserResponseDto> {
-    return this.toggleMfa.execute(user.userId, true);
-  }
-
-  @Patch('mfa/disable')
-  async disableMfa(
-    @CurrentUser() user: SharedDecorators.AuthenticatedUser,
-  ): Promise<UserResponseDto> {
-    return this.toggleMfa.execute(user.userId, false);
+  @Post("login")
+  googleLogin(@Body() dto: GoogleLoginDto) {
+    return this.authService.authenticateWithGoogle(dto.idToken);
   }
 }
