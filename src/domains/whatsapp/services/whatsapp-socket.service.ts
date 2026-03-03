@@ -1,10 +1,14 @@
-import { Injectable, OnModuleInit } from "@nestjs/common";
+import {
+  Injectable,
+  InternalServerErrorException,
+  OnModuleInit,
+} from "@nestjs/common";
 import makeWASocket, {
   Browsers,
-  Chat,
+  BufferedEventData,
   ConnectionState,
-  Contact,
   fetchLatestBaileysVersion,
+  proto,
   useMultiFileAuthState,
   WASocket,
 } from "@whiskeysockets/baileys";
@@ -13,14 +17,9 @@ import * as qrcode from "qrcode-terminal";
 import { join } from "path";
 import { existsSync, mkdirSync, promises as fs } from "node:fs";
 import { WhatsappSessionRepository } from "../repositories/whatsapp-session.repository";
-import { WhatsappContactRepository } from "../repositories/whatsapp-contact.repository";
-import { WhatsappChatRepository } from "../repositories/whatsapp-chat.repository";
-import { WhatsappMessageRepository } from "../repositories/whatsapp-message.repository";
-import {
-  WhatsappBaileyMessageHistorySetDto,
-  WhatsappBaileyMessageUpsert,
-} from "../dtos/whatsapp-bailey.dto";
 import { WhatsappConnectionStatusEnum } from "../enums/whatsapp-connection-status.enum";
+import { WhatsappChat } from "../entities/whatsapp-chat.entity";
+import { WhatsappChatRepository } from "../repositories/whatsapp-chat.repository";
 
 @Injectable()
 export class WhatsappSocketService implements OnModuleInit {
@@ -29,9 +28,7 @@ export class WhatsappSocketService implements OnModuleInit {
 
   constructor(
     private readonly sessionRepository: WhatsappSessionRepository,
-    private readonly contactRepository: WhatsappContactRepository,
     private readonly chatRepository: WhatsappChatRepository,
-    private readonly messageRepository: WhatsappMessageRepository,
   ) {
     if (!existsSync(this.sessionsDir)) {
       mkdirSync(this.sessionsDir, { recursive: true });
@@ -53,35 +50,43 @@ export class WhatsappSocketService implements OnModuleInit {
   public async start(sessionId: string): Promise<void> {
     const socket = await this.createSocket(sessionId);
 
-    socket.ev.on("messaging-history.set", (data) => {
-      void this.messageHistorySet(sessionId, data);
+    // socket.ev.on("messaging-history.set", (data) => {
+    //   void this.messageHistorySet(sessionId, data);
+    // });
+
+    socket.ev.on("messages.upsert", (data) => {
+      // console.log("messages.upsert", { data });
     });
 
-    socket.ev.on("messages.upsert", (m) => {
-      console.log({ m });
-      void this.messageUpset(sessionId, m);
+    socket.ev.on("messages.update", (data) => {
+      // console.log("messages.update", { data });
     });
 
-    socket.ev.on("chats.upsert", (c) => {
-      console.log({ c });
-      void this.chatsUpsert(sessionId, c);
+    socket.ev.on("chats.upsert", (data) => {
+      // console.log("chats.upsert", { data });
     });
 
-    socket.ev.on("chats.update", (c) => {
-      console.log({ c });
-      void this.chatsUpdate(sessionId, c);
+    socket.ev.on("chats.update", (data) => {
+      void this.handleChatUpdate(sessionId, data);
     });
 
-    socket.ev.on("contacts.upsert", (c) => {
-      void this.contactsUpsert(sessionId, c);
+    socket.ev.on("contacts.upsert", (data) => {
+      console.log("contacts.upsert", { data });
     });
 
-    socket.ev.on("contacts.update", (c) => {
-      void this.contactsUpdate(sessionId, c);
+    socket.ev.on("contacts.update", (data) => {
+      console.log("contacts.update", { data });
+      // const contacts = data?.map((item) => {
+      //   return {
+      //     name: item?.verifiedName ?? item?.notify ?? "Desconhecido",
+      //     whatsappId: item?.id,
+      //   };
+      // });
+      // void this.contactRepository.save(contacts);
     });
 
-    socket.ev.on("connection.update", (update) => {
-      void this.connectionUpdate(sessionId, update);
+    socket.ev.on("connection.update", (data) => {
+      void this.connectionUpdate(sessionId, data);
     });
   }
 
@@ -114,6 +119,64 @@ export class WhatsappSocketService implements OnModuleInit {
         statusCode +
         "). DB record and files removed.",
     );
+  }
+
+  private async handleChatUpdate(
+    sessionId: string,
+    data: Partial<
+      proto.IConversation & {
+        lastMessageRecvTimestamp?: number;
+      } & {
+        conditional: (bufferedData: BufferedEventData) => boolean | undefined;
+        timestamp?: number;
+      }
+    >[],
+  ) {
+    // console.log("chats.update", { data });
+    const user = await this.getUsers(sessionId);
+
+    const newChats: WhatsappChat[] = [];
+
+    const chats = data?.forEach((item) => {
+      console.log("chats.update.item", { item });
+
+      const phoneNumber = this.getPhoneNumberFromJid(
+        // @ts-expect-error: missing types
+        item?.messages?.[0]?.message?.key?.remoteJid,
+        // @ts-expect-error: missing types
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+        item?.messages?.[0]?.message?.key?.remoteJidAlt,
+      );
+
+      const name =
+        item?.name ?? item?.messages?.[0]?.message?.pushName ?? "Desconhecido";
+
+      const whatsappId = item?.id;
+
+      const unread = item?.unreadMentionCount
+        ? item?.unreadMentionCount > 0
+        : false;
+
+      if (!whatsappId) {
+        return;
+      }
+
+      newChats.push(
+        this.chatRepository.create({
+          phoneNumber,
+          name,
+          whatsappId,
+          user,
+          unread,
+        }),
+      );
+    });
+
+    void this.chatRepository
+      .save(newChats)
+      .catch(() => console.error("duplicated"));
+
+    console.log({ chats });
   }
 
   private async createSocket(
@@ -184,268 +247,26 @@ export class WhatsappSocketService implements OnModuleInit {
     }
   }
 
-  private async messageHistorySet(
-    sessionId: string,
-    data: WhatsappBaileyMessageHistorySetDto,
-  ) {
-    const { chats, contacts, messages } = data;
-
-    console.log("Initial Sync Received:");
-    console.log(chats.length + " conversations found.");
-    console.log(contacts.length + " contacts found.");
-    console.log(messages.length + " messages found.");
-
-    const session = await this.sessionRepository.findOne({
-      where: { id: sessionId },
-      relations: ["user"],
-    });
-
-    if (!session || !session.user) {
-      console.error(
-        "Session or user not found to sync history for " + sessionId,
-      );
-      return;
-    }
-
-    const user = session.user;
-
-    // 1. Upsert Contacts
-    if (contacts && contacts.length > 0) {
-      const mappedContacts = contacts
-        .filter((c) => c.id)
-        .map((c) => ({
-          user,
-          jid: c.id,
-          name: c.name || null,
-          pushName: c.notify || null,
-        }));
-
-      const chunkSize = 200;
-      for (let i = 0; i < mappedContacts.length; i += chunkSize) {
-        const chunk = mappedContacts.slice(i, i + chunkSize);
-        await this.contactRepository
-          .upsert(chunk, {
-            conflictPaths: ["user", "jid"],
-            skipUpdateIfNoValuesChanged: true,
-          })
-          .catch((e) => console.error("Error upserting contacts", e));
-      }
-      console.log("Contacts sync complete.");
-    }
-
-    // 2. Upsert Chats
-    if (chats && chats.length > 0) {
-      const mappedChats = chats
-        .filter((c) => c.id)
-        .map((c) => ({
-          user,
-          jid: c.id!,
-          unreadCount: c.unreadCount || 0,
-          lastMessageTimestamp: c.conversationTimestamp
-            ? new Date(Number(c.conversationTimestamp) * 1000)
-            : null,
-        }));
-
-      const chunkSize = 200;
-      for (let i = 0; i < mappedChats.length; i += chunkSize) {
-        const chunk = mappedChats.slice(i, i + chunkSize);
-        await this.chatRepository
-          .upsert(chunk, {
-            conflictPaths: ["user", "jid"],
-            skipUpdateIfNoValuesChanged: true,
-          })
-          .catch((e) => console.error("Error upserting chats", e));
-      }
-      console.log("Chats sync complete.");
-    }
-
-    // 3. Upsert Messages
-    if (messages && messages.length > 0) {
-      const mappedMessages = messages
-        .map((m) => ({
-          user,
-          remoteJid: m.key.remoteJid || "",
-          messageId: m.key.id || "",
-          fromMe: m.key.fromMe || false,
-          type: Object.keys(m.message || {})[0] || "unknown",
-          content:
-            m.message?.conversation ||
-            m.message?.extendedTextMessage?.text ||
-            JSON.stringify(m.message || {}),
-          timestamp: m.messageTimestamp
-            ? new Date(Number(m.messageTimestamp) * 1000)
-            : new Date(),
-        }))
-        .filter((m) => m.remoteJid && m.messageId); // Must have ID and JID
-
-      const chunkSize = 200;
-      for (let i = 0; i < mappedMessages.length; i += chunkSize) {
-        const chunk = mappedMessages.slice(i, i + chunkSize);
-        await this.messageRepository
-          .upsert(chunk, {
-            conflictPaths: ["user", "remoteJid", "messageId"],
-            skipUpdateIfNoValuesChanged: true,
-          })
-          .catch((e) =>
-            console.error("Error upserting historical messages", e),
-          );
-      }
-      console.log("History messages sync complete.");
-    }
+  private async getUsers(sessionId: string) {
+    const { user } = await this.sessionRepository
+      .findOneOrFail({
+        where: { id: sessionId },
+        relations: { user: true },
+      })
+      .catch(() => {
+        throw new InternalServerErrorException("getUsers: Session not found");
+      });
+    return user;
   }
 
-  private async messageUpset(
-    sessionId: string,
-    data: WhatsappBaileyMessageUpsert,
-  ) {
-    const session = await this.sessionRepository.findOne({
-      where: { id: sessionId },
-      relations: ["user"],
-    });
-
-    if (!session || !session.user) return;
-
-    const newMessages = data.messages
-      .map((msg) => ({
-        user: session.user,
-        remoteJid: msg.key.remoteJid || "",
-        messageId: msg.key.id || "",
-        fromMe: msg.key.fromMe || false,
-        type: Object.keys(msg.message || {})[0] || "unknown",
-        content:
-          msg.message?.conversation ||
-          msg.message?.extendedTextMessage?.text ||
-          JSON.stringify(msg.message || {}),
-        timestamp: msg.messageTimestamp
-          ? new Date(Number(msg.messageTimestamp) * 1000)
-          : new Date(),
-      }))
-      .filter((msg) => msg.remoteJid && msg.messageId);
-
-    if (newMessages.length > 0) {
-      await this.messageRepository
-        .upsert(newMessages, {
-          conflictPaths: ["user", "remoteJid", "messageId"],
-          skipUpdateIfNoValuesChanged: true,
-        })
-        .catch((e) => console.error("Error upserting new literal messages", e));
+  private getPhoneNumberFromJid(jid: string, jidAlt: string): string | null {
+    const idWhatsApp = "@s.whatsapp.net";
+    if (jid?.includes(idWhatsApp)) {
+      return jid?.replaceAll(idWhatsApp, "")?.slice(2, 1000);
     }
-  }
-
-  private async chatsUpsert(sessionId: string, newChats: Chat[]) {
-    const session = await this.sessionRepository.findOne({
-      where: { id: sessionId },
-      relations: ["user"],
-    });
-
-    if (!session || !session.user) return;
-
-    const mappedChats = newChats
-      .filter((c) => c.id)
-      .map((c) => ({
-        user: session.user,
-        jid: c.id!,
-        unreadCount: c.unreadCount || 0,
-        lastMessageTimestamp: c.conversationTimestamp
-          ? new Date(Number(c.conversationTimestamp) * 1000)
-          : null,
-      }));
-
-    if (mappedChats.length > 0) {
-      await this.chatRepository
-        .upsert(mappedChats, {
-          conflictPaths: ["user", "jid"],
-          skipUpdateIfNoValuesChanged: true,
-        })
-        .catch((e) => console.error("Error upserting new chats", e));
+    if (jidAlt?.includes(idWhatsApp)) {
+      return jidAlt?.replaceAll(idWhatsApp, "")?.slice(2, 1000);
     }
-  }
-
-  private async chatsUpdate(sessionId: string, updates: Partial<Chat>[]) {
-    const session = await this.sessionRepository.findOne({
-      where: { id: sessionId },
-      relations: ["user"],
-    });
-
-    if (!session || !session.user) return;
-
-    for (const update of updates) {
-      if (!update.id) continue;
-
-      const updateData: { unreadCount?: number; lastMessageTimestamp?: Date } =
-        {};
-
-      if (typeof update.unreadCount === "number") {
-        updateData.unreadCount = update.unreadCount;
-      }
-
-      if (update.conversationTimestamp) {
-        updateData.lastMessageTimestamp = new Date(
-          Number(update.conversationTimestamp) * 1000,
-        );
-      }
-
-      if (Object.keys(updateData).length > 0) {
-        await this.chatRepository
-          .update({ user: { id: session.user.id }, jid: update.id }, updateData)
-          .catch((e) => console.error("Error updating chat metadata", e));
-      }
-    }
-  }
-
-  private async contactsUpsert(sessionId: string, newContacts: Contact[]) {
-    const session = await this.sessionRepository.findOne({
-      where: { id: sessionId },
-      relations: ["user"],
-    });
-
-    if (!session || !session.user) return;
-
-    const mappedContacts = newContacts
-      .filter((c) => c.id)
-      .map((c) => ({
-        user: session.user,
-        jid: c.id,
-        name: c.name || null,
-        pushName: c.notify || null,
-      }));
-
-    if (mappedContacts.length > 0) {
-      await this.contactRepository
-        .upsert(mappedContacts, {
-          conflictPaths: ["user", "jid"],
-          skipUpdateIfNoValuesChanged: true,
-        })
-        .catch((e) => console.error("Error upserting new contacts", e));
-    }
-  }
-
-  private async contactsUpdate(sessionId: string, updates: Partial<Contact>[]) {
-    const session = await this.sessionRepository.findOne({
-      where: { id: sessionId },
-      relations: ["user"],
-    });
-
-    if (!session || !session.user) return;
-
-    for (const update of updates) {
-      if (!update.id) continue;
-
-      const updateData: { name?: string; pushName?: string } = {};
-
-      if (update.name !== undefined) {
-        updateData.name = update.name;
-      }
-
-      if (update.notify !== undefined) {
-        updateData.pushName = update.notify;
-      }
-
-      if (Object.keys(updateData).length > 0) {
-        await this.contactRepository
-          .update({ user: { id: session.user.id }, jid: update.id }, updateData)
-          .catch((e) => console.error("Error updating contact metadata", e));
-      }
-    }
+    return null;
   }
 }

@@ -1,17 +1,13 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { WhatsappSessionRepository } from "../repositories/whatsapp-session.repository";
 import { User } from "../../users/entities/user.entity";
-import { WhatsappContactRepository } from "../repositories/whatsapp-contact.repository";
-import { WhatsappChatRepository } from "../repositories/whatsapp-chat.repository";
-import { WhatsappMessageRepository } from "../repositories/whatsapp-message.repository";
+import { WhatsappSocketService } from "./whatsapp-socket.service";
 
 @Injectable()
 export class WhatsappService {
   constructor(
     private readonly sessionRepository: WhatsappSessionRepository,
-    private readonly contactRepository: WhatsappContactRepository,
-    private readonly chatRepository: WhatsappChatRepository,
-    private readonly messageRepository: WhatsappMessageRepository,
+    private readonly whatsappSocketService: WhatsappSocketService,
   ) {}
 
   async connect(user: User) {
@@ -23,9 +19,13 @@ export class WhatsappService {
       await this.sessionRepository.delete({ id: found.id });
     }
 
-    return await this.sessionRepository.save({
+    const newSession = await this.sessionRepository.save({
       user,
     });
+
+    await this.whatsappSocketService.start(newSession.id);
+
+    return await this.findStatus(user);
   }
 
   async disconnect(user: User) {
@@ -43,23 +43,25 @@ export class WhatsappService {
   async findStatus(user: User) {
     return this.sessionRepository
       .findOneByOrFail({ user: { id: user.id } })
-      .catch(() => {
+      .catch(async () => {
+        await this.connect(user);
         throw new NotFoundException("Whatsapp session not found");
       });
   }
 
   async findAllChats(user: User) {
-    return this.chatRepository.find({
-      where: { user: { id: user.id } },
-      relations: {
-        contact: true,
-        messages: true,
-      },
-      order: {
-        messages: {
-          timestamp: "DESC",
-        },
-      },
-    });
+    // return this.chatRepository.find({
+    //   where: { user: { id: user.id } },
+    //   relations: {
+    //     contact: true,
+    //     messages: true,
+    //   },
+    //   order: {
+    //     messages: {
+    //       timestamp: "DESC",
+    //     },
+    //   },
+    // });
+    return [];
   }
 }

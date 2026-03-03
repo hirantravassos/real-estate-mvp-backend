@@ -1,10 +1,9 @@
 import {
-  PrimaryGeneratedColumn,
-  CreateDateColumn,
-  UpdateDateColumn,
   Column,
+  CreateDateColumn,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from "typeorm";
-import { UUID_LENGTH } from "../constants/field-lengths.constant.js";
 
 export abstract class BaseEntity {
   @PrimaryGeneratedColumn("uuid")
@@ -17,17 +16,8 @@ export abstract class BaseEntity {
   readonly updatedAt!: Date;
 
   @Column({
-    type: "varchar",
-    length: UUID_LENGTH,
-    nullable: true,
-    name: "updated_by",
-  })
-  updatedBy!: string | null;
-
-  @Column({
     type: "boolean",
     default: true,
-    name: "is_active",
   })
   active: boolean;
 }

@@ -1,43 +1,28 @@
-import {
-  Column,
-  Entity,
-  JoinColumn,
-  ManyToOne,
-  OneToMany,
-  OneToOne,
-  Unique,
-} from "typeorm";
+import { Column, Entity, ManyToOne, Unique } from "typeorm";
 import { BaseEntity } from "../../../shared/entities/base.entity";
 import { User } from "../../users/entities/user.entity";
-import { WhatsappMessage } from "./whatsapp-message.entity";
-import { WhatsappContact } from "./whatsapp-contact.entity";
 
 @Entity("whatsapp_chats")
-@Unique(["user", "jid"])
+@Unique(["whatsappId", "user"])
 export class WhatsappChat extends BaseEntity {
-  @ManyToOne(() => User, { nullable: false, onDelete: "CASCADE" })
-  @JoinColumn({ name: "userId" })
+  @ManyToOne(() => User, (user) => user.whatsappChats, {
+    nullable: false,
+    onDelete: "CASCADE",
+  })
   user: User;
 
-  @Column({ name: "userId", type: "uuid" })
-  userId: string;
-
   @Column({ type: "varchar", length: 255 })
-  jid: string;
+  whatsappId: string;
 
-  @OneToOne(() => WhatsappContact, { createForeignKeyConstraints: false })
-  @JoinColumn([
-    { name: "userId", referencedColumnName: "userId" },
-    { name: "jid", referencedColumnName: "jid" },
-  ])
-  contact: WhatsappContact;
+  @Column({ type: "varchar", length: 255, nullable: true })
+  name: string | null;
 
-  @OneToMany(() => WhatsappMessage, (message) => message.chat)
-  messages: WhatsappMessage[];
+  @Column({ type: "varchar", length: 255, nullable: true })
+  phoneNumber: string | null;
 
-  @Column({ type: "int", default: 0 })
-  unreadCount: number;
-
-  @Column({ type: "timestamp", nullable: true })
-  lastMessageTimestamp: Date | null;
+  @Column({
+    type: "boolean",
+    default: true,
+  })
+  unread: boolean;
 }
