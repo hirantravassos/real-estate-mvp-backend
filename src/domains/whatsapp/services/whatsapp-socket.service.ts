@@ -1,7 +1,9 @@
 import { Injectable, OnModuleInit } from "@nestjs/common";
 import makeWASocket, {
   Browsers,
+  Chat,
   ConnectionState,
+  Contact,
   fetchLatestBaileysVersion,
   useMultiFileAuthState,
   WASocket,
@@ -18,6 +20,7 @@ import {
   WhatsappBaileyMessageHistorySetDto,
   WhatsappBaileyMessageUpsert,
 } from "../dtos/whatsapp-bailey.dto";
+import { WhatsappConnectionStatusEnum } from "../enums/whatsapp-connection-status.enum";
 
 @Injectable()
 export class WhatsappSocketService implements OnModuleInit {
@@ -55,7 +58,26 @@ export class WhatsappSocketService implements OnModuleInit {
     });
 
     socket.ev.on("messages.upsert", (m) => {
+      console.log({ m });
       void this.messageUpset(sessionId, m);
+    });
+
+    socket.ev.on("chats.upsert", (c) => {
+      console.log({ c });
+      void this.chatsUpsert(sessionId, c);
+    });
+
+    socket.ev.on("chats.update", (c) => {
+      console.log({ c });
+      void this.chatsUpdate(sessionId, c);
+    });
+
+    socket.ev.on("contacts.upsert", (c) => {
+      void this.contactsUpsert(sessionId, c);
+    });
+
+    socket.ev.on("contacts.update", (c) => {
+      void this.contactsUpdate(sessionId, c);
     });
 
     socket.ev.on("connection.update", (update) => {
@@ -65,6 +87,33 @@ export class WhatsappSocketService implements OnModuleInit {
 
   public getSocket(sessionId: string): WASocket | undefined {
     return this.sockets.get(sessionId);
+  }
+
+  public async destroySession(
+    sessionId: string,
+    statusCode?: number,
+  ): Promise<void> {
+    const socket = this.getSocket(sessionId);
+
+    if (socket) {
+      socket.ev.removeAllListeners("connection.update");
+      socket.ev.removeAllListeners("creds.update");
+      socket.end(undefined);
+      this.sockets.delete(sessionId);
+    }
+
+    const sessionPath = join(this.sessionsDir, sessionId);
+
+    await fs.rm(sessionPath, { recursive: true, force: true });
+    await this.sessionRepository.delete({ id: sessionId });
+
+    console.warn(
+      "Session " +
+        sessionId +
+        " OBLITERATED (Code: " +
+        statusCode +
+        "). DB record and files removed.",
+    );
   }
 
   private async createSocket(
@@ -107,10 +156,17 @@ export class WhatsappSocketService implements OnModuleInit {
 
     if (qr) {
       qrcode.generate(qr, { small: true });
+      void this.sessionRepository.update(
+        { id: sessionId },
+        { qr, status: WhatsappConnectionStatusEnum.QR },
+      );
     }
 
     if (connection === "open") {
-      console.log("Session " + sessionId + " is now active.");
+      void this.sessionRepository.update(
+        { id: sessionId },
+        { status: WhatsappConnectionStatusEnum.OPEN },
+      );
     }
 
     if (connection === "close") {
@@ -120,12 +176,10 @@ export class WhatsappSocketService implements OnModuleInit {
         statusCode === 401 || statusCode === 405 || statusCode === 411;
 
       if (isTerminal) {
-        console.error("Terminal failure for " + sessionId + ". Wiping data.");
         this.destroySession(sessionId, statusCode).catch(console.error);
         return;
       }
 
-      console.log("Connection closed, but not terminal. Restarting socket...");
       this.start(sessionId).catch(console.error);
     }
   }
@@ -278,30 +332,120 @@ export class WhatsappSocketService implements OnModuleInit {
     }
   }
 
-  private async destroySession(
-    sessionId: string,
-    statusCode?: number,
-  ): Promise<void> {
-    const socket = this.getSocket(sessionId);
+  private async chatsUpsert(sessionId: string, newChats: Chat[]) {
+    const session = await this.sessionRepository.findOne({
+      where: { id: sessionId },
+      relations: ["user"],
+    });
 
-    if (socket) {
-      socket.ev.removeAllListeners("connection.update");
-      socket.ev.removeAllListeners("creds.update");
-      socket.end(undefined);
-      this.sockets.delete(sessionId);
+    if (!session || !session.user) return;
+
+    const mappedChats = newChats
+      .filter((c) => c.id)
+      .map((c) => ({
+        user: session.user,
+        jid: c.id!,
+        unreadCount: c.unreadCount || 0,
+        lastMessageTimestamp: c.conversationTimestamp
+          ? new Date(Number(c.conversationTimestamp) * 1000)
+          : null,
+      }));
+
+    if (mappedChats.length > 0) {
+      await this.chatRepository
+        .upsert(mappedChats, {
+          conflictPaths: ["user", "jid"],
+          skipUpdateIfNoValuesChanged: true,
+        })
+        .catch((e) => console.error("Error upserting new chats", e));
     }
+  }
 
-    const sessionPath = join(this.sessionsDir, sessionId);
+  private async chatsUpdate(sessionId: string, updates: Partial<Chat>[]) {
+    const session = await this.sessionRepository.findOne({
+      where: { id: sessionId },
+      relations: ["user"],
+    });
 
-    await fs.rm(sessionPath, { recursive: true, force: true });
-    await this.sessionRepository.delete({ id: sessionId });
+    if (!session || !session.user) return;
 
-    console.warn(
-      "Session " +
-        sessionId +
-        " OBLITERATED (Code: " +
-        statusCode +
-        "). DB record and files removed.",
-    );
+    for (const update of updates) {
+      if (!update.id) continue;
+
+      const updateData: { unreadCount?: number; lastMessageTimestamp?: Date } =
+        {};
+
+      if (typeof update.unreadCount === "number") {
+        updateData.unreadCount = update.unreadCount;
+      }
+
+      if (update.conversationTimestamp) {
+        updateData.lastMessageTimestamp = new Date(
+          Number(update.conversationTimestamp) * 1000,
+        );
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        await this.chatRepository
+          .update({ user: { id: session.user.id }, jid: update.id }, updateData)
+          .catch((e) => console.error("Error updating chat metadata", e));
+      }
+    }
+  }
+
+  private async contactsUpsert(sessionId: string, newContacts: Contact[]) {
+    const session = await this.sessionRepository.findOne({
+      where: { id: sessionId },
+      relations: ["user"],
+    });
+
+    if (!session || !session.user) return;
+
+    const mappedContacts = newContacts
+      .filter((c) => c.id)
+      .map((c) => ({
+        user: session.user,
+        jid: c.id,
+        name: c.name || null,
+        pushName: c.notify || null,
+      }));
+
+    if (mappedContacts.length > 0) {
+      await this.contactRepository
+        .upsert(mappedContacts, {
+          conflictPaths: ["user", "jid"],
+          skipUpdateIfNoValuesChanged: true,
+        })
+        .catch((e) => console.error("Error upserting new contacts", e));
+    }
+  }
+
+  private async contactsUpdate(sessionId: string, updates: Partial<Contact>[]) {
+    const session = await this.sessionRepository.findOne({
+      where: { id: sessionId },
+      relations: ["user"],
+    });
+
+    if (!session || !session.user) return;
+
+    for (const update of updates) {
+      if (!update.id) continue;
+
+      const updateData: { name?: string; pushName?: string } = {};
+
+      if (update.name !== undefined) {
+        updateData.name = update.name;
+      }
+
+      if (update.notify !== undefined) {
+        updateData.pushName = update.notify;
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        await this.contactRepository
+          .update({ user: { id: session.user.id }, jid: update.id }, updateData)
+          .catch((e) => console.error("Error updating contact metadata", e));
+      }
+    }
   }
 }

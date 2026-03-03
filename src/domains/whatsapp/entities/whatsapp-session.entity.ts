@@ -1,6 +1,7 @@
 import { Column, Entity, JoinColumn, OneToOne } from "typeorm";
 import { BaseEntity } from "../../../shared/entities/base.entity";
 import { User } from "../../users/entities/user.entity";
+import { WhatsappConnectionStatusEnum } from "../enums/whatsapp-connection-status.enum";
 
 @Entity("whatsapp_sessions")
 export class WhatsappSession extends BaseEntity {
@@ -8,15 +9,9 @@ export class WhatsappSession extends BaseEntity {
   @JoinColumn()
   user: User;
 
-  @Column({ type: "longtext", nullable: true })
-  credentials: string | null;
+  @Column({ type: "varchar", length: 255 })
+  qr: string;
 
-  @Column({ type: "longtext", nullable: true })
-  keys: string | null;
-
-  @Column({ type: "boolean", default: false, name: "is_connected" })
-  isConnected: boolean;
-
-  @Column({ type: "timestamp", nullable: true, name: "last_connected_at" })
-  lastConnectedAt: Date | null;
+  @Column({ type: "enum", enum: WhatsappConnectionStatusEnum })
+  status: WhatsappConnectionStatusEnum;
 }

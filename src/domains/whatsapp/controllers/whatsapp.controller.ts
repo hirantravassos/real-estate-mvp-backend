@@ -1,4 +1,4 @@
-import { Controller, Delete, Post, UseGuards } from "@nestjs/common";
+import { Controller, Delete, Get, Post, UseGuards } from "@nestjs/common";
 import { JwtGuard } from "../../auth/guards/jwt.guard";
 import { WhatsappService } from "../services/whatsapp.service";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
@@ -12,6 +12,16 @@ export class WhatsappController {
     private readonly whatsappService: WhatsappService,
     private readonly whatsappSocketService: WhatsappSocketService,
   ) {}
+
+  @Get()
+  async findStatus(@GetUser() user: User) {
+    return this.whatsappService.findStatus(user);
+  }
+
+  @Get("chats")
+  async findAllChats(@GetUser() user: User) {
+    return this.whatsappService.findAllChats(user);
+  }
 
   @Post("connect")
   async connect(@GetUser() user: User) {
