@@ -4,33 +4,31 @@ import { User } from "../../users/entities/user.entity";
 
 @Injectable()
 export class WhatsappService {
-  constructor(
-    private readonly whatsappSessionRepository: WhatsappSessionRepository,
-  ) {}
+  constructor(private readonly sessionRepository: WhatsappSessionRepository) {}
 
   async connect(user: User) {
-    const found = await this.whatsappSessionRepository.findOneBy({
+    const found = await this.sessionRepository.findOneBy({
       user: { id: user.id },
     });
 
     if (found) {
-      await this.whatsappSessionRepository.delete({ id: found.id });
+      await this.sessionRepository.delete({ id: found.id });
     }
 
-    return await this.whatsappSessionRepository.save({
+    return await this.sessionRepository.save({
       user,
     });
   }
 
   async disconnect(user: User) {
-    const found = await this.whatsappSessionRepository
+    const found = await this.sessionRepository
       .findOneByOrFail({
         user: { id: user.id },
       })
       .catch(() => {
         throw new NotFoundException("Whatsapp session not found");
       });
-    await this.whatsappSessionRepository.delete({ id: found.id });
+    await this.sessionRepository.delete({ id: found.id });
     return found;
   }
 }

@@ -16,7 +16,7 @@ export class WhatsappController {
   @Post("connect")
   async connect(@GetUser() user: User) {
     const newSession = await this.whatsappService.connect(user);
-    return this.whatsappSocketService.initializeSession(newSession.id);
+    return this.whatsappSocketService.start(newSession.id);
   }
 
   @Delete("disconnect")
