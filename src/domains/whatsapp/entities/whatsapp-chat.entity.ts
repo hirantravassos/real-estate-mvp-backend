@@ -1,6 +1,14 @@
-import { Column, Entity, ManyToOne, OneToMany, Unique } from "typeorm";
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  Unique,
+} from "typeorm";
 import { BaseEntity } from "../../../shared/entities/base.entity";
 import { User } from "../../users/entities/user.entity";
+import { WhatsappContact } from "./whatsapp-contact.entity";
 import { WhatsappMessage } from "./whatsapp-message.entity";
 
 @Entity("whatsapp_chats")
@@ -12,19 +20,20 @@ export class WhatsappChat extends BaseEntity {
   })
   user: User;
 
-  @OneToMany(() => WhatsappMessage, (message) => message.chat, {
-    cascade: true,
+  @ManyToOne(() => WhatsappContact, {
+    createForeignKeyConstraints: false,
   })
+  @JoinColumn([
+    { name: "whatsappId", referencedColumnName: "whatsappId" },
+    { name: "userId", referencedColumnName: "user" },
+  ])
+  contact: WhatsappContact;
+
+  @OneToMany(() => WhatsappMessage, (whatsappMessage) => whatsappMessage.chat)
   messages: WhatsappMessage[];
 
   @Column({ type: "varchar", length: 255 })
   whatsappId: string;
-
-  @Column({ type: "varchar", length: 255, nullable: true })
-  name: string | null;
-
-  @Column({ type: "varchar", length: 255, nullable: true })
-  phoneNumber: string | null;
 
   @Column({
     type: "boolean",

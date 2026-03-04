@@ -52,8 +52,17 @@ export class WhatsappService {
   }
 
   async findAllChats(user: User) {
-    return this.whatsappChatRepository.find({
-      where: { user: { id: user.id } },
+    const userId = user.id;
+
+    return await this.whatsappChatRepository.find({
+      where: { user: { id: userId } },
+      order: {
+        createdAt: "DESC",
+      },
+      relations: {
+        contact: true,
+        messages: true,
+      },
     });
   }
 }

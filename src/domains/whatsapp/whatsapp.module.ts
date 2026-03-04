@@ -9,24 +9,42 @@ import { WhatsappChat } from "./entities/whatsapp-chat.entity";
 import { WhatsappChatRepository } from "./repositories/whatsapp-chat.repository";
 import { WhatsappMessage } from "./entities/whatsapp-message.entity";
 import { WhatsappMessageRepository } from "./repositories/whatsapp-message.repository";
+import { WhatsappMessageService } from "./services/whatsapp-message.service";
+import { WhatsappChatService } from "./services/whatsapp-chat.service";
+import { WhatsappContactService } from "./services/whatsapp-contact.service";
+import { WhatsappContactRepository } from "./repositories/whatsapp-contact.repository";
+import { WhatsappContact } from "./entities/whatsapp-contact.entity";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([WhatsappSession, WhatsappChat, WhatsappMessage]),
+    TypeOrmModule.forFeature([
+      WhatsappSession,
+      WhatsappChat,
+      WhatsappMessage,
+      WhatsappContact,
+    ]),
   ],
   controllers: [WhatsappController],
   providers: [
     WhatsappSessionRepository,
     WhatsappChatRepository,
     WhatsappMessageRepository,
+    WhatsappContactRepository,
     WhatsappService,
     WhatsappSocketService,
+    WhatsappMessageService,
+    WhatsappChatService,
+    WhatsappContactService,
   ],
   exports: [
     WhatsappService,
     WhatsappSocketService,
     WhatsappChatRepository,
     WhatsappMessageRepository,
+    WhatsappContactRepository,
+    WhatsappMessageService,
+    WhatsappChatService,
+    WhatsappContactService,
   ],
 })
 export class WhatsappModule {}

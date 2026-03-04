@@ -4,14 +4,22 @@ import { ColumnName } from "../../../shared/decorators/columns/column-name.decor
 import { ColumnEmail } from "../../../shared/decorators/columns/column-email.decorator.js";
 import { Customer } from "../../customers/entities/customer.entity";
 import { WhatsappChat } from "../../whatsapp/entities/whatsapp-chat.entity";
+import { WhatsappMessage } from "../../whatsapp/entities/whatsapp-message.entity";
+import { WhatsappContact } from "../../whatsapp/entities/whatsapp-contact.entity";
 
 @Entity("users")
 export class User extends BaseEntity {
   @OneToMany(() => Customer, (customer) => customer.user)
   customers: Customer[];
 
-  @OneToMany(() => WhatsappChat, (whatsappChat) => whatsappChat.user)
+  @OneToMany(() => WhatsappChat, (chat) => chat.user)
   whatsappChats: WhatsappChat[];
+
+  @OneToMany(() => WhatsappMessage, (message) => message.user)
+  whatsappMessages: WhatsappMessage[];
+
+  @OneToMany(() => WhatsappContact, (contact) => contact.user)
+  whatsappContacts: WhatsappContact[];
 
   @ColumnEmail({ unique: true })
   email: string;
