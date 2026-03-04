@@ -1,16 +1,20 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException, } from "@nestjs/common";
 import { User } from "../../users/entities/user.entity";
 import { proto, WAMessage } from "@whiskeysockets/baileys";
 import dayjs from "dayjs";
 import { WhatsappMessageRepository } from "../repositories/whatsapp-message.repository";
 import { CreateWhatsappMessageDto } from "../dtos/create-whatsapp-message.dto";
 import { WhatsappMessageTypeEnum } from "../enums/whatsapp-message-type.enum";
+import { WhatsappContactRepository } from "../repositories/whatsapp-contact.repository";
 import IMessage = proto.IMessage;
 import IHistorySyncMsg = proto.IHistorySyncMsg;
 
 @Injectable()
 export class WhatsappMessageService {
-  constructor(private readonly messageRepository: WhatsappMessageRepository) {}
+  constructor(
+    private readonly messageRepository: WhatsappMessageRepository,
+    private readonly contactRepository: WhatsappContactRepository,
+  ) {}
 
   async findAll(user: User, whatsappId: string) {
     return this.messageRepository.find({
@@ -21,6 +25,30 @@ export class WhatsappMessageService {
       order: {
         sentAt: "DESC",
       },
+    });
+  }
+
+  async findAllByPhone(user: User, phone: string) {
+    const chat = await this.contactRepository
+      .findOneOrFail({
+        where: { user: { id: user.id }, phoneNumber: phone },
+      })
+      .catch(() => {
+        throw new NotFoundException("Whatsapp contact not found");
+      });
+
+    const whatsappId = chat.whatsappId;
+
+    return this.messageRepository.find({
+      where: {
+        user: { id: user.id },
+        whatsappId: whatsappId,
+        me: false,
+      },
+      order: {
+        sentAt: "DESC",
+      },
+      take: 100,
     });
   }
 

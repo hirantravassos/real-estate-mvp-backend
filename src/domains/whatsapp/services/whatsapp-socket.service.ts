@@ -29,6 +29,7 @@ import { User } from "../../users/entities/user.entity";
 
 @Injectable()
 export class WhatsappSocketService implements OnModuleInit {
+  private socket: WASocket;
   private readonly sockets = new Map<string, WASocket>();
   private readonly sessionsDir = join(process.cwd(), "sessions");
 
@@ -58,6 +59,7 @@ export class WhatsappSocketService implements OnModuleInit {
 
   public async start(sessionId: string, user: User): Promise<void> {
     const socket = await this.createSocket(sessionId);
+    this.socket = socket;
 
     socket.ev.on("messaging-history.set", (data) => {
       void this.handleMessagingHistorySet(user, data);
@@ -151,6 +153,7 @@ export class WhatsappSocketService implements OnModuleInit {
         void this.messageService.saveHistorySyncMessage(user, syncMessage);
         void this.contactService.updateContactFromSyncMessage(
           user,
+          this.socket,
           syncMessage,
         );
       }
@@ -171,14 +174,22 @@ export class WhatsappSocketService implements OnModuleInit {
   ) {
     for (const WAMessage of data.messages) {
       void this.messageService.saveWAMessage(user, WAMessage);
-      void this.contactService.updateContactFromWAMessage(user, WAMessage);
+      void this.contactService.updateContactFromWAMessage(
+        user,
+        this.socket,
+        WAMessage,
+      );
     }
   }
 
   private handleMessageUpdate(user: User, data: WAMessageUpdate[]) {
     for (const WAMessage of data) {
       void this.messageService.saveWAMessage(user, WAMessage);
-      void this.contactService.updateContactFromWAMessage(user, WAMessage);
+      void this.contactService.updateContactFromWAMessage(
+        user,
+        this.socket,
+        WAMessage,
+      );
     }
   }
 
@@ -188,7 +199,11 @@ export class WhatsappSocketService implements OnModuleInit {
 
       for (const message of chat?.messages ?? []) {
         void this.messageService.saveHistorySyncMessage(user, message);
-        void this.contactService.updateContactFromSyncMessage(user, message);
+        void this.contactService.updateContactFromSyncMessage(
+          user,
+          this.socket,
+          message,
+        );
       }
     }
   }

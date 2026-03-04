@@ -6,7 +6,7 @@ import { ColumnName } from "../../../shared/decorators/columns/column-name.decor
 @Entity("whatsapp_contacts")
 @Unique(["whatsappId", "user"])
 export class WhatsappContact extends BaseEntity {
-  @ManyToOne(() => User, (user) => user.whatsappContacts, {
+  @ManyToOne(() => User, {
     nullable: false,
     onDelete: "CASCADE",
   })

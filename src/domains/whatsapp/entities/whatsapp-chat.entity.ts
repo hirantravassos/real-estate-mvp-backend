@@ -1,20 +1,12 @@
-import {
-  Column,
-  Entity,
-  JoinColumn,
-  ManyToOne,
-  OneToMany,
-  Unique,
-} from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne, Unique } from "typeorm";
 import { BaseEntity } from "../../../shared/entities/base.entity";
 import { User } from "../../users/entities/user.entity";
 import { WhatsappContact } from "./whatsapp-contact.entity";
-import { WhatsappMessage } from "./whatsapp-message.entity";
 
 @Entity("whatsapp_chats")
 @Unique(["whatsappId", "user"])
 export class WhatsappChat extends BaseEntity {
-  @ManyToOne(() => User, (user) => user.whatsappChats, {
+  @ManyToOne(() => User, {
     nullable: false,
     onDelete: "CASCADE",
   })

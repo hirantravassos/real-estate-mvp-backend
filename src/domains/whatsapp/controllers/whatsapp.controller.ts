@@ -11,6 +11,7 @@ import { WhatsappService } from "../services/whatsapp.service";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { User } from "../../users/entities/user.entity";
 import { WhatsappSocketService } from "../services/whatsapp-socket.service";
+import { WhatsappMessageService } from "../services/whatsapp-message.service";
 
 @Controller("whatsapp")
 @UseGuards(JwtGuard)
@@ -18,6 +19,7 @@ export class WhatsappController {
   constructor(
     private readonly whatsappService: WhatsappService,
     private readonly whatsappSocketService: WhatsappSocketService,
+    private readonly whatsappMessageService: WhatsappMessageService,
   ) {}
 
   @Get()
@@ -36,6 +38,14 @@ export class WhatsappController {
     @Param("whatsappId") whatsappId: string,
   ) {
     return this.whatsappService.findAllMessages(user, whatsappId);
+  }
+
+  @Get("messages-by-phone/:phone")
+  async findAllMessagesByPhone(
+    @GetUser() user: User,
+    @Param("phone") phone: string,
+  ) {
+    return this.whatsappMessageService.findAllByPhone(user, phone);
   }
 
   @Post("connect")

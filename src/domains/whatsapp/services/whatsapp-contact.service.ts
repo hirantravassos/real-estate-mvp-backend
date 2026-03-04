@@ -1,9 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { WhatsappContactRepository } from "../repositories/whatsapp-contact.repository";
 import { User } from "../../users/entities/user.entity";
-import { Contact, proto, WAMessage } from "@whiskeysockets/baileys";
+import { Contact, proto, WAMessage, WASocket } from "@whiskeysockets/baileys";
 import { CreateWhatsappContactDto } from "../dtos/create-whatsapp-contact.dto";
 import { CustomerRepository } from "../../customers/repositories/customer.repository";
+import { WhatsappSessionRepository } from "../repositories/whatsapp-session.repository";
 import IHistorySyncMsg = proto.IHistorySyncMsg;
 
 @Injectable()
@@ -11,6 +12,7 @@ export class WhatsappContactService {
   constructor(
     private readonly contactRepository: WhatsappContactRepository,
     private readonly customerRepository: CustomerRepository,
+    private readonly sessionRepository: WhatsappSessionRepository,
   ) {}
 
   async saveFromContact(user: User, contact: Partial<Contact>) {
@@ -25,7 +27,11 @@ export class WhatsappContactService {
     });
   }
 
-  async updateContactFromSyncMessage(user: User, syncMessage: IHistorySyncMsg) {
+  async updateContactFromSyncMessage(
+    user: User,
+    socket: WASocket,
+    syncMessage: IHistorySyncMsg,
+  ) {
     const whatsappId = syncMessage?.message?.key?.remoteJid;
     const phoneNumber =
       this.getPhoneNumberFromJid(whatsappId ?? undefined) ??
@@ -35,7 +41,11 @@ export class WhatsappContactService {
       // @ts-expect-error: missing type
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       this.getPhoneNumberFromJid(syncMessage?.message?.key?.remoteJidAlt);
-    const name = `syncMessage?.message?.pushName ${syncMessage?.message?.pushName}`;
+    const name = this.getCleanName(
+      user,
+      socket,
+      syncMessage?.message?.pushName,
+    );
 
     if (!whatsappId) return;
 
@@ -56,16 +66,20 @@ export class WhatsappContactService {
     if (phoneNumber) contact.phoneNumber = phoneNumber;
     if (name) contact.name = name;
 
-    await this.contactRepository.save(contact);
+    await this.save(contact);
   }
 
-  async updateContactFromWAMessage(user: User, WAMessage: WAMessage) {
+  async updateContactFromWAMessage(
+    user: User,
+    socket: WASocket,
+    WAMessage: WAMessage,
+  ) {
     const whatsappId = WAMessage?.key?.remoteJid;
     const phoneNumber =
       this.getPhoneNumberFromJid(whatsappId ?? undefined) ??
       this.getPhoneNumberFromJid(WAMessage?.key?.remoteJid ?? undefined) ??
       this.getPhoneNumberFromJid(WAMessage?.key?.remoteJidAlt);
-    const name = `WAMessage?.pushName ${WAMessage?.pushName}`;
+    const name = this.getCleanName(user, socket, WAMessage?.pushName);
 
     if (!whatsappId) return;
 
@@ -86,14 +100,14 @@ export class WhatsappContactService {
     if (phoneNumber) contact.phoneNumber = phoneNumber;
     if (name) contact.name = name;
 
-    await this.contactRepository.save(contact);
+    await this.save(contact);
   }
 
   private async save(dto: CreateWhatsappContactDto) {
     if (dto.whatsappId === "") return;
     if (!dto.whatsappId) return;
 
-    if (dto.phoneNumber) {
+    if (dto?.phoneNumber) {
       void this.customerRepository
         .upsert(
           {
@@ -105,7 +119,7 @@ export class WhatsappContactService {
             phone: dto.phoneNumber,
             user: dto.user,
           },
-          ["user", "phone"],
+          ["userId", "phone"],
         )
         .catch((err) => {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -132,5 +146,16 @@ export class WhatsappContactService {
       return newPhone;
     }
     return null;
+  }
+
+  private getCleanName(
+    user: User,
+    socket: WASocket,
+    possibleName?: string | null,
+  ): string | null {
+    return (
+      possibleName?.replaceAll(socket?.authState?.creds?.me?.name ?? "", "") ??
+      null
+    );
   }
 }

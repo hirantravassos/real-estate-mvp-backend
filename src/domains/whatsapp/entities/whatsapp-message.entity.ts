@@ -7,7 +7,7 @@ import { WhatsappMessageTypeEnum } from "../enums/whatsapp-message-type.enum";
 @Entity("whatsapp_messages")
 @Unique("UQ_WHATSAPP_MESSAGE_COMPOSITE", ["whatsappId", "messageId", "user"])
 export class WhatsappMessage extends BaseEntity {
-  @ManyToOne(() => User, (user) => user.whatsappMessages, {
+  @ManyToOne(() => User, {
     nullable: false,
     onDelete: "CASCADE",
   })
