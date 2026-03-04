@@ -1,4 +1,4 @@
-import { Entity, ManyToOne, OneToMany } from "typeorm";
+import { Column, Entity, ManyToOne, OneToMany } from "typeorm";
 import { BaseEntity } from "../../../shared/entities/base.entity";
 import { ColumnName } from "../../../shared/decorators/columns/column-name.decorator";
 import { User } from "../../users/entities/user.entity";
@@ -7,10 +7,13 @@ import { ColumnLongText } from "../../../shared/decorators/columns/column-long-t
 
 @Entity("kanbans")
 export class Kanban extends BaseEntity {
-  @ManyToOne(() => User, (user) => user.id, {
+  @ManyToOne(() => User, {
     nullable: false,
   })
   user: User;
+
+  @Column({ type: "varchar", length: 255 })
+  userId: string;
 
   @OneToMany(() => Customer, (customer) => customer.kanban)
   customers: Customer[];
@@ -21,3 +24,4 @@ export class Kanban extends BaseEntity {
   @ColumnLongText({ nullable: true })
   description: string | null;
 }
+

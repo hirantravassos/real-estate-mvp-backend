@@ -14,7 +14,7 @@ export class WhatsappMessageService {
   constructor(
     private readonly messageRepository: WhatsappMessageRepository,
     private readonly contactRepository: WhatsappContactRepository,
-  ) {}
+  ) { }
 
   async findAll(user: User, whatsappId: string) {
     return this.messageRepository.find({
@@ -103,7 +103,7 @@ export class WhatsappMessageService {
   private save(message: CreateWhatsappMessageDto) {
     return this.messageRepository.upsert(message, [
       "whatsappId",
-      "user",
+      "userId",
       "messageId",
     ]);
   }

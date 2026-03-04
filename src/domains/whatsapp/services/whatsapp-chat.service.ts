@@ -6,7 +6,7 @@ import { CreateWhatsappChatDto } from "../dtos/create-whatsapp-chat.dto";
 
 @Injectable()
 export class WhatsappChatService {
-  constructor(private readonly chatRepository: WhatsappChatRepository) {}
+  constructor(private readonly chatRepository: WhatsappChatRepository) { }
 
   async saveChat(user: User, chat: Chat) {
     const whatsappId = chat?.id;
@@ -23,6 +23,6 @@ export class WhatsappChatService {
   }
 
   private async save(chat: CreateWhatsappChatDto) {
-    await this.chatRepository.upsert(chat, ["whatsappId", "user.id"]);
+    await this.chatRepository.upsert(chat, ["whatsappId", "userId"]);
   }
 }

@@ -5,7 +5,7 @@ import { Customer } from "./customer.entity";
 
 @Entity("customer_comments")
 export class CustomerComment extends BaseEntity {
-  @ManyToOne(() => Customer, (customer) => customer.id, {
+  @ManyToOne(() => Customer, (customer) => customer.comments, {
     onDelete: "CASCADE",
   })
   customer: Customer;

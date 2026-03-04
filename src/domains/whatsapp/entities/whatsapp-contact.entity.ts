@@ -4,13 +4,16 @@ import { User } from "../../users/entities/user.entity";
 import { ColumnName } from "../../../shared/decorators/columns/column-name.decorator";
 
 @Entity("whatsapp_contacts")
-@Unique(["whatsappId", "user"])
+@Unique(["whatsappId", "userId"])
 export class WhatsappContact extends BaseEntity {
   @ManyToOne(() => User, {
     nullable: false,
-    onDelete: "CASCADE",
+    createForeignKeyConstraints: false,
   })
   user: User;
+
+  @Column({ type: "varchar", length: 255 })
+  userId: string;
 
   @Column({ type: "varchar", length: 255 })
   whatsappId: string;

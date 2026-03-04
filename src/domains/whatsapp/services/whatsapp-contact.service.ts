@@ -3,17 +3,13 @@ import { WhatsappContactRepository } from "../repositories/whatsapp-contact.repo
 import { User } from "../../users/entities/user.entity";
 import { Contact, proto, WAMessage, WASocket } from "@whiskeysockets/baileys";
 import { CreateWhatsappContactDto } from "../dtos/create-whatsapp-contact.dto";
-import { CustomerRepository } from "../../customers/repositories/customer.repository";
-import { WhatsappSessionRepository } from "../repositories/whatsapp-session.repository";
 import IHistorySyncMsg = proto.IHistorySyncMsg;
 
 @Injectable()
 export class WhatsappContactService {
   constructor(
     private readonly contactRepository: WhatsappContactRepository,
-    private readonly customerRepository: CustomerRepository,
-    private readonly sessionRepository: WhatsappSessionRepository,
-  ) {}
+  ) { }
 
   async saveFromContact(user: User, contact: Partial<Contact>) {
     const whatsappId = contact?.id;
@@ -51,7 +47,7 @@ export class WhatsappContactService {
 
     const contact = await this.contactRepository.findOneBy({
       whatsappId,
-      user: { id: user.id },
+      userId: user.id,
     });
 
     if (!contact) {
@@ -85,7 +81,7 @@ export class WhatsappContactService {
 
     const contact = await this.contactRepository.findOneBy({
       whatsappId,
-      user: { id: user.id },
+      userId: user.id,
     });
 
     if (!contact) {
@@ -107,26 +103,6 @@ export class WhatsappContactService {
     if (dto.whatsappId === "") return;
     if (!dto.whatsappId) return;
 
-    if (dto?.phoneNumber) {
-      void this.customerRepository
-        .upsert(
-          {
-            kanban: null,
-            comments: [
-              { comment: "Gerado pelo sistema, via integração do WhatsApp" },
-            ],
-            name: dto.name,
-            phone: dto.phoneNumber,
-            user: dto.user,
-          },
-          ["userId", "phone"],
-        )
-        .catch((err) => {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          console.warn("customer not created", { err });
-        });
-    }
-
     return await this.contactRepository.upsert(
       {
         ...(dto.phoneNumber ? { phoneNumber: dto.phoneNumber } : {}),
@@ -134,7 +110,7 @@ export class WhatsappContactService {
         whatsappId: dto.whatsappId,
         name: dto.name,
       },
-      ["whatsappId", "user.id"],
+      ["whatsappId", "userId"],
     );
   }
 

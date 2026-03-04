@@ -6,6 +6,8 @@ import { WhatsappChatRepository } from "../repositories/whatsapp-chat.repository
 import { WhatsappMessageService } from "./whatsapp-message.service";
 import { WhatsappMessageRepository } from "../repositories/whatsapp-message.repository";
 import { WhatsappMessage } from "../entities/whatsapp-message.entity";
+import { WhatsappContact } from "../entities/whatsapp-contact.entity";
+import { WhatsappContactRepository } from "../repositories/whatsapp-contact.repository";
 
 @Injectable()
 export class WhatsappService {
@@ -13,9 +15,10 @@ export class WhatsappService {
     private readonly sessionRepository: WhatsappSessionRepository,
     private readonly chatRepository: WhatsappChatRepository,
     private readonly messageRepository: WhatsappMessageRepository,
+    private readonly contactRepository: WhatsappContactRepository,
     private readonly socketService: WhatsappSocketService,
     private readonly messageService: WhatsappMessageService,
-  ) {}
+  ) { }
 
   async connect(user: User) {
     const found = await this.sessionRepository.findOneBy({
@@ -63,7 +66,7 @@ export class WhatsappService {
       .createQueryBuilder("msg")
       .select("msg.whatsappId", "whatsappId")
       .addSelect("MAX(msg.sentAt)", "latestSentAt")
-      .where("msg.user.id = :userId", { userId }) // Using full descriptive name 'userId'
+      .where("msg.userId = :userId", { userId })
       .groupBy("msg.whatsappId");
 
     return await this.chatRepository
@@ -81,19 +84,26 @@ export class WhatsappService {
         "message",
         "message.whatsappId = chat.whatsappId AND message.sentAt = latest_msg.latestSentAt",
       )
-      .leftJoinAndSelect("chat.contact", "contact")
+      .leftJoinAndMapOne(
+        "chat.contact",
+        WhatsappContact,
+        "contact",
+        "contact.whatsappId = chat.whatsappId AND contact.userId = chat.userId",
+      )
       .setParameters(latestMessagesQuery.getParameters())
-      .where("chat.user.id = :userId", { userId })
+      .where("chat.userId = :userId", { userId })
       .orderBy("latest_msg.latestSentAt", "DESC")
       .getMany();
   }
 
   async findAllMessages(user: User, whatsappId: string) {
     const chat = await this.chatRepository.findOne({
-      where: { whatsappId, user: { id: user.id } },
-      relations: {
-        contact: true,
-      },
+      where: { whatsappId, userId: user.id },
+    });
+
+    const contact = await this.contactRepository.findOneBy({
+      whatsappId,
+      userId: user.id,
     });
 
     const messages = await this.messageRepository.find({
@@ -109,6 +119,7 @@ export class WhatsappService {
 
     return {
       ...chat,
+      contact,
       messages,
     };
   }

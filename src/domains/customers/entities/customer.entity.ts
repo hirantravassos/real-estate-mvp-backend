@@ -1,4 +1,4 @@
-import { Entity, ManyToOne, OneToMany } from "typeorm";
+import { Column, Entity, ManyToOne, OneToMany } from "typeorm";
 import { BaseEntity } from "../../../shared/entities/base.entity";
 import { ColumnName } from "../../../shared/decorators/columns/column-name.decorator";
 import { ColumnPhone } from "../../../shared/decorators/columns/column-phone.decorator";
@@ -13,6 +13,9 @@ export class Customer extends BaseEntity {
     nullable: false,
   })
   user: User;
+
+  @Column({ type: "varchar", length: 255 })
+  userId: string;
 
   @ManyToOne(() => Kanban, (kanban) => kanban.customers, {
     nullable: true,
@@ -37,3 +40,4 @@ export class Customer extends BaseEntity {
   @ColumnBoolean({ default: true })
   pending: boolean;
 }
+
