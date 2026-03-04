@@ -6,7 +6,7 @@ import { UserCreateDto } from "../dtos/user-create.dto";
 
 @Injectable()
 export class UserService {
-  constructor(private readonly userRepository: UserRepository) { }
+  constructor(private readonly userRepository: UserRepository) {}
 
   async findByEmail(email: string): Promise<User | null> {
     return this.userRepository.findByEmail(email);

@@ -1,5 +1,11 @@
 import { Injectable } from "@nestjs/common";
-import { Chat, Contact, proto, WAMessage, WAMessageUpdate, } from "@whiskeysockets/baileys";
+import {
+  Chat,
+  Contact,
+  proto,
+  WAMessage,
+  WAMessageUpdate,
+} from "@whiskeysockets/baileys";
 import dayjs from "dayjs";
 import { User } from "../../users/entities/user.entity";
 import { WhatsappContactService } from "./whatsapp-contact.service";

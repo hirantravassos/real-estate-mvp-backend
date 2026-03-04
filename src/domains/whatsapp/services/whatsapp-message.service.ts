@@ -18,7 +18,7 @@ export class WhatsappMessageService {
   constructor(
     private readonly messageRepository: WhatsappMessageRepository,
     private readonly contactRepository: WhatsappContactRepository,
-  ) { }
+  ) {}
 
   async findAll(user: User, whatsappId: string) {
     return this.messageRepository.find({

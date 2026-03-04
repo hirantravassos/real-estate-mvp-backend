@@ -29,12 +29,12 @@ export class UserMapper {
 
   static toEntityFromGoogle(dto: TokenPayload): User {
     const user = new User();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
     user.name = dto?.name as string;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
     user.email = dto?.email as string;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    user.googleId = dto?.sub as string;
+
+    user.googleId = dto?.sub;
 
     return user;
   }

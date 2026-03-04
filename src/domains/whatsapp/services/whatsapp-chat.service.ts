@@ -4,7 +4,7 @@ import { User } from "../../users/entities/user.entity";
 
 @Injectable()
 export class WhatsappChatService {
-  constructor(private readonly chatRepository: WhatsappChatRepository) { }
+  constructor(private readonly chatRepository: WhatsappChatRepository) {}
 
   async upsertChat(
     user: User,

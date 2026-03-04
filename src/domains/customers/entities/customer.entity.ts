@@ -1,4 +1,4 @@
-import { Column, Entity, ManyToOne, OneToMany } from "typeorm";
+import { Column, Entity, ManyToOne, OneToMany, Unique } from "typeorm";
 import { BaseEntity } from "../../../shared/entities/base.entity";
 import { ColumnName } from "../../../shared/decorators/columns/column-name.decorator";
 import { ColumnPhone } from "../../../shared/decorators/columns/column-phone.decorator";
@@ -8,6 +8,7 @@ import { CustomerComment } from "./customer-comments.entity";
 import { ColumnBoolean } from "../../../shared/decorators/columns/column-boolean.decorator";
 
 @Entity("customers")
+@Unique(["userId", "phone"])
 export class Customer extends BaseEntity {
   @ManyToOne(() => User, (user) => user.customers, {
     nullable: false,
@@ -40,4 +41,3 @@ export class Customer extends BaseEntity {
   @ColumnBoolean({ default: true })
   pending: boolean;
 }
-

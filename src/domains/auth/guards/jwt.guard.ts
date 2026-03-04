@@ -6,7 +6,7 @@ import { User } from "../../users/entities/user.entity";
 export class JwtGuard extends AuthGuard("jwt") {
   handleRequest<TUser = User>(error: any, user: TUser): TUser {
     if (error || !user) {
-      throw  new UnauthorizedException("Invalid or expired token");
+      throw new UnauthorizedException("Invalid or expired token");
     }
     return user;
   }

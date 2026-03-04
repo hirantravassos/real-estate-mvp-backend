@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { WhatsappContactRepository } from "../repositories/whatsapp-contact.repository";
+import { CustomerRepository } from "../../customers/repositories/customer.repository";
 import { User } from "../../users/entities/user.entity";
 
 interface UpsertContactData {
@@ -10,7 +11,10 @@ interface UpsertContactData {
 
 @Injectable()
 export class WhatsappContactService {
-  constructor(private readonly contactRepository: WhatsappContactRepository) {}
+  constructor(
+    private readonly contactRepository: WhatsappContactRepository,
+    private readonly customerRepository: CustomerRepository,
+  ) {}
 
   async upsertContact(user: User, data: UpsertContactData): Promise<void> {
     if (!data.whatsappId) return;
@@ -36,15 +40,46 @@ export class WhatsappContactService {
       if (hasRealName) existingContact.name = data.name;
       if (hasRealPhone) existingContact.phoneNumber = data.phoneNumber;
       await this.contactRepository.save(existingContact);
-      return;
+    } else {
+      await this.contactRepository.upsert(
+        {
+          ...payload,
+          name: data.name ?? "Desconhecido",
+        },
+        ["whatsappId", "userId"],
+      );
     }
 
-    await this.contactRepository.upsert(
-      {
-        ...payload,
-        name: data.name ?? "Desconhecido",
-      },
-      ["whatsappId", "userId"],
-    );
+    if (hasRealPhone) {
+      void this.ensurePendingCustomerExists(user, data.phoneNumber, data.name);
+    }
+  }
+
+  private async ensurePendingCustomerExists(
+    user: User,
+    phone: string,
+    name?: string | null,
+  ): Promise<void> {
+    const existingCustomer = await this.customerRepository.findOneBy({
+      userId: user.id,
+      phone,
+    });
+
+    if (existingCustomer) return;
+
+    await this.customerRepository
+      .save({
+        user,
+        name: name ?? "Desconhecido",
+        phone,
+        pending: true,
+        ignored: false,
+      })
+      .catch((error) => {
+        console.warn(
+          "Customer auto-create skipped (likely duplicate):",
+          error?.message,
+        );
+      });
   }
 }

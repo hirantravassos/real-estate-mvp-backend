@@ -15,7 +15,7 @@ export class WhatsappService {
     private readonly messageRepository: WhatsappMessageRepository,
     private readonly contactRepository: WhatsappContactRepository,
     private readonly socketService: WhatsappSocketService,
-  ) { }
+  ) {}
 
   async connect(user: User) {
     const found = await this.sessionRepository.findOneBy({

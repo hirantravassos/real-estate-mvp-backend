@@ -24,4 +24,3 @@ export class Kanban extends BaseEntity {
   @ColumnLongText({ nullable: true })
   description: string | null;
 }
-
