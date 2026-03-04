@@ -22,4 +22,7 @@ export class WhatsappChat extends BaseEntity {
     default: true,
   })
   unread: boolean;
+
+  @Column({ type: "datetime", nullable: true })
+  lastSentAt: string | null;
 }

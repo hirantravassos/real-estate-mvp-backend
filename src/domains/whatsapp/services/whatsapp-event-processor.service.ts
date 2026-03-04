@@ -19,7 +19,7 @@ export class WhatsappEventProcessorService {
     private readonly contactService: WhatsappContactService,
     private readonly chatService: WhatsappChatService,
     private readonly messageService: WhatsappMessageService,
-  ) {}
+  ) { }
 
   processHistorySync(
     user: User,
@@ -111,12 +111,13 @@ export class WhatsappEventProcessorService {
       name,
     });
 
-    void this.chatService.upsertChat(user, whatsappId, true);
+    const sentAt = fullMessage.messageTimestamp
+      ? dayjs.unix(fullMessage.messageTimestamp as number).toISOString()
+      : new Date().toISOString();
+
+    void this.chatService.upsertChat(user, whatsappId, true, sentAt);
 
     if (fullMessage.message || fullMessage.messageTimestamp) {
-      const sentAt = fullMessage.messageTimestamp
-        ? dayjs.unix(fullMessage.messageTimestamp as number).toISOString()
-        : new Date().toISOString();
 
       void this.messageService.upsertMessage(user, {
         messageId,
@@ -156,6 +157,8 @@ export class WhatsappEventProcessorService {
     const sentAt = innerMessage.messageTimestamp
       ? dayjs.unix(innerMessage.messageTimestamp as number).toISOString()
       : new Date().toISOString();
+
+    void this.chatService.upsertChat(user, whatsappId, false, sentAt);
 
     void this.messageService.upsertMessage(user, {
       messageId,

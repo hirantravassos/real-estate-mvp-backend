@@ -4,18 +4,19 @@ import { User } from "../../users/entities/user.entity";
 
 @Injectable()
 export class WhatsappChatService {
-  constructor(private readonly chatRepository: WhatsappChatRepository) {}
+  constructor(private readonly chatRepository: WhatsappChatRepository) { }
 
   async upsertChat(
     user: User,
     whatsappId: string,
     unread: boolean,
+    lastSentAt?: string | null,
   ): Promise<void> {
     if (!whatsappId) return;
 
-    await this.chatRepository.upsert({ user, whatsappId, unread }, [
-      "whatsappId",
-      "userId",
-    ]);
+    const payload: Record<string, unknown> = { user, whatsappId, unread };
+    if (lastSentAt) payload.lastSentAt = lastSentAt;
+
+    await this.chatRepository.upsert(payload, ["whatsappId", "userId"]);
   }
 }
