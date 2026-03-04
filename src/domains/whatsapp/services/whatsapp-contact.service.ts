@@ -21,6 +21,7 @@ export class WhatsappContactService {
       phoneNumber,
     });
   }
+
   async updateContactFromSyncMessage(user: User, syncMessage: IHistorySyncMsg) {
     const whatsappId = syncMessage?.message?.key?.remoteJid;
     const phoneNumber =

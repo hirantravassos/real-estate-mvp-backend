@@ -4,12 +4,25 @@ import { proto, WAMessage } from "@whiskeysockets/baileys";
 import dayjs from "dayjs";
 import { WhatsappMessageRepository } from "../repositories/whatsapp-message.repository";
 import { CreateWhatsappMessageDto } from "../dtos/create-whatsapp-message.dto";
+import { WhatsappMessageTypeEnum } from "../enums/whatsapp-message-type.enum";
 import IMessage = proto.IMessage;
 import IHistorySyncMsg = proto.IHistorySyncMsg;
 
 @Injectable()
 export class WhatsappMessageService {
   constructor(private readonly messageRepository: WhatsappMessageRepository) {}
+
+  async findAll(user: User, whatsappId: string) {
+    return this.messageRepository.find({
+      where: {
+        user: { id: user.id },
+        whatsappId,
+      },
+      order: {
+        sentAt: "DESC",
+      },
+    });
+  }
 
   async saveWAMessage(user: User, message: WAMessage) {
     const whatsappId = message?.key?.remoteJid;
@@ -18,8 +31,12 @@ export class WhatsappMessageService {
       ? dayjs.unix(message.messageTimestamp as number).toDate()
       : new Date();
     const content = message?.message?.conversation ?? "";
-    const type = this.getMessageType(message?.message) as string;
+    const type = this.getMessageType(message?.message);
     const me = !!message?.key?.fromMe;
+
+    if (!message?.message) {
+      console.warn("saveWAMessage is null: ", { message });
+    }
 
     if (!whatsappId) return;
     if (!messageId) return;
@@ -42,11 +59,15 @@ export class WhatsappMessageService {
       ? dayjs.unix(message?.message.messageTimestamp as number).toDate()
       : new Date();
     const content = message?.message?.message?.conversation ?? "";
-    const type = this.getMessageType(message?.message?.message) as string;
+    const type = this.getMessageType(message?.message?.message);
     const me = !!message?.message?.key?.fromMe;
 
     if (!whatsappId) throw new BadRequestException("whatsappId is required");
     if (!messageId) throw new BadRequestException("messageId is required");
+
+    if (!message?.message?.message) {
+      console.warn("saveHistorySyncMessage is null: ", { message });
+    }
 
     return this.save({
       user,
@@ -67,33 +88,24 @@ export class WhatsappMessageService {
     ]);
   }
 
-  private getMessageType(message: IMessage | null | undefined) {
-    if (!message) {
-      return "unknown";
+  private getMessageType(
+    message: IMessage | null | undefined,
+  ): WhatsappMessageTypeEnum {
+    if (message?.conversation) return WhatsappMessageTypeEnum.TEXT;
+    if (message?.imageMessage) return WhatsappMessageTypeEnum.IMAGE;
+    if (message?.videoMessage) return WhatsappMessageTypeEnum.VIDEO;
+    if (message?.audioMessage) return WhatsappMessageTypeEnum.AUDIO;
+    if (message?.documentMessage) return WhatsappMessageTypeEnum.DOCUMENT;
+    if (message?.stickerMessage) return WhatsappMessageTypeEnum.STICKER;
+    if (message?.locationMessage) return WhatsappMessageTypeEnum.LOCATION;
+    if (message?.eventMessage) return WhatsappMessageTypeEnum.EVENT;
+    if (message?.protocolMessage) return WhatsappMessageTypeEnum.PROTOCOL;
+    if (message?.templateMessage) return WhatsappMessageTypeEnum.TEMPLATE;
+
+    if (message) {
+      console.warn("message set as unknown: ", { message });
     }
-    if (message.conversation) {
-      return "text";
-    }
-    if (message.imageMessage) {
-      return "image";
-    }
-    if (message.videoMessage) {
-      return "video";
-    }
-    if (message.audioMessage) {
-      return "audio";
-    }
-    if (message.documentMessage) {
-      return "document";
-    }
-    if (message.stickerMessage) {
-      return "sticker";
-    }
-    if (message.locationMessage) {
-      return "location";
-    }
-    if (message.eventMessage) {
-      return "event";
-    }
+
+    return WhatsappMessageTypeEnum.UNKNOWN;
   }
 }

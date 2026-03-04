@@ -25,6 +25,7 @@ import { WhatsappConnectionStatusEnum } from "../enums/whatsapp-connection-statu
 import { WhatsappMessageService } from "./whatsapp-message.service";
 import { WhatsappChatService } from "./whatsapp-chat.service";
 import { WhatsappContactService } from "./whatsapp-contact.service";
+import { User } from "../../users/entities/user.entity";
 
 @Injectable()
 export class WhatsappSocketService implements OnModuleInit {
@@ -48,41 +49,42 @@ export class WhatsappSocketService implements OnModuleInit {
     });
 
     for (const session of activeSessions) {
-      await this.start(session.id).catch((error) => {
+      const user = await this.getUsers(session.id);
+      await this.start(session.id, user).catch((error) => {
         console.error("Initial boot failed for " + session.id, error);
       });
     }
   }
 
-  public async start(sessionId: string): Promise<void> {
+  public async start(sessionId: string, user: User): Promise<void> {
     const socket = await this.createSocket(sessionId);
 
     socket.ev.on("messaging-history.set", (data) => {
-      void this.handleMessagingHistorySet(sessionId, data);
+      void this.handleMessagingHistorySet(user, data);
     });
 
     socket.ev.on("messages.upsert", (data) => {
-      void this.handleMessageUpsert(sessionId, data);
+      void this.handleMessageUpsert(user, data);
     });
 
     socket.ev.on("messages.update", (data) => {
-      void this.handleMessageUpdate(sessionId, data);
+      void this.handleMessageUpdate(user, data);
     });
 
     socket.ev.on("chats.upsert", (data) => {
-      void this.handleChatUpsert(sessionId, data);
+      void this.handleChatUpsert(user, data);
     });
 
     socket.ev.on("chats.update", (data) => {
-      void this.handleChatUpdate(sessionId, data);
+      void this.handleChatUpdate(user, data);
     });
 
     socket.ev.on("contacts.upsert", (data) => {
-      void this.handleContactUpsert(sessionId, data);
+      void this.handleContactUpsert(user, data);
     });
 
     socket.ev.on("contacts.update", (data) => {
-      void this.handleContactUpdate(sessionId, data);
+      void this.handleContactUpdate(user, data);
     });
 
     socket.ev.on("connection.update", (data) => {
@@ -110,7 +112,14 @@ export class WhatsappSocketService implements OnModuleInit {
     const sessionPath = join(this.sessionsDir, sessionId);
 
     await fs.rm(sessionPath, { recursive: true, force: true });
-    await this.sessionRepository.delete({ id: sessionId });
+    await this.sessionRepository.update(
+      {
+        id: sessionId,
+      },
+      {
+        status: WhatsappConnectionStatusEnum.CLOSED,
+      },
+    );
 
     console.warn(
       "Session " +
@@ -121,8 +130,8 @@ export class WhatsappSocketService implements OnModuleInit {
     );
   }
 
-  private async handleMessagingHistorySet(
-    sessionId: string,
+  private handleMessagingHistorySet(
+    user: User,
     data: {
       chats: Chat[];
       contacts: Contact[];
@@ -133,8 +142,6 @@ export class WhatsappSocketService implements OnModuleInit {
       peerDataRequestSessionId?: string | null;
     },
   ) {
-    const user = await this.getUsers(sessionId);
-
     if (!user) return;
 
     for (const chat of data.chats) {
@@ -154,35 +161,28 @@ export class WhatsappSocketService implements OnModuleInit {
     }
   }
 
-  private async handleMessageUpsert(
-    sessionId: string,
+  private handleMessageUpsert(
+    user: User,
     data: {
       messages: WAMessage[];
       type: MessageUpsertType;
       requestId?: string;
     },
   ) {
-    const user = await this.getUsers(sessionId);
     for (const WAMessage of data.messages) {
       void this.messageService.saveWAMessage(user, WAMessage);
       void this.contactService.updateContactFromWAMessage(user, WAMessage);
     }
   }
 
-  private async handleMessageUpdate(
-    sessionId: string,
-    data: WAMessageUpdate[],
-  ) {
-    const user = await this.getUsers(sessionId);
+  private handleMessageUpdate(user: User, data: WAMessageUpdate[]) {
     for (const WAMessage of data) {
       void this.messageService.saveWAMessage(user, WAMessage);
       void this.contactService.updateContactFromWAMessage(user, WAMessage);
     }
   }
 
-  private async handleChatUpsert(sessionId: string, data: Chat[]) {
-    const user = await this.getUsers(sessionId);
-
+  private handleChatUpsert(user: User, data: Chat[]) {
     for (const chat of data) {
       void this.chatService.saveChat(user, chat);
 
@@ -193,30 +193,24 @@ export class WhatsappSocketService implements OnModuleInit {
     }
   }
 
-  private async handleChatUpdate(sessionId: string, data: Chat[]) {
-    const user = await this.getUsers(sessionId);
-
+  private handleChatUpdate(user: User, data: Chat[]) {
     for (const chat of data) {
       void this.chatService.saveChat(user, chat);
 
       for (const message of chat?.messages ?? []) {
-        await this.messageService.saveHistorySyncMessage(user, message);
+        void this.messageService.saveHistorySyncMessage(user, message);
+        void this.contactService.updateContactFromSyncMessage(user, message);
       }
     }
   }
 
-  private async handleContactUpsert(sessionId: string, data: Contact[]) {
-    const user = await this.getUsers(sessionId);
+  private handleContactUpsert(user: User, data: Contact[]) {
     for (const contact of data) {
       void this.contactService.saveFromContact(user, contact);
     }
   }
 
-  private async handleContactUpdate(
-    sessionId: string,
-    data: Partial<Contact>[],
-  ) {
-    const user = await this.getUsers(sessionId);
+  private handleContactUpdate(user: User, data: Partial<Contact>[]) {
     for (const contact of data) {
       void this.contactService.saveFromContact(user, contact);
     }
@@ -254,7 +248,7 @@ export class WhatsappSocketService implements OnModuleInit {
     return socket;
   }
 
-  private connectionUpdate(
+  private async connectionUpdate(
     sessionId: string,
     update: Partial<ConnectionState>,
   ) {
@@ -286,7 +280,8 @@ export class WhatsappSocketService implements OnModuleInit {
         return;
       }
 
-      this.start(sessionId).catch(console.error);
+      const user = await this.getUsers(sessionId);
+      this.start(sessionId, user).catch(console.error);
     }
   }
 

@@ -29,9 +29,6 @@ export class WhatsappChat extends BaseEntity {
   ])
   contact: WhatsappContact;
 
-  @OneToMany(() => WhatsappMessage, (whatsappMessage) => whatsappMessage.chat)
-  messages: WhatsappMessage[];
-
   @Column({ type: "varchar", length: 255 })
   whatsappId: string;
 

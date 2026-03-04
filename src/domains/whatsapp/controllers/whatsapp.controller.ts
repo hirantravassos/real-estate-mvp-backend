@@ -1,4 +1,11 @@
-import { Controller, Delete, Get, Post, UseGuards } from "@nestjs/common";
+import {
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  UseGuards,
+} from "@nestjs/common";
 import { JwtGuard } from "../../auth/guards/jwt.guard";
 import { WhatsappService } from "../services/whatsapp.service";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
@@ -21,6 +28,14 @@ export class WhatsappController {
   @Get("chats")
   async findAllChats(@GetUser() user: User) {
     return this.whatsappService.findAllChats(user);
+  }
+
+  @Get("chats/:whatsappId")
+  async findAllMessages(
+    @GetUser() user: User,
+    @Param("whatsappId") whatsappId: string,
+  ) {
+    return this.whatsappService.findAllMessages(user, whatsappId);
   }
 
   @Post("connect")

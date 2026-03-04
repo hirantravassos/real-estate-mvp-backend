@@ -2,6 +2,7 @@ import { Column, Entity, JoinColumn, ManyToOne, Unique } from "typeorm";
 import { BaseEntity } from "../../../shared/entities/base.entity";
 import { User } from "../../users/entities/user.entity";
 import { WhatsappChat } from "./whatsapp-chat.entity";
+import { WhatsappMessageTypeEnum } from "../enums/whatsapp-message-type.enum";
 
 @Entity("whatsapp_messages")
 @Unique("UQ_WHATSAPP_MESSAGE_COMPOSITE", ["whatsappId", "messageId", "user"])
@@ -30,8 +31,8 @@ export class WhatsappMessage extends BaseEntity {
   @Column({ type: "varchar", length: 255 })
   content: string;
 
-  @Column({ type: "varchar", length: 255 })
-  type: string;
+  @Column({ type: "enum", enum: WhatsappMessageTypeEnum })
+  type: WhatsappMessageTypeEnum;
 
   @Column({
     type: "boolean",
