@@ -19,7 +19,7 @@ export class WhatsappEventProcessorService {
     private readonly contactService: WhatsappContactService,
     private readonly chatService: WhatsappChatService,
     private readonly messageService: WhatsappMessageService,
-  ) { }
+  ) {}
 
   processHistorySync(
     user: User,
@@ -101,7 +101,9 @@ export class WhatsappEventProcessorService {
 
     if (!whatsappId || !messageId) return;
 
-    const phoneNumber = this.extractPhoneNumber(whatsappId);
+    const phoneNumber =
+      this.extractPhoneNumber(whatsappId) ??
+      this.extractPhoneNumber(rawMessage.key?.remoteJidAlt);
     const name = this.cleanName(selfName, (rawMessage as WAMessage).pushName);
     const fullMessage = rawMessage as WAMessage;
 
@@ -118,7 +120,6 @@ export class WhatsappEventProcessorService {
     void this.chatService.upsertChat(user, whatsappId, true, sentAt);
 
     if (fullMessage.message || fullMessage.messageTimestamp) {
-
       void this.messageService.upsertMessage(user, {
         messageId,
         whatsappId,
@@ -145,7 +146,9 @@ export class WhatsappEventProcessorService {
 
     const phoneNumber =
       this.extractPhoneNumber(whatsappId) ??
-      this.extractPhoneNumber(innerMessage.key?.remoteJid ?? undefined);
+      this.extractPhoneNumber(innerMessage.key?.remoteJid ?? undefined) ??
+      // @ts-expect-error: missing type
+      this.extractPhoneNumber(innerMessage.key?.remoteJidAlt);
     const name = this.cleanName(selfName, innerMessage.pushName);
 
     void this.contactService.upsertContact(user, {
