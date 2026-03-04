@@ -2,12 +2,14 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { WhatsappSessionRepository } from "../repositories/whatsapp-session.repository";
 import { User } from "../../users/entities/user.entity";
 import { WhatsappSocketService } from "./whatsapp-socket.service";
+import { WhatsappChatRepository } from "../repositories/whatsapp-chat.repository";
 
 @Injectable()
 export class WhatsappService {
   constructor(
     private readonly sessionRepository: WhatsappSessionRepository,
     private readonly whatsappSocketService: WhatsappSocketService,
+    private readonly whatsappChatRepository: WhatsappChatRepository,
   ) {}
 
   async connect(user: User) {
@@ -50,18 +52,8 @@ export class WhatsappService {
   }
 
   async findAllChats(user: User) {
-    // return this.chatRepository.find({
-    //   where: { user: { id: user.id } },
-    //   relations: {
-    //     contact: true,
-    //     messages: true,
-    //   },
-    //   order: {
-    //     messages: {
-    //       timestamp: "DESC",
-    //     },
-    //   },
-    // });
-    return [];
+    return this.whatsappChatRepository.find({
+      where: { user: { id: user.id } },
+    });
   }
 }

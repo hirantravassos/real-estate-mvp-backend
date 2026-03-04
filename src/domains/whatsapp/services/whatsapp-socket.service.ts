@@ -1,15 +1,13 @@
-import {
-  Injectable,
-  InternalServerErrorException,
-  OnModuleInit,
-} from "@nestjs/common";
+import { Injectable, InternalServerErrorException, OnModuleInit, } from "@nestjs/common";
 import makeWASocket, {
   Browsers,
-  BufferedEventData,
+  Chat,
   ConnectionState,
+  Contact,
   fetchLatestBaileysVersion,
   proto,
   useMultiFileAuthState,
+  WAMessage,
   WASocket,
 } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
@@ -18,8 +16,11 @@ import { join } from "path";
 import { existsSync, mkdirSync, promises as fs } from "node:fs";
 import { WhatsappSessionRepository } from "../repositories/whatsapp-session.repository";
 import { WhatsappConnectionStatusEnum } from "../enums/whatsapp-connection-status.enum";
-import { WhatsappChat } from "../entities/whatsapp-chat.entity";
 import { WhatsappChatRepository } from "../repositories/whatsapp-chat.repository";
+import dayjs from "dayjs";
+import { WhatsappMessageRepository } from "../repositories/whatsapp-message.repository";
+import { WhatsappChat } from "../entities/whatsapp-chat.entity";
+import IMessage = proto.IMessage;
 
 @Injectable()
 export class WhatsappSocketService implements OnModuleInit {
@@ -29,6 +30,7 @@ export class WhatsappSocketService implements OnModuleInit {
   constructor(
     private readonly sessionRepository: WhatsappSessionRepository,
     private readonly chatRepository: WhatsappChatRepository,
+    private readonly messageRepository: WhatsappMessageRepository,
   ) {
     if (!existsSync(this.sessionsDir)) {
       mkdirSync(this.sessionsDir, { recursive: true });
@@ -50,9 +52,9 @@ export class WhatsappSocketService implements OnModuleInit {
   public async start(sessionId: string): Promise<void> {
     const socket = await this.createSocket(sessionId);
 
-    // socket.ev.on("messaging-history.set", (data) => {
-    //   void this.messageHistorySet(sessionId, data);
-    // });
+    socket.ev.on("messaging-history.set", (data) => {
+      void this.handleHistoryLoad(sessionId, data);
+    });
 
     socket.ev.on("messages.upsert", (data) => {
       // console.log("messages.upsert", { data });
@@ -68,21 +70,6 @@ export class WhatsappSocketService implements OnModuleInit {
 
     socket.ev.on("chats.update", (data) => {
       void this.handleChatUpdate(sessionId, data);
-    });
-
-    socket.ev.on("contacts.upsert", (data) => {
-      console.log("contacts.upsert", { data });
-    });
-
-    socket.ev.on("contacts.update", (data) => {
-      console.log("contacts.update", { data });
-      // const contacts = data?.map((item) => {
-      //   return {
-      //     name: item?.verifiedName ?? item?.notify ?? "Desconhecido",
-      //     whatsappId: item?.id,
-      //   };
-      // });
-      // void this.contactRepository.save(contacts);
     });
 
     socket.ev.on("connection.update", (data) => {
@@ -121,62 +108,172 @@ export class WhatsappSocketService implements OnModuleInit {
     );
   }
 
-  private async handleChatUpdate(
+  private async handleHistoryLoad(
     sessionId: string,
-    data: Partial<
-      proto.IConversation & {
-        lastMessageRecvTimestamp?: number;
-      } & {
-        conditional: (bufferedData: BufferedEventData) => boolean | undefined;
-        timestamp?: number;
-      }
-    >[],
+    data: {
+      chats: Chat[];
+      contacts: Contact[];
+      messages: WAMessage[];
+      isLatest?: boolean;
+      progress?: number | null;
+      syncType?: proto.HistorySync.HistorySyncType | null;
+      peerDataRequestSessionId?: string | null;
+    },
   ) {
-    // console.log("chats.update", { data });
     const user = await this.getUsers(sessionId);
+
+    console.log("hasUser", Boolean(user), { user });
+
+    if (!user) return;
 
     const newChats: WhatsappChat[] = [];
 
-    const chats = data?.forEach((item) => {
-      console.log("chats.update.item", { item });
+    for (const chat of data.chats) {
+      const whatsappId = chat?.id;
 
-      const phoneNumber = this.getPhoneNumberFromJid(
-        // @ts-expect-error: missing types
-        item?.messages?.[0]?.message?.key?.remoteJid,
-        // @ts-expect-error: missing types
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-        item?.messages?.[0]?.message?.key?.remoteJidAlt,
+      console.log(
+        "data.chats => hasWhatsappId",
+        Boolean(whatsappId),
+        whatsappId,
       );
 
-      const name =
-        item?.name ?? item?.messages?.[0]?.message?.pushName ?? "Desconhecido";
+      if (!whatsappId) continue;
 
-      const whatsappId = item?.id;
+      const contact = data?.contacts?.find((contact) => {
+        return chat.id === contact.id;
+      });
 
-      const unread = item?.unreadMentionCount
-        ? item?.unreadMentionCount > 0
-        : false;
+      const phoneNumber = this.getPhoneNumberFromJid(
+        contact?.phoneNumber ?? "",
+      );
 
-      if (!whatsappId) {
-        return;
-      }
+      console.log(
+        "data.chats => hasPhoneNumber",
+        Boolean(phoneNumber),
+        phoneNumber,
+      );
+
+      if (!phoneNumber) continue;
 
       newChats.push(
         this.chatRepository.create({
+          phoneNumber,
+          name: contact?.notify ?? "Desconhecido",
+          whatsappId,
+          user,
+          unread: (chat?.unreadCount ?? 0) > 0,
+        }),
+      );
+
+      console.log("data.chats => pushed successfully");
+    }
+
+    console.log("data.chats => upsert", { newChats });
+
+    await this.chatRepository.upsert(newChats, ["whatsappId", "user.id"]);
+
+    for (const message of data.messages) {
+      const whatsappId = message?.key?.remoteJid;
+
+      if (!whatsappId) continue;
+
+      const chat = await this.chatRepository.findOne({
+        where: { whatsappId, user: { id: user.id } },
+      });
+
+      if (!chat) continue;
+
+      const messageId = message?.key?.id as string;
+      const sentAt = message?.messageTimestamp
+        ? dayjs.unix(message.messageTimestamp as number).toDate()
+        : new Date();
+      const content = message?.message?.conversation ?? "";
+      const type = this.getMessageType(message?.message) as string;
+      const me = !!message?.key?.fromMe;
+
+      void this.messageRepository.upsert(
+        {
+          chat,
+          messageId,
+          sentAt: sentAt?.toISOString(),
+          content,
+          type,
+          me,
+        },
+        {
+          conflictPaths: ["messageId"],
+          skipUpdateIfNoValuesChanged: true,
+        },
+      );
+    }
+  }
+
+  private async handleChatUpdate(sessionId: string, data: Chat[]) {
+    const user = await this.getUsers(sessionId);
+
+    for (const chatData of data) {
+      const whatsappId = chatData?.id;
+
+      if (!whatsappId) continue;
+
+      const phoneNumber = this.getPhoneNumberFromJid(
+        // @ts-expect-error: missing types
+        chatData?.messages?.[0]?.message?.key?.remoteJid,
+        // @ts-expect-error: missing types
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+        chatData?.messages?.[0]?.message?.key?.remoteJidAlt,
+      );
+
+      const name =
+        chatData?.name ??
+        chatData?.messages?.[0]?.message?.pushName ??
+        "Desconhecido";
+
+      const unread = (chatData?.unreadCount ?? 0) > 0;
+
+      await this.chatRepository.upsert(
+        {
           phoneNumber,
           name,
           whatsappId,
           user,
           unread,
-        }),
+        },
+        ["whatsappId", "user.id"],
       );
-    });
 
-    void this.chatRepository
-      .save(newChats)
-      .catch(() => console.error("duplicated"));
+      const chatRecord = await this.chatRepository.findOne({
+        where: { whatsappId, user: { id: user.id } },
+      });
 
-    console.log({ chats });
+      if (!chatRecord) continue;
+
+      const messagesToUpsert = (chatData?.messages ?? []).map((message) => {
+        const content = message?.message?.message?.conversation ?? "";
+        const messageId = message?.message?.key?.id as string;
+        const sentAt = message?.message?.messageTimestamp
+          ? dayjs.unix(message.message.messageTimestamp as number).toDate()
+          : new Date();
+        const type = this.getMessageType(message?.message?.message) as string;
+
+        return this.messageRepository.create({
+          sentAt: sentAt.toISOString(),
+          content,
+          messageId,
+          whatsappId: message?.message?.key?.remoteJid as string,
+          type,
+          me: !!message?.message?.key?.fromMe,
+          chat: chatRecord,
+        });
+      });
+
+      if (messagesToUpsert.length > 0) {
+        await this.messageRepository.upsert(messagesToUpsert, {
+          conflictPaths: ["messageId"],
+          skipUpdateIfNoValuesChanged: true,
+        });
+      }
+    }
   }
 
   private async createSocket(
@@ -259,7 +356,37 @@ export class WhatsappSocketService implements OnModuleInit {
     return user;
   }
 
-  private getPhoneNumberFromJid(jid: string, jidAlt: string): string | null {
+  private getMessageType(message: IMessage | null | undefined) {
+    if (!message) {
+      return "unknown";
+    }
+    if (message.conversation) {
+      return "text";
+    }
+    if (message.imageMessage) {
+      return "image";
+    }
+    if (message.videoMessage) {
+      return "video";
+    }
+    if (message.audioMessage) {
+      return "audio";
+    }
+    if (message.documentMessage) {
+      return "document";
+    }
+    if (message.stickerMessage) {
+      return "sticker";
+    }
+    if (message.locationMessage) {
+      return "location";
+    }
+    if (message.eventMessage) {
+      return "event";
+    }
+  }
+
+  private getPhoneNumberFromJid(jid: string, jidAlt?: string): string | null {
     const idWhatsApp = "@s.whatsapp.net";
     if (jid?.includes(idWhatsApp)) {
       return jid?.replaceAll(idWhatsApp, "")?.slice(2, 1000);
