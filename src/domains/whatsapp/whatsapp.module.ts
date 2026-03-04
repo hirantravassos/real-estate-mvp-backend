@@ -14,6 +14,7 @@ import { WhatsappChatService } from "./services/whatsapp-chat.service";
 import { WhatsappContactService } from "./services/whatsapp-contact.service";
 import { WhatsappContactRepository } from "./repositories/whatsapp-contact.repository";
 import { WhatsappContact } from "./entities/whatsapp-contact.entity";
+import { WhatsappEventProcessorService } from "./services/whatsapp-event-processor.service";
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { WhatsappContact } from "./entities/whatsapp-contact.entity";
     WhatsappContactRepository,
     WhatsappService,
     WhatsappSocketService,
+    WhatsappEventProcessorService,
     WhatsappMessageService,
     WhatsappChatService,
     WhatsappContactService,

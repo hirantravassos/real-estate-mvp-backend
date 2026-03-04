@@ -5,15 +5,9 @@ import {
 } from "@nestjs/common";
 import makeWASocket, {
   Browsers,
-  Chat,
   ConnectionState,
-  Contact,
   fetchLatestBaileysVersion,
-  MessageUpsertType,
-  proto,
   useMultiFileAuthState,
-  WAMessage,
-  WAMessageUpdate,
   WASocket,
 } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
@@ -22,22 +16,17 @@ import { join } from "path";
 import { existsSync, mkdirSync, promises as fs } from "node:fs";
 import { WhatsappSessionRepository } from "../repositories/whatsapp-session.repository";
 import { WhatsappConnectionStatusEnum } from "../enums/whatsapp-connection-status.enum";
-import { WhatsappMessageService } from "./whatsapp-message.service";
-import { WhatsappChatService } from "./whatsapp-chat.service";
-import { WhatsappContactService } from "./whatsapp-contact.service";
+import { WhatsappEventProcessorService } from "./whatsapp-event-processor.service";
 import { User } from "../../users/entities/user.entity";
 
 @Injectable()
 export class WhatsappSocketService implements OnModuleInit {
-  private socket: WASocket;
   private readonly sockets = new Map<string, WASocket>();
   private readonly sessionsDir = join(process.cwd(), "sessions");
 
   constructor(
     private readonly sessionRepository: WhatsappSessionRepository,
-    private readonly messageService: WhatsappMessageService,
-    private readonly chatService: WhatsappChatService,
-    private readonly contactService: WhatsappContactService,
+    private readonly eventProcessor: WhatsappEventProcessorService,
   ) {
     if (!existsSync(this.sessionsDir)) {
       mkdirSync(this.sessionsDir, { recursive: true });
@@ -50,7 +39,7 @@ export class WhatsappSocketService implements OnModuleInit {
     });
 
     for (const session of sessions) {
-      const user = await this.getUsers(session.id);
+      const user = await this.findUserBySessionId(session.id);
       await this.start(session.id, user).catch((error) => {
         console.error("Initial boot failed for " + session.id, error);
       });
@@ -59,38 +48,42 @@ export class WhatsappSocketService implements OnModuleInit {
 
   public async start(sessionId: string, user: User): Promise<void> {
     const socket = await this.createSocket(sessionId);
-    this.socket = socket;
+    const selfName = socket.authState?.creds?.me?.name ?? "";
 
     socket.ev.on("messaging-history.set", (data) => {
-      void this.handleMessagingHistorySet(user, data);
+      void this.eventProcessor.processHistorySync(user, selfName, data);
     });
 
     socket.ev.on("messages.upsert", (data) => {
-      void this.handleMessageUpsert(user, data);
+      void this.eventProcessor.processMessageUpsert(
+        user,
+        selfName,
+        data.messages,
+      );
     });
 
     socket.ev.on("messages.update", (data) => {
-      void this.handleMessageUpdate(user, data);
+      void this.eventProcessor.processMessageUpdate(user, selfName, data);
     });
 
     socket.ev.on("chats.upsert", (data) => {
-      void this.handleChat(user, data);
+      void this.eventProcessor.processChats(user, data);
     });
 
     socket.ev.on("chats.update", (data) => {
-      void this.handleChat(user, data);
+      void this.eventProcessor.processChats(user, data);
     });
 
     socket.ev.on("contacts.upsert", (data) => {
-      void this.handleContactUpsert(user, data);
+      void this.eventProcessor.processContacts(user, data);
     });
 
     socket.ev.on("contacts.update", (data) => {
-      void this.handleContactUpdate(user, data);
+      void this.eventProcessor.processContacts(user, data);
     });
 
     socket.ev.on("connection.update", (data) => {
-      void this.connectionUpdate(sessionId, data);
+      void this.handleConnectionUpdate(sessionId, data);
     });
   }
 
@@ -115,109 +108,13 @@ export class WhatsappSocketService implements OnModuleInit {
 
     await fs.rm(sessionPath, { recursive: true, force: true });
     await this.sessionRepository.update(
-      {
-        id: sessionId,
-      },
-      {
-        status: WhatsappConnectionStatusEnum.CLOSED,
-      },
+      { id: sessionId },
+      { status: WhatsappConnectionStatusEnum.CLOSED },
     );
 
     console.warn(
-      "Session " +
-        sessionId +
-        " OBLITERATED (Code: " +
-        statusCode +
-        "). DB record and files removed.",
+      `Session ${sessionId} OBLITERATED (Code: ${statusCode}). DB record and files removed.`,
     );
-  }
-
-  private handleMessagingHistorySet(
-    user: User,
-    data: {
-      chats: Chat[];
-      contacts: Contact[];
-      messages: WAMessage[];
-      isLatest?: boolean;
-      progress?: number | null;
-      syncType?: proto.HistorySync.HistorySyncType | null;
-      peerDataRequestSessionId?: string | null;
-    },
-  ) {
-    if (!user) return;
-
-    for (const chat of data.chats) {
-      void this.chatService.saveChat(user, chat);
-
-      for (const syncMessage of chat?.messages ?? []) {
-        void this.messageService.saveHistorySyncMessage(user, syncMessage);
-        void this.contactService.updateContactFromSyncMessage(
-          user,
-          this.socket,
-          syncMessage,
-        );
-      }
-    }
-
-    for (const WAMessage of data.messages) {
-      void this.messageService.saveWAMessage(user, WAMessage);
-    }
-  }
-
-  private handleMessageUpsert(
-    user: User,
-    data: {
-      messages: WAMessage[];
-      type: MessageUpsertType;
-      requestId?: string;
-    },
-  ) {
-    for (const WAMessage of data.messages) {
-      void this.messageService.saveWAMessage(user, WAMessage);
-      void this.contactService.updateContactFromWAMessage(
-        user,
-        this.socket,
-        WAMessage,
-      );
-    }
-  }
-
-  private handleMessageUpdate(user: User, data: WAMessageUpdate[]) {
-    for (const WAMessage of data) {
-      void this.messageService.saveWAMessage(user, WAMessage);
-      void this.contactService.updateContactFromWAMessage(
-        user,
-        this.socket,
-        WAMessage,
-      );
-    }
-  }
-
-  private handleChat(user: User, data: Chat[]) {
-    for (const chat of data) {
-      void this.chatService.saveChat(user, chat);
-
-      for (const message of chat?.messages ?? []) {
-        void this.messageService.saveHistorySyncMessage(user, message);
-        void this.contactService.updateContactFromSyncMessage(
-          user,
-          this.socket,
-          message,
-        );
-      }
-    }
-  }
-
-  private handleContactUpsert(user: User, data: Contact[]) {
-    for (const contact of data) {
-      void this.contactService.saveFromContact(user, contact);
-    }
-  }
-
-  private handleContactUpdate(user: User, data: Partial<Contact>[]) {
-    for (const contact of data) {
-      void this.contactService.saveFromContact(user, contact);
-    }
   }
 
   private async createSocket(
@@ -252,7 +149,7 @@ export class WhatsappSocketService implements OnModuleInit {
     return socket;
   }
 
-  private async connectionUpdate(
+  private async handleConnectionUpdate(
     sessionId: string,
     update: Partial<ConnectionState>,
   ) {
@@ -288,19 +185,21 @@ export class WhatsappSocketService implements OnModuleInit {
         return;
       }
 
-      const user = await this.getUsers(sessionId);
+      const user = await this.findUserBySessionId(sessionId);
       this.start(sessionId, user).catch(console.error);
     }
   }
 
-  private async getUsers(sessionId: string) {
+  private async findUserBySessionId(sessionId: string): Promise<User> {
     const { user } = await this.sessionRepository
       .findOneOrFail({
         where: { id: sessionId },
         relations: { user: true },
       })
       .catch(() => {
-        throw new InternalServerErrorException("getUsers: Session not found");
+        throw new InternalServerErrorException(
+          "findUserBySessionId: Session not found",
+        );
       });
     return user;
   }

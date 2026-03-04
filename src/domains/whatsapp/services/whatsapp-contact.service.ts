@@ -1,137 +1,50 @@
 import { Injectable } from "@nestjs/common";
 import { WhatsappContactRepository } from "../repositories/whatsapp-contact.repository";
 import { User } from "../../users/entities/user.entity";
-import { Contact, proto, WAMessage, WASocket } from "@whiskeysockets/baileys";
-import { CreateWhatsappContactDto } from "../dtos/create-whatsapp-contact.dto";
-import IHistorySyncMsg = proto.IHistorySyncMsg;
+
+interface UpsertContactData {
+  readonly whatsappId: string;
+  readonly phoneNumber?: string | null;
+  readonly name?: string | null;
+}
 
 @Injectable()
 export class WhatsappContactService {
-  constructor(
-    private readonly contactRepository: WhatsappContactRepository,
-  ) { }
+  constructor(private readonly contactRepository: WhatsappContactRepository) {}
 
-  async saveFromContact(user: User, contact: Partial<Contact>) {
-    const whatsappId = contact?.id;
-    const name = contact?.notify ?? contact?.name;
-    if (!whatsappId) return;
-    return await this.save({
+  async upsertContact(user: User, data: UpsertContactData): Promise<void> {
+    if (!data.whatsappId) return;
+
+    const payload: Record<string, unknown> = {
       user,
-      whatsappId,
-      name: name ?? "Desconhecido",
-      phoneNumber: this.getPhoneNumberFromJid(whatsappId),
-    });
-  }
+      whatsappId: data.whatsappId,
+    };
 
-  async updateContactFromSyncMessage(
-    user: User,
-    socket: WASocket,
-    syncMessage: IHistorySyncMsg,
-  ) {
-    const whatsappId = syncMessage?.message?.key?.remoteJid;
-    const phoneNumber =
-      this.getPhoneNumberFromJid(whatsappId ?? undefined) ??
-      this.getPhoneNumberFromJid(
-        syncMessage?.message?.key?.remoteJid ?? undefined,
-      ) ??
-      // @ts-expect-error: missing type
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      this.getPhoneNumberFromJid(syncMessage?.message?.key?.remoteJidAlt);
-    const name = this.getCleanName(
-      user,
-      socket,
-      syncMessage?.message?.pushName,
-    );
+    const hasRealName = data.name !== null && data.name !== undefined;
+    const hasRealPhone =
+      data.phoneNumber !== null && data.phoneNumber !== undefined;
 
-    if (!whatsappId) return;
+    if (hasRealName) payload.name = data.name;
+    if (hasRealPhone) payload.phoneNumber = data.phoneNumber;
 
-    const contact = await this.contactRepository.findOneBy({
-      whatsappId,
+    const existingContact = await this.contactRepository.findOneBy({
+      whatsappId: data.whatsappId,
       userId: user.id,
     });
 
-    if (!contact) {
-      return await this.save({
-        user,
-        whatsappId,
-        name: name ?? "Desconhecido",
-        phoneNumber,
-      });
+    if (existingContact) {
+      if (hasRealName) existingContact.name = data.name;
+      if (hasRealPhone) existingContact.phoneNumber = data.phoneNumber;
+      await this.contactRepository.save(existingContact);
+      return;
     }
 
-    if (phoneNumber) contact.phoneNumber = phoneNumber;
-    if (name) contact.name = name;
-
-    await this.save(contact);
-  }
-
-  async updateContactFromWAMessage(
-    user: User,
-    socket: WASocket,
-    WAMessage: WAMessage,
-  ) {
-    const whatsappId = WAMessage?.key?.remoteJid;
-    const phoneNumber =
-      this.getPhoneNumberFromJid(whatsappId ?? undefined) ??
-      this.getPhoneNumberFromJid(WAMessage?.key?.remoteJid ?? undefined) ??
-      this.getPhoneNumberFromJid(WAMessage?.key?.remoteJidAlt);
-    const name = this.getCleanName(user, socket, WAMessage?.pushName);
-
-    if (!whatsappId) return;
-
-    const contact = await this.contactRepository.findOneBy({
-      whatsappId,
-      userId: user.id,
-    });
-
-    if (!contact) {
-      return await this.save({
-        user,
-        whatsappId,
-        name: name ?? "Desconhecido",
-        phoneNumber,
-      });
-    }
-
-    if (phoneNumber) contact.phoneNumber = phoneNumber;
-    if (name) contact.name = name;
-
-    await this.save(contact);
-  }
-
-  private async save(dto: CreateWhatsappContactDto) {
-    if (dto.whatsappId === "") return;
-    if (!dto.whatsappId) return;
-
-    return await this.contactRepository.upsert(
+    await this.contactRepository.upsert(
       {
-        ...(dto.phoneNumber ? { phoneNumber: dto.phoneNumber } : {}),
-        user: dto.user,
-        whatsappId: dto.whatsappId,
-        name: dto.name,
+        ...payload,
+        name: data.name ?? "Desconhecido",
       },
       ["whatsappId", "userId"],
-    );
-  }
-
-  private getPhoneNumberFromJid(jid?: string): string | null {
-    const idWhatsApp = "@s.whatsapp.net";
-    if (jid?.includes(idWhatsApp)) {
-      const newPhone = jid?.replaceAll(idWhatsApp, "")?.slice(2, 1000);
-      if (newPhone?.length < 10) return null;
-      return newPhone;
-    }
-    return null;
-  }
-
-  private getCleanName(
-    user: User,
-    socket: WASocket,
-    possibleName?: string | null,
-  ): string | null {
-    return (
-      possibleName?.replaceAll(socket?.authState?.creds?.me?.name ?? "", "") ??
-      null
     );
   }
 }
