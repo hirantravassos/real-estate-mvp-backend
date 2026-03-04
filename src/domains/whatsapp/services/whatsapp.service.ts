@@ -68,7 +68,8 @@ export class WhatsappService {
         "contact.whatsappId = chat.whatsappId AND contact.userId = chat.userId",
       )
       .where("chat.userId = :userId", { userId })
-      .orderBy("chat.lastSentAt", "DESC", "NULLS LAST")
+      .orderBy("ISNULL(chat.lastSentAt)", "ASC")
+      .addOrderBy("chat.lastSentAt", "DESC")
       .getMany();
   }
 
