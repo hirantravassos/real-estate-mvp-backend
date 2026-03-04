@@ -35,6 +35,19 @@ export class CustomerController {
     };
   }
 
+  @Get("pending")
+  async findAllPending(
+    @GetUser() user: User,
+    @Query() pagination: PaginationRequestDto,
+  ) {
+    const result = await this.customerService.findAllPending(user, pagination);
+
+    return {
+      ...result,
+      data: CustomerMapper.toListDto(result.data),
+    };
+  }
+
   @Get(":id")
   async findOne(@GetUser() user: User, @Param("id") id: string) {
     return CustomerMapper.toDto(await this.customerService.findOne(user, id));
@@ -52,6 +65,16 @@ export class CustomerController {
     @Body() dto: CustomerCreateDto,
   ) {
     return CustomerMapper.toDto(await this.customerService.save(user, dto, id));
+  }
+
+  @Post(":id/ignore")
+  async ignore(@GetUser() user: User, @Param("id") customerId: string) {
+    return await this.customerService.ignore(user, customerId);
+  }
+
+  @Post(":id/accept")
+  async accept(@GetUser() user: User, @Param("id") customerId: string) {
+    return await this.customerService.accept(user, customerId);
   }
 
   @Delete(":id")

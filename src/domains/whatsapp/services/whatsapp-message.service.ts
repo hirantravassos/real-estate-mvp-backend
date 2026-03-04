@@ -34,10 +34,6 @@ export class WhatsappMessageService {
     const type = this.getMessageType(message?.message);
     const me = !!message?.key?.fromMe;
 
-    if (!message?.message) {
-      console.warn("saveWAMessage is null: ", { message });
-    }
-
     if (!whatsappId) return;
     if (!messageId) return;
 
@@ -65,10 +61,6 @@ export class WhatsappMessageService {
     if (!whatsappId) throw new BadRequestException("whatsappId is required");
     if (!messageId) throw new BadRequestException("messageId is required");
 
-    if (!message?.message?.message) {
-      console.warn("saveHistorySyncMessage is null: ", { message });
-    }
-
     return this.save({
       user,
       messageId,
@@ -94,6 +86,7 @@ export class WhatsappMessageService {
     if (message?.conversation) return WhatsappMessageTypeEnum.TEXT;
     if (message?.imageMessage) return WhatsappMessageTypeEnum.IMAGE;
     if (message?.videoMessage) return WhatsappMessageTypeEnum.VIDEO;
+    if (message?.invoiceMessage) return WhatsappMessageTypeEnum.VOICE;
     if (message?.audioMessage) return WhatsappMessageTypeEnum.AUDIO;
     if (message?.documentMessage) return WhatsappMessageTypeEnum.DOCUMENT;
     if (message?.stickerMessage) return WhatsappMessageTypeEnum.STICKER;

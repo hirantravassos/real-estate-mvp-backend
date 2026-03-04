@@ -14,6 +14,7 @@ import { WhatsappChatService } from "./services/whatsapp-chat.service";
 import { WhatsappContactService } from "./services/whatsapp-contact.service";
 import { WhatsappContactRepository } from "./repositories/whatsapp-contact.repository";
 import { WhatsappContact } from "./entities/whatsapp-contact.entity";
+import { CustomerModule } from "../customers/customer.module";
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { WhatsappContact } from "./entities/whatsapp-contact.entity";
       WhatsappMessage,
       WhatsappContact,
     ]),
+    CustomerModule,
   ],
   controllers: [WhatsappController],
   providers: [

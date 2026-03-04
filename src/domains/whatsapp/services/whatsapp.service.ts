@@ -5,7 +5,7 @@ import { WhatsappSocketService } from "./whatsapp-socket.service";
 import { WhatsappChatRepository } from "../repositories/whatsapp-chat.repository";
 import { WhatsappMessageService } from "./whatsapp-message.service";
 import { WhatsappMessageRepository } from "../repositories/whatsapp-message.repository";
-import { In } from "typeorm";
+import { WhatsappMessage } from "../entities/whatsapp-message.entity";
 
 @Injectable()
 export class WhatsappService {
@@ -59,26 +59,32 @@ export class WhatsappService {
   async findAllChats(user: User) {
     const userId = user.id;
 
-    // 1. Get the latest message sentAt for each whatsappId
-    const latestMessages = this.messageRepository
+    const latestMessagesQuery = this.messageRepository
       .createQueryBuilder("msg")
       .select("msg.whatsappId", "whatsappId")
-      .addSelect("MAX(msg.sentAt)", "latestMessage")
-      .where("msg.user.id = :userId", { userId })
+      .addSelect("MAX(msg.sentAt)", "latestSentAt")
+      .where("msg.user.id = :userId", { userId }) // Using full descriptive name 'userId'
       .groupBy("msg.whatsappId");
 
-    // 2. Join chats with the subquery to order them
     return await this.chatRepository
       .createQueryBuilder("chat")
+      // 1. Join the subquery results
       .innerJoin(
-        `(${latestMessages.getQuery()})`,
+        `(${latestMessagesQuery.getQuery()})`,
         "latest_msg",
         "latest_msg.whatsappId = chat.whatsappId",
       )
-      .setParameters(latestMessages.getParameters())
+      // 2. Map the actual Message entity to a virtual property 'latestMessage'
+      .leftJoinAndMapOne(
+        "chat.latestMessage",
+        WhatsappMessage,
+        "message",
+        "message.whatsappId = chat.whatsappId AND message.sentAt = latest_msg.latestSentAt",
+      )
       .leftJoinAndSelect("chat.contact", "contact")
+      .setParameters(latestMessagesQuery.getParameters())
       .where("chat.user.id = :userId", { userId })
-      .orderBy("latest_msg.latestMessage", "DESC")
+      .orderBy("latest_msg.latestSentAt", "DESC")
       .getMany();
   }
 

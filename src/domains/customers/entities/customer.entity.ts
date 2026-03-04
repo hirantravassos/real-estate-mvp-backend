@@ -5,6 +5,7 @@ import { ColumnPhone } from "../../../shared/decorators/columns/column-phone.dec
 import { User } from "../../users/entities/user.entity";
 import { Kanban } from "../../kanbans/entities/kanban.entity";
 import { CustomerComment } from "./customer-comments.entity";
+import { ColumnBoolean } from "../../../shared/decorators/columns/column-boolean.decorator";
 
 @Entity("customers")
 export class Customer extends BaseEntity {
@@ -29,4 +30,10 @@ export class Customer extends BaseEntity {
 
   @ColumnPhone()
   phone: string;
+
+  @ColumnBoolean({ default: false })
+  ignored: boolean;
+
+  @ColumnBoolean({ default: true })
+  pending: boolean;
 }

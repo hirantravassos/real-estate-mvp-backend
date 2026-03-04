@@ -44,11 +44,11 @@ export class WhatsappSocketService implements OnModuleInit {
   }
 
   async onModuleInit(): Promise<void> {
-    const activeSessions = await this.sessionRepository.find({
+    const sessions = await this.sessionRepository.find({
       where: { active: true },
     });
 
-    for (const session of activeSessions) {
+    for (const session of sessions) {
       const user = await this.getUsers(session.id);
       await this.start(session.id, user).catch((error) => {
         console.error("Initial boot failed for " + session.id, error);
@@ -72,11 +72,11 @@ export class WhatsappSocketService implements OnModuleInit {
     });
 
     socket.ev.on("chats.upsert", (data) => {
-      void this.handleChatUpsert(user, data);
+      void this.handleChat(user, data);
     });
 
     socket.ev.on("chats.update", (data) => {
-      void this.handleChatUpdate(user, data);
+      void this.handleChat(user, data);
     });
 
     socket.ev.on("contacts.upsert", (data) => {
@@ -182,18 +182,7 @@ export class WhatsappSocketService implements OnModuleInit {
     }
   }
 
-  private handleChatUpsert(user: User, data: Chat[]) {
-    for (const chat of data) {
-      void this.chatService.saveChat(user, chat);
-
-      for (const message of chat?.messages ?? []) {
-        void this.messageService.saveHistorySyncMessage(user, message);
-        void this.contactService.updateContactFromSyncMessage(user, message);
-      }
-    }
-  }
-
-  private handleChatUpdate(user: User, data: Chat[]) {
+  private handleChat(user: User, data: Chat[]) {
     for (const chat of data) {
       void this.chatService.saveChat(user, chat);
 
@@ -253,6 +242,7 @@ export class WhatsappSocketService implements OnModuleInit {
     update: Partial<ConnectionState>,
   ) {
     const { connection, lastDisconnect, qr } = update;
+    const socket = this.getSocket(sessionId);
 
     if (qr) {
       qrcode.generate(qr, { small: true });
@@ -265,7 +255,10 @@ export class WhatsappSocketService implements OnModuleInit {
     if (connection === "open") {
       void this.sessionRepository.update(
         { id: sessionId },
-        { status: WhatsappConnectionStatusEnum.OPEN },
+        {
+          status: WhatsappConnectionStatusEnum.OPEN,
+          name: socket?.authState?.creds?.me?.name,
+        },
       );
     }
 

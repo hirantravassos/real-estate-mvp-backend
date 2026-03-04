@@ -3,22 +3,25 @@ import { WhatsappContactRepository } from "../repositories/whatsapp-contact.repo
 import { User } from "../../users/entities/user.entity";
 import { Contact, proto, WAMessage } from "@whiskeysockets/baileys";
 import { CreateWhatsappContactDto } from "../dtos/create-whatsapp-contact.dto";
+import { CustomerRepository } from "../../customers/repositories/customer.repository";
 import IHistorySyncMsg = proto.IHistorySyncMsg;
 
 @Injectable()
 export class WhatsappContactService {
-  constructor(private readonly contactRepository: WhatsappContactRepository) {}
+  constructor(
+    private readonly contactRepository: WhatsappContactRepository,
+    private readonly customerRepository: CustomerRepository,
+  ) {}
 
   async saveFromContact(user: User, contact: Partial<Contact>) {
     const whatsappId = contact?.id;
-    const phoneNumber = contact?.notify;
-    const name = contact?.notify;
+    const name = contact?.notify ?? contact?.name;
     if (!whatsappId) return;
     return await this.save({
       user,
       whatsappId,
       name: name ?? "Desconhecido",
-      phoneNumber,
+      phoneNumber: this.getPhoneNumberFromJid(whatsappId),
     });
   }
 
@@ -32,8 +35,7 @@ export class WhatsappContactService {
       // @ts-expect-error: missing type
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       this.getPhoneNumberFromJid(syncMessage?.message?.key?.remoteJidAlt);
-    const name =
-      syncMessage?.message?.pushName ?? syncMessage?.message?.verifiedBizName;
+    const name = `syncMessage?.message?.pushName ${syncMessage?.message?.pushName}`;
 
     if (!whatsappId) return;
 
@@ -63,7 +65,7 @@ export class WhatsappContactService {
       this.getPhoneNumberFromJid(whatsappId ?? undefined) ??
       this.getPhoneNumberFromJid(WAMessage?.key?.remoteJid ?? undefined) ??
       this.getPhoneNumberFromJid(WAMessage?.key?.remoteJidAlt);
-    const name = WAMessage?.pushName ?? WAMessage?.verifiedBizName;
+    const name = `WAMessage?.pushName ${WAMessage?.pushName}`;
 
     if (!whatsappId) return;
 
@@ -91,9 +93,29 @@ export class WhatsappContactService {
     if (dto.whatsappId === "") return;
     if (!dto.whatsappId) return;
 
+    if (dto.phoneNumber) {
+      void this.customerRepository
+        .upsert(
+          {
+            kanban: null,
+            comments: [
+              { comment: "Gerado pelo sistema, via integração do WhatsApp" },
+            ],
+            name: dto.name,
+            phone: dto.phoneNumber,
+            user: dto.user,
+          },
+          ["user", "phone"],
+        )
+        .catch((err) => {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          console.warn("customer not created", { err });
+        });
+    }
+
     return await this.contactRepository.upsert(
       {
-        phoneNumber: dto.phoneNumber ?? null,
+        ...(dto.phoneNumber ? { phoneNumber: dto.phoneNumber } : {}),
         user: dto.user,
         whatsappId: dto.whatsappId,
         name: dto.name,
