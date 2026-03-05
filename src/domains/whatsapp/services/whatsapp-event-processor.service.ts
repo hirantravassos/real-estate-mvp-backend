@@ -1,11 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import {
-  Chat,
-  Contact,
-  proto,
-  WAMessage,
-  WAMessageUpdate,
-} from "@whiskeysockets/baileys";
+import { Chat, Contact, proto, WAMessage, WAMessageUpdate, } from "@whiskeysockets/baileys";
 import dayjs from "dayjs";
 import { User } from "../../users/entities/user.entity";
 import { WhatsappContactService } from "./whatsapp-contact.service";
@@ -13,13 +7,16 @@ import { WhatsappChatService } from "./whatsapp-chat.service";
 import { WhatsappMessageService } from "./whatsapp-message.service";
 import { WhatsappMediaService } from "./whatsapp-media.service";
 import { WhatsappMessageTypeEnum } from "../enums/whatsapp-message-type.enum";
+import { Long } from "typeorm";
 import IMessage = proto.IMessage;
 import IHistorySyncMsg = proto.IHistorySyncMsg;
 
 const WHATSAPP_JID_SUFFIX = "@s.whatsapp.net";
 const MINIMUM_PHONE_LENGTH = 10;
 const COUNTRY_CODE_LENGTH = 2;
-const BATCH_SIZE = 30;
+const SYNC_BATCH_SIZE = 10;
+const SYNC_BATCH_DELAY_MS = 100;
+const SYNC_MAX_AGE_MONTHS = 6;
 
 @Injectable()
 export class WhatsappEventProcessorService {
@@ -28,7 +25,7 @@ export class WhatsappEventProcessorService {
     private readonly chatService: WhatsappChatService,
     private readonly messageService: WhatsappMessageService,
     private readonly mediaService: WhatsappMediaService,
-  ) { }
+  ) {}
 
   processHistorySync(
     user: User,
@@ -39,28 +36,47 @@ export class WhatsappEventProcessorService {
       messages: WAMessage[];
     },
   ): void {
-    const tasks: Array<() => void> = [];
+    const tasks: Array<() => Promise<void>> = [];
+    const cutoffDate = dayjs().subtract(SYNC_MAX_AGE_MONTHS, "month");
 
     for (const chat of data.chats) {
-      tasks.push(() => {
-        void this.chatService.upsertChat(
+      tasks.push(() =>
+        this.chatService.upsertChat(
           user,
           chat?.id as string,
           (chat.unreadCount ?? 0) > 0,
-        );
-      });
+        ),
+      );
 
       for (const syncMessage of chat.messages ?? []) {
-        tasks.push(() => this.processSyncMessage(user, selfName, syncMessage));
+        if (
+          this.isWithinThreshold(
+            syncMessage.message?.messageTimestamp as number | Long | null,
+            cutoffDate,
+          )
+        ) {
+          tasks.push(() =>
+            this.processSyncMessageAsync(user, selfName, syncMessage),
+          );
+        }
       }
     }
 
     for (const contact of data.contacts) {
-      tasks.push(() => this.processContact(user, contact));
+      tasks.push(() => this.processContactAsync(user, contact));
     }
 
     for (const rawMessage of data.messages) {
-      tasks.push(() => this.processWAMessage(user, selfName, rawMessage));
+      if (
+        this.isWithinThreshold(
+          rawMessage.messageTimestamp as number | Long | null,
+          cutoffDate,
+        )
+      ) {
+        tasks.push(() =>
+          this.processMessageAsync(user, selfName, rawMessage, false),
+        );
+      }
     }
 
     void this.processInChunks(tasks);
@@ -72,7 +88,7 @@ export class WhatsappEventProcessorService {
     messages: WAMessage[],
   ): void {
     for (const rawMessage of messages) {
-      this.processWAMessage(user, selfName, rawMessage);
+      this.processRealtimeMessage(user, selfName, rawMessage);
     }
   }
 
@@ -82,24 +98,32 @@ export class WhatsappEventProcessorService {
     updates: WAMessageUpdate[],
   ): void {
     for (const update of updates) {
-      this.processWAMessage(user, selfName, update);
+      this.processRealtimeMessage(user, selfName, update);
     }
   }
 
   processChats(user: User, chats: Chat[]): void {
-    const tasks: Array<() => void> = [];
+    const tasks: Array<() => Promise<void>> = [];
+    const cutoffDate = dayjs().subtract(SYNC_MAX_AGE_MONTHS, "month");
 
     for (const chat of chats) {
-      tasks.push(() => {
-        void this.chatService.upsertChat(
+      tasks.push(() =>
+        this.chatService.upsertChat(
           user,
           chat?.id as string,
           (chat.unreadCount ?? 0) > 0,
-        );
-      });
+        ),
+      );
 
       for (const syncMessage of chat.messages ?? []) {
-        tasks.push(() => this.processSyncMessage(user, "", syncMessage));
+        if (
+          this.isWithinThreshold(
+            syncMessage.message?.messageTimestamp as number | Long | null,
+            cutoffDate,
+          )
+        ) {
+          tasks.push(() => this.processSyncMessageAsync(user, "", syncMessage));
+        }
       }
     }
 
@@ -107,34 +131,47 @@ export class WhatsappEventProcessorService {
   }
 
   processContacts(user: User, contacts: Partial<Contact>[]): void {
-    const tasks: Array<() => void> = [];
+    const tasks: Array<() => Promise<void>> = [];
 
     for (const contact of contacts) {
-      tasks.push(() => this.processContact(user, contact));
+      tasks.push(() => this.processContactAsync(user, contact));
     }
 
     void this.processInChunks(tasks);
   }
 
-  private async processInChunks(tasks: Array<() => void>): Promise<void> {
-    for (let offset = 0; offset < tasks.length; offset += BATCH_SIZE) {
-      const chunk = tasks.slice(offset, offset + BATCH_SIZE);
+  private async processInChunks(
+    tasks: Array<() => Promise<void>>,
+  ): Promise<void> {
+    for (let offset = 0; offset < tasks.length; offset += SYNC_BATCH_SIZE) {
+      const chunk = tasks.slice(offset, offset + SYNC_BATCH_SIZE);
 
       for (const task of chunk) {
-        task();
+        await task();
       }
 
-      if (offset + BATCH_SIZE < tasks.length) {
-        await this.yieldEventLoop();
+      if (offset + SYNC_BATCH_SIZE < tasks.length) {
+        await this.delay(SYNC_BATCH_DELAY_MS);
       }
     }
   }
 
-  private yieldEventLoop(): Promise<void> {
-    return new Promise((resolve) => setImmediate(resolve));
+  private delay(milliseconds: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, milliseconds));
   }
 
-  private processWAMessage(
+  private isWithinThreshold(
+    timestamp: number | Long | null | undefined,
+    cutoffDate: dayjs.Dayjs,
+  ): boolean {
+    if (!timestamp) return true;
+    return dayjs.unix(Number(timestamp)).isAfter(cutoffDate);
+  }
+
+  /**
+   * Real-time messages: fire-and-forget, includes media download.
+   */
+  private processRealtimeMessage(
     user: User,
     selfName: string,
     rawMessage: WAMessage | WAMessageUpdate,
@@ -178,11 +215,59 @@ export class WhatsappEventProcessorService {
     }
   }
 
-  private processSyncMessage(
+  /**
+   * Sync messages: sequential (awaited), no media download.
+   */
+  private async processMessageAsync(
+    user: User,
+    selfName: string,
+    rawMessage: WAMessage | WAMessageUpdate,
+    shouldDownloadMedia: boolean,
+  ): Promise<void> {
+    const whatsappId = rawMessage.key?.remoteJid;
+    const messageId = rawMessage.key?.id;
+
+    if (!whatsappId || !messageId) return;
+
+    const phoneNumber =
+      this.extractPhoneNumber(whatsappId) ??
+      this.extractPhoneNumber(rawMessage.key?.remoteJidAlt);
+    const name = this.cleanName(selfName, (rawMessage as WAMessage).pushName);
+    const fullMessage = rawMessage as WAMessage;
+
+    await this.contactService.upsertContact(user, {
+      whatsappId,
+      phoneNumber,
+      name,
+    });
+
+    const sentAt = fullMessage.messageTimestamp
+      ? dayjs.unix(fullMessage.messageTimestamp as number).toISOString()
+      : new Date().toISOString();
+
+    await this.chatService.upsertChat(user, whatsappId, true, sentAt);
+
+    if (fullMessage.message || fullMessage.messageTimestamp) {
+      await this.messageService.upsertMessage(user, {
+        messageId,
+        whatsappId,
+        sentAt,
+        content: this.extractContent(fullMessage.message),
+        type: this.resolveMessageType(fullMessage.message),
+        me: !!fullMessage.key?.fromMe,
+      });
+
+      if (shouldDownloadMedia && fullMessage.message) {
+        await this.mediaService.downloadAndStore(user, fullMessage);
+      }
+    }
+  }
+
+  private async processSyncMessageAsync(
     user: User,
     selfName: string,
     syncMessage: IHistorySyncMsg,
-  ): void {
+  ): Promise<void> {
     const innerMessage = syncMessage.message;
     if (!innerMessage) return;
 
@@ -198,7 +283,7 @@ export class WhatsappEventProcessorService {
       this.extractPhoneNumber(innerMessage.key?.remoteJidAlt);
     const name = this.cleanName(selfName, innerMessage.pushName);
 
-    void this.contactService.upsertContact(user, {
+    await this.contactService.upsertContact(user, {
       whatsappId,
       phoneNumber,
       name,
@@ -208,9 +293,9 @@ export class WhatsappEventProcessorService {
       ? dayjs.unix(innerMessage.messageTimestamp as number).toISOString()
       : new Date().toISOString();
 
-    void this.chatService.upsertChat(user, whatsappId, false, sentAt);
+    await this.chatService.upsertChat(user, whatsappId, false, sentAt);
 
-    void this.messageService.upsertMessage(user, {
+    await this.messageService.upsertMessage(user, {
       messageId,
       whatsappId,
       sentAt,
@@ -218,20 +303,16 @@ export class WhatsappEventProcessorService {
       type: this.resolveMessageType(innerMessage.message),
       me: !!innerMessage.key?.fromMe,
     });
-
-    if (innerMessage.message) {
-      void this.mediaService.downloadAndStore(
-        user,
-        innerMessage as unknown as WAMessage,
-      );
-    }
   }
 
-  private processContact(user: User, contact: Partial<Contact>): void {
+  private async processContactAsync(
+    user: User,
+    contact: Partial<Contact>,
+  ): Promise<void> {
     const whatsappId = contact.id;
     if (!whatsappId) return;
 
-    void this.contactService.upsertContact(user, {
+    await this.contactService.upsertContact(user, {
       whatsappId,
       phoneNumber: this.extractPhoneNumber(whatsappId),
       name: contact.notify ?? contact.name ?? null,
@@ -283,10 +364,12 @@ export class WhatsappEventProcessorService {
     if (!message) return "";
 
     if (message.conversation) return message.conversation;
-    if (message.extendedTextMessage?.text) return message.extendedTextMessage.text;
+    if (message.extendedTextMessage?.text)
+      return message.extendedTextMessage.text;
     if (message.imageMessage?.caption) return message.imageMessage.caption;
     if (message.videoMessage?.caption) return message.videoMessage.caption;
-    if (message.documentMessage?.fileName) return message.documentMessage.fileName;
+    if (message.documentMessage?.fileName)
+      return message.documentMessage.fileName;
 
     return "";
   }
