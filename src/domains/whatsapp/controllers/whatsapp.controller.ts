@@ -46,6 +46,14 @@ export class WhatsappController {
     return this.whatsappService.findAllMessages(user, whatsappId);
   }
 
+  @Post("chats/:whatsappId/seen")
+  async markChatAsSeen(
+    @GetUser() user: User,
+    @Param("whatsappId") whatsappId: string,
+  ) {
+    return this.whatsappService.markChatAsSeen(user, whatsappId);
+  }
+
   @Get("messages-by-phone/:phone")
   async findAllMessagesByPhone(
     @GetUser() user: User,

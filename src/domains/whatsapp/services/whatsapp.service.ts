@@ -112,4 +112,50 @@ export class WhatsappService {
       messages,
     };
   }
+
+  async markChatAsSeen(user: User, whatsappId: string) {
+    const session = await this.sessionRepository.findOne({
+      where: {
+        user: { id: user.id },
+        active: true,
+      },
+    });
+
+    if (!session) {
+      throw new NotFoundException("Whatsapp session not found");
+    }
+
+    const socket = this.socketService.getSocket(session.id);
+
+    if (!socket) {
+      throw new NotFoundException("Whatsapp connection not active");
+    }
+
+    const messages = await this.messageRepository.find({
+      where: {
+        user: { id: user.id },
+        whatsappId,
+      },
+      order: {
+        sentAt: "DESC",
+      },
+      take: 50,
+    });
+
+    const keys = messages.map((message) => ({
+      remoteJid: whatsappId,
+      id: message.messageId,
+    }));
+
+    if (keys.length > 0) {
+      await socket.readMessages(keys);
+    }
+
+    await this.chatRepository.update(
+      { userId: user.id, whatsappId },
+      { unread: false },
+    );
+
+    return this.findAllMessages(user, whatsappId);
+  }
 }
