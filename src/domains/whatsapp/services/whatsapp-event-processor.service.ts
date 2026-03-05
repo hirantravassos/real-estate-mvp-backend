@@ -11,6 +11,7 @@ import { User } from "../../users/entities/user.entity";
 import { WhatsappContactService } from "./whatsapp-contact.service";
 import { WhatsappChatService } from "./whatsapp-chat.service";
 import { WhatsappMessageService } from "./whatsapp-message.service";
+import { WhatsappMediaService } from "./whatsapp-media.service";
 import { WhatsappMessageTypeEnum } from "../enums/whatsapp-message-type.enum";
 import IMessage = proto.IMessage;
 import IHistorySyncMsg = proto.IHistorySyncMsg;
@@ -26,7 +27,8 @@ export class WhatsappEventProcessorService {
     private readonly contactService: WhatsappContactService,
     private readonly chatService: WhatsappChatService,
     private readonly messageService: WhatsappMessageService,
-  ) {}
+    private readonly mediaService: WhatsappMediaService,
+  ) { }
 
   processHistorySync(
     user: User,
@@ -165,10 +167,14 @@ export class WhatsappEventProcessorService {
         messageId,
         whatsappId,
         sentAt,
-        content: fullMessage.message?.conversation ?? "",
+        content: this.extractContent(fullMessage.message),
         type: this.resolveMessageType(fullMessage.message),
         me: !!fullMessage.key?.fromMe,
       });
+
+      if (fullMessage.message) {
+        void this.mediaService.downloadAndStore(user, fullMessage);
+      }
     }
   }
 
@@ -208,10 +214,17 @@ export class WhatsappEventProcessorService {
       messageId,
       whatsappId,
       sentAt,
-      content: innerMessage.message?.conversation ?? "",
+      content: this.extractContent(innerMessage.message),
       type: this.resolveMessageType(innerMessage.message),
       me: !!innerMessage.key?.fromMe,
     });
+
+    if (innerMessage.message) {
+      void this.mediaService.downloadAndStore(
+        user,
+        innerMessage as unknown as WAMessage,
+      );
+    }
   }
 
   private processContact(user: User, contact: Partial<Contact>): void {
@@ -251,9 +264,10 @@ export class WhatsappEventProcessorService {
     if (!message) return WhatsappMessageTypeEnum.UNKNOWN;
 
     if (message.conversation) return WhatsappMessageTypeEnum.TEXT;
+    if (message.extendedTextMessage) return WhatsappMessageTypeEnum.TEXT;
     if (message.imageMessage) return WhatsappMessageTypeEnum.IMAGE;
     if (message.videoMessage) return WhatsappMessageTypeEnum.VIDEO;
-    if (message.invoiceMessage) return WhatsappMessageTypeEnum.VOICE;
+    if (message.audioMessage?.ptt) return WhatsappMessageTypeEnum.VOICE;
     if (message.audioMessage) return WhatsappMessageTypeEnum.AUDIO;
     if (message.documentMessage) return WhatsappMessageTypeEnum.DOCUMENT;
     if (message.stickerMessage) return WhatsappMessageTypeEnum.STICKER;
@@ -263,5 +277,17 @@ export class WhatsappEventProcessorService {
     if (message.templateMessage) return WhatsappMessageTypeEnum.TEMPLATE;
 
     return WhatsappMessageTypeEnum.UNKNOWN;
+  }
+
+  private extractContent(message: IMessage | null | undefined): string {
+    if (!message) return "";
+
+    if (message.conversation) return message.conversation;
+    if (message.extendedTextMessage?.text) return message.extendedTextMessage.text;
+    if (message.imageMessage?.caption) return message.imageMessage.caption;
+    if (message.videoMessage?.caption) return message.videoMessage.caption;
+    if (message.documentMessage?.fileName) return message.documentMessage.fileName;
+
+    return "";
   }
 }

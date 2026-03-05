@@ -21,7 +21,7 @@ export class WhatsappMessage extends BaseEntity {
   @Column({ type: "varchar", length: 255 })
   messageId: string;
 
-  @Column({ type: "varchar", length: 255 })
+  @Column({ type: "text" })
   content: string;
 
   @Column({ type: "enum", enum: WhatsappMessageTypeEnum })
@@ -35,4 +35,10 @@ export class WhatsappMessage extends BaseEntity {
 
   @Column({ type: "datetime" })
   sentAt: string;
+
+  @Column({ type: "varchar", length: 500, nullable: true })
+  mediaPath: string | null;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  mimetype: string | null;
 }

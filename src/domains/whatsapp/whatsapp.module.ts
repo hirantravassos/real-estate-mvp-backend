@@ -15,6 +15,7 @@ import { WhatsappContactService } from "./services/whatsapp-contact.service";
 import { WhatsappContactRepository } from "./repositories/whatsapp-contact.repository";
 import { WhatsappContact } from "./entities/whatsapp-contact.entity";
 import { WhatsappEventProcessorService } from "./services/whatsapp-event-processor.service";
+import { WhatsappMediaService } from "./services/whatsapp-media.service";
 import { CustomerModule } from "../customers/customer.module";
 
 @Module({
@@ -36,6 +37,7 @@ import { CustomerModule } from "../customers/customer.module";
     WhatsappService,
     WhatsappSocketService,
     WhatsappEventProcessorService,
+    WhatsappMediaService,
     WhatsappMessageService,
     WhatsappChatService,
     WhatsappContactService,
@@ -46,9 +48,10 @@ import { CustomerModule } from "../customers/customer.module";
     WhatsappChatRepository,
     WhatsappMessageRepository,
     WhatsappContactRepository,
+    WhatsappMediaService,
     WhatsappMessageService,
     WhatsappChatService,
     WhatsappContactService,
   ],
 })
-export class WhatsappModule {}
+export class WhatsappModule { }
