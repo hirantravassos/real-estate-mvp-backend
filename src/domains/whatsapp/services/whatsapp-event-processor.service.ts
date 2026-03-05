@@ -1,11 +1,5 @@
-import { Injectable } from "@nestjs/common";
-import {
-  Chat,
-  Contact,
-  proto,
-  WAMessage,
-  WAMessageUpdate,
-} from "@whiskeysockets/baileys";
+import { forwardRef, Inject, Injectable } from "@nestjs/common";
+import { Chat, Contact, proto, WAMessage, WAMessageUpdate, } from "@whiskeysockets/baileys";
 import dayjs from "dayjs";
 import { User } from "../../users/entities/user.entity";
 import { WhatsappContactService } from "./whatsapp-contact.service";
@@ -13,6 +7,7 @@ import { WhatsappChatService } from "./whatsapp-chat.service";
 import { WhatsappMessageService } from "./whatsapp-message.service";
 import { WhatsappMediaService } from "./whatsapp-media.service";
 import { WhatsappMessageTypeEnum } from "../enums/whatsapp-message-type.enum";
+import { WhatsappGateway } from "../gateways/whatsapp.gateway";
 import { Long } from "typeorm";
 import IMessage = proto.IMessage;
 import IHistorySyncMsg = proto.IHistorySyncMsg;
@@ -31,7 +26,9 @@ export class WhatsappEventProcessorService {
     private readonly chatService: WhatsappChatService,
     private readonly messageService: WhatsappMessageService,
     private readonly mediaService: WhatsappMediaService,
-  ) { }
+    @Inject(forwardRef(() => WhatsappGateway))
+    private readonly gateway: WhatsappGateway,
+  ) {}
 
   processHistorySync(
     user: User,
@@ -50,7 +47,7 @@ export class WhatsappEventProcessorService {
         this.chatService.upsertChat(
           user,
           chat?.id as string,
-          (chat.unreadCount ?? 0) > 0,
+          this.getChatUnreadCount(chat.unreadCount),
         ),
       );
 
@@ -117,7 +114,7 @@ export class WhatsappEventProcessorService {
         this.chatService.upsertChat(
           user,
           chat?.id as string,
-          (chat.unreadCount ?? 0) > 0,
+          this.getChatUnreadCount(chat.unreadCount),
         ),
       );
 
@@ -221,9 +218,14 @@ export class WhatsappEventProcessorService {
       });
 
       if (fullMessage.message) {
-        void this.mediaService.downloadAndStore(user, fullMessage);
+        void this.mediaService.downloadAndStore(user, fullMessage).then(() => {
+          void this.gateway.emitChatUpdate(user.id, whatsappId);
+        });
       }
     }
+
+    void this.gateway.emitChatsUpdate(user.id);
+    void this.gateway.emitChatUpdate(user.id, whatsappId);
   }
 
   /**
@@ -277,6 +279,9 @@ export class WhatsappEventProcessorService {
         await this.mediaService.downloadAndStore(user, fullMessage);
       }
     }
+
+    void this.gateway.emitChatsUpdate(user.id);
+    void this.gateway.emitChatUpdate(user.id, whatsappId);
   }
 
   private async processSyncMessageAsync(
@@ -297,7 +302,10 @@ export class WhatsappEventProcessorService {
       this.extractPhoneNumber(innerMessage.key?.remoteJid ?? undefined) ??
       // @ts-expect-error: missing type
       this.extractPhoneNumber(innerMessage.key?.remoteJidAlt);
-    const name = this.cleanName(selfName, innerMessage.pushName);
+    const isFromMe = !!innerMessage.key?.fromMe;
+    const name = isFromMe
+      ? null
+      : this.cleanName(selfName, innerMessage.pushName);
 
     await this.contactService.upsertContact(user, {
       whatsappId,
@@ -309,7 +317,7 @@ export class WhatsappEventProcessorService {
       ? dayjs.unix(innerMessage.messageTimestamp as number).toISOString()
       : new Date().toISOString();
 
-    await this.chatService.upsertChat(user, whatsappId, false, sentAt);
+    await this.chatService.upsertChat(user, whatsappId, true, sentAt);
 
     const unwrapped = this.unwrapMessage(innerMessage.message);
 
@@ -321,6 +329,9 @@ export class WhatsappEventProcessorService {
       type: this.resolveMessageType(unwrapped),
       me: !!innerMessage.key?.fromMe,
     });
+
+    void this.gateway.emitChatsUpdate(user.id);
+    void this.gateway.emitChatUpdate(user.id, whatsappId);
   }
 
   private async processContactAsync(
@@ -361,9 +372,7 @@ export class WhatsappEventProcessorService {
    * Recursively unwraps FutureProofMessage wrappers (viewOnce, ephemeral,
    * documentWithCaption, editedMessage, etc.) to reach the real message content.
    */
-  private unwrapMessage(
-    message: IMessage | null | undefined,
-  ): IMessage | null {
+  private unwrapMessage(message: IMessage | null | undefined): IMessage | null {
     if (!message) return null;
 
     const wrapperCandidates = [
@@ -398,16 +407,21 @@ export class WhatsappEventProcessorService {
     if (message.audioMessage) return WhatsappMessageTypeEnum.AUDIO;
     if (message.documentMessage) return WhatsappMessageTypeEnum.DOCUMENT;
     if (message.stickerMessage) return WhatsappMessageTypeEnum.STICKER;
-    if (message.lottieStickerMessage) return WhatsappMessageTypeEnum.LOTTIE_STICKER;
+    if (message.lottieStickerMessage)
+      return WhatsappMessageTypeEnum.LOTTIE_STICKER;
     if (message.locationMessage) return WhatsappMessageTypeEnum.LOCATION;
-    if (message.liveLocationMessage) return WhatsappMessageTypeEnum.LIVE_LOCATION;
+    if (message.liveLocationMessage)
+      return WhatsappMessageTypeEnum.LIVE_LOCATION;
     if (message.contactMessage) return WhatsappMessageTypeEnum.CONTACT;
-    if (message.contactsArrayMessage) return WhatsappMessageTypeEnum.CONTACT_ARRAY;
+    if (message.contactsArrayMessage)
+      return WhatsappMessageTypeEnum.CONTACT_ARRAY;
     if (message.groupInviteMessage) return WhatsappMessageTypeEnum.GROUP_INVITE;
     if (message.listMessage) return WhatsappMessageTypeEnum.LIST;
-    if (message.listResponseMessage) return WhatsappMessageTypeEnum.LIST_RESPONSE;
+    if (message.listResponseMessage)
+      return WhatsappMessageTypeEnum.LIST_RESPONSE;
     if (message.buttonsMessage) return WhatsappMessageTypeEnum.BUTTONS;
-    if (message.buttonsResponseMessage) return WhatsappMessageTypeEnum.BUTTONS_RESPONSE;
+    if (message.buttonsResponseMessage)
+      return WhatsappMessageTypeEnum.BUTTONS_RESPONSE;
     if (message.templateMessage) return WhatsappMessageTypeEnum.TEMPLATE;
     if (message.reactionMessage) return WhatsappMessageTypeEnum.REACTION;
     if (message.pollCreationMessage) return WhatsappMessageTypeEnum.POLL;
@@ -416,13 +430,14 @@ export class WhatsappEventProcessorService {
     if (message.pollUpdateMessage) return WhatsappMessageTypeEnum.POLL_UPDATE;
     if (message.orderMessage) return WhatsappMessageTypeEnum.ORDER;
     if (message.interactiveMessage) return WhatsappMessageTypeEnum.INTERACTIVE;
-    if (message.interactiveResponseMessage) return WhatsappMessageTypeEnum.INTERACTIVE;
+    if (message.interactiveResponseMessage)
+      return WhatsappMessageTypeEnum.INTERACTIVE;
     if (message.callLogMesssage) return WhatsappMessageTypeEnum.CALL;
     if (message.bcallMessage) return WhatsappMessageTypeEnum.CALL;
     if (message.albumMessage) return WhatsappMessageTypeEnum.ALBUM;
     if (message.eventMessage) return WhatsappMessageTypeEnum.EVENT;
     if (message.protocolMessage) {
-      if (message.protocolMessage.type === 14) { // 14 is the protobuf enum for MESSAGE_EDIT
+      if (message.protocolMessage.type === 14) {
         return this.resolveMessageType(message.protocolMessage.editedMessage);
       }
       return WhatsappMessageTypeEnum.PROTOCOL;
@@ -487,8 +502,7 @@ export class WhatsappEventProcessorService {
     if (message.buttonsResponseMessage?.selectedDisplayText)
       return message.buttonsResponseMessage.selectedDisplayText;
 
-    if (message.reactionMessage?.text)
-      return message.reactionMessage.text;
+    if (message.reactionMessage?.text) return message.reactionMessage.text;
 
     if (message.pollCreationMessage?.name)
       return message.pollCreationMessage.name;
@@ -512,7 +526,8 @@ export class WhatsappEventProcessorService {
     if (message.lottieStickerMessage) return "";
 
     if (message.protocolMessage) {
-      if (message.protocolMessage.type === 14) { // 14 is the protobuf enum for MESSAGE_EDIT
+      if (message.protocolMessage.type === 14) {
+        // 14 is the protobuf enum for MESSAGE_EDIT
         const text = this.extractContent(message.protocolMessage.editedMessage);
         return text ? `[Editado] ${text}` : "";
       }
@@ -520,9 +535,13 @@ export class WhatsappEventProcessorService {
     }
 
     console.warn(
-      `Unhandled message content parsing payload:\n${JSON.stringify(message, null, 2)}`
+      `Unhandled message content parsing payload:\n${JSON.stringify(message, null, 2)}`,
     );
 
     return "";
+  }
+
+  private getChatUnreadCount(count: number | null | undefined): boolean {
+    return (count ?? 1) > 0;
   }
 }

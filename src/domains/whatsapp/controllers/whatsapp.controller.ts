@@ -30,7 +30,6 @@ export class WhatsappController {
 
   @Get()
   async findStatus(@GetUser() user: User) {
-    console.log("user findStatus",user)
     return this.whatsappService.findStatus(user);
   }
 

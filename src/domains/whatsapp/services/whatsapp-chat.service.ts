@@ -15,6 +15,7 @@ export class WhatsappChatService {
     if (!whatsappId) return;
 
     const payload: Record<string, unknown> = { user, whatsappId, unread };
+
     if (lastSentAt) payload.lastSentAt = lastSentAt;
 
     await this.chatRepository.upsert(payload, ["whatsappId", "userId"]);

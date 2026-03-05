@@ -12,6 +12,7 @@ import { forwardRef, Inject, Logger } from "@nestjs/common";
 import { WhatsappService } from "../services/whatsapp.service";
 import { User } from "../../users/entities/user.entity";
 import { WhatsappConnectionStatusEnum } from "../enums/whatsapp-connection-status.enum";
+import { WhatsappChatRepository } from "../repositories/whatsapp-chat.repository";
 
 @WebSocketGateway({
   cors: {
@@ -30,6 +31,7 @@ export class WhatsappGateway
     private readonly jwtService: JwtService,
     @Inject(forwardRef(() => WhatsappService))
     private readonly whatsappService: WhatsappService,
+    private readonly whatsappChatRepository: WhatsappChatRepository,
   ) {}
 
   afterInit() {
@@ -78,6 +80,48 @@ export class WhatsappGateway
       client.emit("whatsapp_status", status);
     } catch (error) {
       this.logger.error("Failed to get status via socket", error);
+    }
+  }
+
+  async emitChatsUpdate(userId: string) {
+    const user = { id: userId } as User;
+    const chats = await this.whatsappService.findAllChats(user);
+    this.server.to(`user_${userId}`).emit("whatsapp_chats", chats);
+  }
+
+  async emitChatUpdate(userId: string, whatsappId: string) {
+    const user = { id: userId } as User;
+    const chat = await this.whatsappService.findAllMessages(user, whatsappId);
+    this.server.to(`user_${userId}`).emit("whatsapp_chat", chat);
+  }
+
+  @SubscribeMessage("get_chats")
+  async handleGetChats(client: Socket) {
+    try {
+      const userId = await this.getUserId(client);
+      if (!userId) return;
+      await this.emitChatsUpdate(userId);
+    } catch (error) {
+      this.logger.error("Failed to get chats via socket", error);
+    }
+  }
+
+  @SubscribeMessage("get_chat")
+  async handleGetChat(client: Socket, payload: { whatsappId: string }) {
+    try {
+      const userId = await this.getUserId(client);
+      if (!userId) return;
+      if (!payload?.whatsappId) return;
+      void this.whatsappChatRepository.update(
+        { whatsappId: payload.whatsappId, userId },
+        {
+          unread: false,
+        },
+      );
+      await this.emitChatUpdate(userId, payload.whatsappId);
+      await this.emitChatsUpdate(userId);
+    } catch (error) {
+      this.logger.error("Failed to get chat via socket", error);
     }
   }
 
