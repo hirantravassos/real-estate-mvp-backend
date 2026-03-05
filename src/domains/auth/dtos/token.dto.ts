@@ -1,5 +1,4 @@
 export class TokenDto {
-  idToken: string;
-  refreshToken: string;
-  accessToken: string;
+  readonly accessToken: string;
+  readonly refreshToken: string;
 }
