@@ -45,7 +45,6 @@ export class WhatsappMessageService {
       where: {
         userId: user.id,
         whatsappId: contact.whatsappId,
-        me: false,
       },
       order: {
         sentAt: "DESC",
