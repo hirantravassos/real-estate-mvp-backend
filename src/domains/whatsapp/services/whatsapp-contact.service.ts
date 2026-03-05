@@ -14,7 +14,7 @@ export class WhatsappContactService {
   constructor(
     private readonly contactRepository: WhatsappContactRepository,
     private readonly customerRepository: CustomerRepository,
-  ) {}
+  ) { }
 
   async upsertContact(user: User, data: UpsertContactData): Promise<void> {
     if (!data.whatsappId) return;
@@ -41,13 +41,7 @@ export class WhatsappContactService {
       if (hasRealPhone) existingContact.phoneNumber = data.phoneNumber;
       await this.contactRepository.save(existingContact);
     } else {
-      await this.contactRepository.upsert(
-        {
-          ...payload,
-          name: data.name ?? "Desconhecido",
-        },
-        ["whatsappId", "userId"],
-      );
+      await this.contactRepository.upsert(payload, ["whatsappId", "userId"]);
     }
 
     if (hasRealPhone) {
@@ -70,7 +64,7 @@ export class WhatsappContactService {
     await this.customerRepository
       .save({
         user,
-        name: name ?? "Desconhecido",
+        name: name ?? null,
         phone,
         pending: true,
         ignored: false,

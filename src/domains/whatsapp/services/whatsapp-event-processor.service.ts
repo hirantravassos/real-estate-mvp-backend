@@ -184,7 +184,10 @@ export class WhatsappEventProcessorService {
     const phoneNumber =
       this.extractPhoneNumber(whatsappId) ??
       this.extractPhoneNumber(rawMessage.key?.remoteJidAlt);
-    const name = this.cleanName(selfName, (rawMessage as WAMessage).pushName);
+    const isFromMe = !!rawMessage.key?.fromMe;
+    const name = isFromMe
+      ? null
+      : this.cleanName(selfName, (rawMessage as WAMessage).pushName);
     const fullMessage = rawMessage as WAMessage;
 
     void this.contactService.upsertContact(user, {
@@ -232,7 +235,10 @@ export class WhatsappEventProcessorService {
     const phoneNumber =
       this.extractPhoneNumber(whatsappId) ??
       this.extractPhoneNumber(rawMessage.key?.remoteJidAlt);
-    const name = this.cleanName(selfName, (rawMessage as WAMessage).pushName);
+    const isFromMe = !!rawMessage.key?.fromMe;
+    const name = isFromMe
+      ? null
+      : this.cleanName(selfName, (rawMessage as WAMessage).pushName);
     const fullMessage = rawMessage as WAMessage;
 
     await this.contactService.upsertContact(user, {

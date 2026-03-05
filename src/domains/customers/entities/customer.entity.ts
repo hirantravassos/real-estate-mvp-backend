@@ -29,8 +29,8 @@ export class Customer extends BaseEntity {
   )
   comments: CustomerComment[];
 
-  @ColumnName()
-  name: string;
+  @ColumnName({ nullable: true })
+  name: string | null;
 
   @ColumnPhone()
   phone: string;
