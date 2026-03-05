@@ -68,15 +68,20 @@ export class WhatsappService {
 
     return await this.chatRepository
       .createQueryBuilder("chat")
-      .leftJoinAndMapOne(
+      .innerJoinAndMapOne(
         "chat.contact",
         WhatsappContact,
         "contact",
-        "contact.whatsappId = chat.whatsappId AND contact.userId = chat.userId",
+        "contact.whatsappId = chat.whatsappId AND contact.userId = chat.userId AND contact.phoneNumber IS NOT NULL",
+      )
+      .addSelect(
+        "CASE WHEN chat.lastSentAt IS NULL THEN 1 ELSE 0 END",
+        "lastSentAtIsNull",
       )
       .where("chat.userId = :userId", { userId })
-      .orderBy("ISNULL(chat.lastSentAt)", "ASC")
+      .orderBy("lastSentAtIsNull", "ASC")
       .addOrderBy("chat.lastSentAt", "DESC")
+      .take(100)
       .getMany();
   }
 
@@ -98,7 +103,7 @@ export class WhatsappService {
       order: {
         sentAt: "DESC",
       },
-      take: 1000,
+      take: 100,
     });
 
     return {

@@ -14,7 +14,7 @@ export class WhatsappContactService {
   constructor(
     private readonly contactRepository: WhatsappContactRepository,
     private readonly customerRepository: CustomerRepository,
-  ) { }
+  ) {}
 
   async upsertContact(user: User, data: UpsertContactData): Promise<void> {
     if (!data.whatsappId) return;
