@@ -48,12 +48,19 @@ export class WhatsappService {
   }
 
   async findStatus(user: User) {
-    return this.sessionRepository
-      .findOneByOrFail({ user: { id: user.id } })
-      .catch(async () => {
-        await this.connect(user);
-        throw new NotFoundException("Whatsapp session not found");
-      });
+    const session = await this.sessionRepository.findOneBy({
+      user: { id: user.id },
+    });
+
+    if (!session) {
+      return {
+        status: "closed",
+        name: user.name,
+        qr: null,
+      };
+    }
+
+    return session;
   }
 
   async findAllChats(user: User) {

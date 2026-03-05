@@ -1,5 +1,11 @@
 import { Injectable } from "@nestjs/common";
-import { Chat, Contact, proto, WAMessage, WAMessageUpdate, } from "@whiskeysockets/baileys";
+import {
+  Chat,
+  Contact,
+  proto,
+  WAMessage,
+  WAMessageUpdate,
+} from "@whiskeysockets/baileys";
 import dayjs from "dayjs";
 import { User } from "../../users/entities/user.entity";
 import { WhatsappContactService } from "./whatsapp-contact.service";
@@ -25,7 +31,7 @@ export class WhatsappEventProcessorService {
     private readonly chatService: WhatsappChatService,
     private readonly messageService: WhatsappMessageService,
     private readonly mediaService: WhatsappMediaService,
-  ) {}
+  ) { }
 
   processHistorySync(
     user: User,
@@ -203,12 +209,14 @@ export class WhatsappEventProcessorService {
     void this.chatService.upsertChat(user, whatsappId, true, sentAt);
 
     if (fullMessage.message || fullMessage.messageTimestamp) {
+      const unwrapped = this.unwrapMessage(fullMessage.message);
+
       void this.messageService.upsertMessage(user, {
         messageId,
         whatsappId,
         sentAt,
-        content: this.extractContent(fullMessage.message),
-        type: this.resolveMessageType(fullMessage.message),
+        content: this.extractContent(unwrapped),
+        type: this.resolveMessageType(unwrapped),
         me: !!fullMessage.key?.fromMe,
       });
 
@@ -254,12 +262,14 @@ export class WhatsappEventProcessorService {
     await this.chatService.upsertChat(user, whatsappId, true, sentAt);
 
     if (fullMessage.message || fullMessage.messageTimestamp) {
+      const unwrapped = this.unwrapMessage(fullMessage.message);
+
       await this.messageService.upsertMessage(user, {
         messageId,
         whatsappId,
         sentAt,
-        content: this.extractContent(fullMessage.message),
-        type: this.resolveMessageType(fullMessage.message),
+        content: this.extractContent(unwrapped),
+        type: this.resolveMessageType(unwrapped),
         me: !!fullMessage.key?.fromMe,
       });
 
@@ -301,12 +311,14 @@ export class WhatsappEventProcessorService {
 
     await this.chatService.upsertChat(user, whatsappId, false, sentAt);
 
+    const unwrapped = this.unwrapMessage(innerMessage.message);
+
     await this.messageService.upsertMessage(user, {
       messageId,
       whatsappId,
       sentAt,
-      content: this.extractContent(innerMessage.message),
-      type: this.resolveMessageType(innerMessage.message),
+      content: this.extractContent(unwrapped),
+      type: this.resolveMessageType(unwrapped),
       me: !!innerMessage.key?.fromMe,
     });
   }
@@ -345,6 +357,33 @@ export class WhatsappEventProcessorService {
     return cleaned.length > 0 ? cleaned : null;
   }
 
+  /**
+   * Recursively unwraps FutureProofMessage wrappers (viewOnce, ephemeral,
+   * documentWithCaption, editedMessage, etc.) to reach the real message content.
+   */
+  private unwrapMessage(
+    message: IMessage | null | undefined,
+  ): IMessage | null {
+    if (!message) return null;
+
+    const wrapperCandidates = [
+      message.viewOnceMessage,
+      message.viewOnceMessageV2,
+      message.viewOnceMessageV2Extension,
+      message.ephemeralMessage,
+      message.documentWithCaptionMessage,
+      message.editedMessage,
+    ];
+
+    for (const wrapper of wrapperCandidates) {
+      if (wrapper?.message) {
+        return this.unwrapMessage(wrapper.message);
+      }
+    }
+
+    return message;
+  }
+
   private resolveMessageType(
     message: IMessage | null | undefined,
   ): WhatsappMessageTypeEnum {
@@ -354,14 +393,40 @@ export class WhatsappEventProcessorService {
     if (message.extendedTextMessage) return WhatsappMessageTypeEnum.TEXT;
     if (message.imageMessage) return WhatsappMessageTypeEnum.IMAGE;
     if (message.videoMessage) return WhatsappMessageTypeEnum.VIDEO;
+    if (message.ptvMessage) return WhatsappMessageTypeEnum.PTV;
     if (message.audioMessage?.ptt) return WhatsappMessageTypeEnum.VOICE;
     if (message.audioMessage) return WhatsappMessageTypeEnum.AUDIO;
     if (message.documentMessage) return WhatsappMessageTypeEnum.DOCUMENT;
     if (message.stickerMessage) return WhatsappMessageTypeEnum.STICKER;
+    if (message.lottieStickerMessage) return WhatsappMessageTypeEnum.LOTTIE_STICKER;
     if (message.locationMessage) return WhatsappMessageTypeEnum.LOCATION;
-    if (message.eventMessage) return WhatsappMessageTypeEnum.EVENT;
-    if (message.protocolMessage) return WhatsappMessageTypeEnum.PROTOCOL;
+    if (message.liveLocationMessage) return WhatsappMessageTypeEnum.LIVE_LOCATION;
+    if (message.contactMessage) return WhatsappMessageTypeEnum.CONTACT;
+    if (message.contactsArrayMessage) return WhatsappMessageTypeEnum.CONTACT_ARRAY;
+    if (message.groupInviteMessage) return WhatsappMessageTypeEnum.GROUP_INVITE;
+    if (message.listMessage) return WhatsappMessageTypeEnum.LIST;
+    if (message.listResponseMessage) return WhatsappMessageTypeEnum.LIST_RESPONSE;
+    if (message.buttonsMessage) return WhatsappMessageTypeEnum.BUTTONS;
+    if (message.buttonsResponseMessage) return WhatsappMessageTypeEnum.BUTTONS_RESPONSE;
     if (message.templateMessage) return WhatsappMessageTypeEnum.TEMPLATE;
+    if (message.reactionMessage) return WhatsappMessageTypeEnum.REACTION;
+    if (message.pollCreationMessage) return WhatsappMessageTypeEnum.POLL;
+    if (message.pollCreationMessageV2) return WhatsappMessageTypeEnum.POLL;
+    if (message.pollCreationMessageV3) return WhatsappMessageTypeEnum.POLL;
+    if (message.pollUpdateMessage) return WhatsappMessageTypeEnum.POLL_UPDATE;
+    if (message.orderMessage) return WhatsappMessageTypeEnum.ORDER;
+    if (message.interactiveMessage) return WhatsappMessageTypeEnum.INTERACTIVE;
+    if (message.interactiveResponseMessage) return WhatsappMessageTypeEnum.INTERACTIVE;
+    if (message.callLogMesssage) return WhatsappMessageTypeEnum.CALL;
+    if (message.bcallMessage) return WhatsappMessageTypeEnum.CALL;
+    if (message.albumMessage) return WhatsappMessageTypeEnum.ALBUM;
+    if (message.eventMessage) return WhatsappMessageTypeEnum.EVENT;
+    if (message.protocolMessage) {
+      if (message.protocolMessage.type === 14) { // 14 is the protobuf enum for MESSAGE_EDIT
+        return this.resolveMessageType(message.protocolMessage.editedMessage);
+      }
+      return WhatsappMessageTypeEnum.PROTOCOL;
+    }
 
     return WhatsappMessageTypeEnum.UNKNOWN;
   }
@@ -374,8 +439,89 @@ export class WhatsappEventProcessorService {
       return message.extendedTextMessage.text;
     if (message.imageMessage?.caption) return message.imageMessage.caption;
     if (message.videoMessage?.caption) return message.videoMessage.caption;
+    if (message.ptvMessage?.caption) return message.ptvMessage.caption;
     if (message.documentMessage?.fileName)
       return message.documentMessage.fileName;
+
+    if (message.contactMessage?.displayName)
+      return message.contactMessage.displayName;
+
+    if (message.contactsArrayMessage?.contacts) {
+      return message.contactsArrayMessage.contacts
+        .map((contact) => contact.displayName)
+        .filter(Boolean)
+        .join(", ");
+    }
+
+    if (message.locationMessage) {
+      const latitude = message.locationMessage.degreesLatitude;
+      const longitude = message.locationMessage.degreesLongitude;
+      if (latitude && longitude) {
+        return `https://maps.google.com/?q=${latitude},${longitude}`;
+      }
+      return message.locationMessage.name ?? "";
+    }
+
+    if (message.liveLocationMessage) {
+      const latitude = message.liveLocationMessage.degreesLatitude;
+      const longitude = message.liveLocationMessage.degreesLongitude;
+      if (latitude && longitude) {
+        return `https://maps.google.com/?q=${latitude},${longitude}`;
+      }
+      return message.liveLocationMessage.caption ?? "";
+    }
+
+    if (message.groupInviteMessage?.groupName)
+      return message.groupInviteMessage.groupName;
+
+    if (message.listMessage) {
+      return message.listMessage.title ?? message.listMessage.description ?? "";
+    }
+
+    if (message.listResponseMessage?.title)
+      return message.listResponseMessage.title;
+
+    if (message.buttonsMessage?.contentText)
+      return message.buttonsMessage.contentText;
+
+    if (message.buttonsResponseMessage?.selectedDisplayText)
+      return message.buttonsResponseMessage.selectedDisplayText;
+
+    if (message.reactionMessage?.text)
+      return message.reactionMessage.text;
+
+    if (message.pollCreationMessage?.name)
+      return message.pollCreationMessage.name;
+    if (message.pollCreationMessageV2?.name)
+      return message.pollCreationMessageV2.name;
+    if (message.pollCreationMessageV3?.name)
+      return message.pollCreationMessageV3.name;
+
+    if (message.orderMessage?.message) return message.orderMessage.message;
+
+    if (message.interactiveMessage?.body?.text)
+      return message.interactiveMessage.body.text;
+
+    if (message.templateMessage?.hydratedFourRowTemplate) {
+      const template = message.templateMessage.hydratedFourRowTemplate;
+      return template.hydratedContentText ?? template.hydratedTitleText ?? "";
+    }
+
+    if (message.audioMessage) return "";
+    if (message.stickerMessage) return "";
+    if (message.lottieStickerMessage) return "";
+
+    if (message.protocolMessage) {
+      if (message.protocolMessage.type === 14) { // 14 is the protobuf enum for MESSAGE_EDIT
+        const text = this.extractContent(message.protocolMessage.editedMessage);
+        return text ? `[Editado] ${text}` : "";
+      }
+      return "";
+    }
+
+    console.warn(
+      `Unhandled message content parsing payload:\n${JSON.stringify(message, null, 2)}`
+    );
 
     return "";
   }

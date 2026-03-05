@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  InternalServerErrorException,
-  OnModuleInit,
-} from "@nestjs/common";
+import { forwardRef, Inject, Injectable, OnModuleInit } from "@nestjs/common";
 import makeWASocket, {
   Browsers,
   ConnectionState,
@@ -18,6 +14,7 @@ import { WhatsappSessionRepository } from "../repositories/whatsapp-session.repo
 import { WhatsappConnectionStatusEnum } from "../enums/whatsapp-connection-status.enum";
 import { WhatsappEventProcessorService } from "./whatsapp-event-processor.service";
 import { User } from "../../users/entities/user.entity";
+import { WhatsappGateway } from "../gateways/whatsapp.gateway";
 
 @Injectable()
 export class WhatsappSocketService implements OnModuleInit {
@@ -27,6 +24,8 @@ export class WhatsappSocketService implements OnModuleInit {
   constructor(
     private readonly sessionRepository: WhatsappSessionRepository,
     private readonly eventProcessor: WhatsappEventProcessorService,
+    @Inject(forwardRef(() => WhatsappGateway))
+    private readonly gateway: WhatsappGateway,
   ) {
     if (!existsSync(this.sessionsDir)) {
       mkdirSync(this.sessionsDir, { recursive: true });
@@ -39,7 +38,22 @@ export class WhatsappSocketService implements OnModuleInit {
     });
 
     for (const session of sessions) {
-      const user = await this.findUserBySessionId(session.id);
+      const { user } = await this.sessionRepository
+        .findOneOrFail({
+          where: { id: session.id },
+          relations: {
+            user: true,
+          },
+        })
+        .catch(() => {
+          this.destroySession(session.id, session.user, 404).catch(
+            console.error,
+          );
+          return { user: null };
+        });
+
+      if (!user) continue;
+
       await this.start(session.id, user).catch((error) => {
         console.error("Initial boot failed for " + session.id, error);
       });
@@ -66,12 +80,32 @@ export class WhatsappSocketService implements OnModuleInit {
       void this.eventProcessor.processMessageUpdate(user, selfName, data);
     });
 
+    socket.ev.on("messages.media-update", (data) => {
+      console.log("messages.media-update", data);
+    });
+
+    socket.ev.on("message-receipt.update", (data) => {
+      console.log("message-receipt.update", data);
+    });
+
     socket.ev.on("chats.upsert", (data) => {
       void this.eventProcessor.processChats(user, data);
     });
 
     socket.ev.on("chats.update", (data) => {
       void this.eventProcessor.processChats(user, data);
+    });
+
+    socket.ev.on("call", (data) => {
+      console.log("call", data);
+    });
+
+    socket.ev.on("lid-mapping.update", (data) => {
+      console.log("lid-mapping.update", data);
+    });
+
+    socket.ev.on("presence.update", () => {
+      // Show if a person is typing something to the user
     });
 
     socket.ev.on("contacts.upsert", (data) => {
@@ -83,7 +117,7 @@ export class WhatsappSocketService implements OnModuleInit {
     });
 
     socket.ev.on("connection.update", (data) => {
-      void this.handleConnectionUpdate(sessionId, data);
+      void this.handleConnectionUpdate(sessionId, user, data);
     });
   }
 
@@ -93,6 +127,7 @@ export class WhatsappSocketService implements OnModuleInit {
 
   public async destroySession(
     sessionId: string,
+    user: User,
     statusCode?: number,
   ): Promise<void> {
     const socket = this.getSocket(sessionId);
@@ -111,6 +146,16 @@ export class WhatsappSocketService implements OnModuleInit {
       { id: sessionId },
       { status: WhatsappConnectionStatusEnum.CLOSED },
     );
+
+    try {
+      this.gateway.emitStatusUpdate(user.id, {
+        status: WhatsappConnectionStatusEnum.CLOSED,
+        name: user.name,
+        qr: null,
+      });
+    } catch (e) {
+      console.error("destroy session error:", e);
+    }
 
     console.warn(
       `Session ${sessionId} OBLITERATED (Code: ${statusCode}). DB record and files removed.`,
@@ -149,8 +194,9 @@ export class WhatsappSocketService implements OnModuleInit {
     return socket;
   }
 
-  private async handleConnectionUpdate(
+  private handleConnectionUpdate(
     sessionId: string,
+    user: User,
     update: Partial<ConnectionState>,
   ) {
     const { connection, lastDisconnect, qr } = update;
@@ -162,16 +208,27 @@ export class WhatsappSocketService implements OnModuleInit {
         { id: sessionId },
         { qr, status: WhatsappConnectionStatusEnum.QR },
       );
+      this.gateway.emitStatusUpdate(user.id, {
+        status: WhatsappConnectionStatusEnum.QR,
+        name: user.name,
+        qr,
+      });
     }
 
     if (connection === "open") {
+      const selfName = socket?.authState?.creds?.me?.name;
       void this.sessionRepository.update(
         { id: sessionId },
         {
           status: WhatsappConnectionStatusEnum.OPEN,
-          name: socket?.authState?.creds?.me?.name,
+          name: selfName,
         },
       );
+      this.gateway.emitStatusUpdate(user.id, {
+        status: WhatsappConnectionStatusEnum.OPEN,
+        name: selfName || user.name,
+        qr: null,
+      });
     }
 
     if (connection === "close") {
@@ -181,26 +238,11 @@ export class WhatsappSocketService implements OnModuleInit {
         statusCode === 401 || statusCode === 405 || statusCode === 411;
 
       if (isTerminal) {
-        this.destroySession(sessionId, statusCode).catch(console.error);
+        this.destroySession(sessionId, user, statusCode).catch(console.error);
         return;
       }
 
-      const user = await this.findUserBySessionId(sessionId);
       this.start(sessionId, user).catch(console.error);
     }
-  }
-
-  private async findUserBySessionId(sessionId: string): Promise<User> {
-    const { user } = await this.sessionRepository
-      .findOneOrFail({
-        where: { id: sessionId },
-        relations: { user: true },
-      })
-      .catch(() => {
-        throw new InternalServerErrorException(
-          "findUserBySessionId: Session not found",
-        );
-      });
-    return user;
   }
 }

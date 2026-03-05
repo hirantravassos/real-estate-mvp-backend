@@ -26,10 +26,11 @@ export class WhatsappController {
     private readonly whatsappSocketService: WhatsappSocketService,
     private readonly whatsappMessageService: WhatsappMessageService,
     private readonly whatsappMediaService: WhatsappMediaService,
-  ) { }
+  ) {}
 
   @Get()
   async findStatus(@GetUser() user: User) {
+    console.log("user findStatus",user)
     return this.whatsappService.findStatus(user);
   }
 
@@ -93,6 +94,6 @@ export class WhatsappController {
   @Delete("disconnect")
   async disconnect(@GetUser() user: User) {
     const fromSession = await this.whatsappService.disconnect(user);
-    return this.whatsappSocketService.destroySession(fromSession.id);
+    return this.whatsappSocketService.destroySession(fromSession.id, user);
   }
 }
