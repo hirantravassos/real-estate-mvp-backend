@@ -18,6 +18,7 @@ import IHistorySyncMsg = proto.IHistorySyncMsg;
 const WHATSAPP_JID_SUFFIX = "@s.whatsapp.net";
 const MINIMUM_PHONE_LENGTH = 10;
 const COUNTRY_CODE_LENGTH = 2;
+const BATCH_SIZE = 30;
 
 @Injectable()
 export class WhatsappEventProcessorService {
@@ -36,25 +37,31 @@ export class WhatsappEventProcessorService {
       messages: WAMessage[];
     },
   ): void {
+    const tasks: Array<() => void> = [];
+
     for (const chat of data.chats) {
-      void this.chatService.upsertChat(
-        user,
-        chat?.id as string,
-        (chat.unreadCount ?? 0) > 0,
-      );
+      tasks.push(() => {
+        void this.chatService.upsertChat(
+          user,
+          chat?.id as string,
+          (chat.unreadCount ?? 0) > 0,
+        );
+      });
 
       for (const syncMessage of chat.messages ?? []) {
-        this.processSyncMessage(user, selfName, syncMessage);
+        tasks.push(() => this.processSyncMessage(user, selfName, syncMessage));
       }
     }
 
     for (const contact of data.contacts) {
-      this.processContact(user, contact);
+      tasks.push(() => this.processContact(user, contact));
     }
 
     for (const rawMessage of data.messages) {
-      this.processWAMessage(user, selfName, rawMessage);
+      tasks.push(() => this.processWAMessage(user, selfName, rawMessage));
     }
+
+    void this.processInChunks(tasks);
   }
 
   processMessageUpsert(
@@ -78,23 +85,51 @@ export class WhatsappEventProcessorService {
   }
 
   processChats(user: User, chats: Chat[]): void {
+    const tasks: Array<() => void> = [];
+
     for (const chat of chats) {
-      void this.chatService.upsertChat(
-        user,
-        chat?.id as string,
-        (chat.unreadCount ?? 0) > 0,
-      );
+      tasks.push(() => {
+        void this.chatService.upsertChat(
+          user,
+          chat?.id as string,
+          (chat.unreadCount ?? 0) > 0,
+        );
+      });
 
       for (const syncMessage of chat.messages ?? []) {
-        this.processSyncMessage(user, "", syncMessage);
+        tasks.push(() => this.processSyncMessage(user, "", syncMessage));
+      }
+    }
+
+    void this.processInChunks(tasks);
+  }
+
+  processContacts(user: User, contacts: Partial<Contact>[]): void {
+    const tasks: Array<() => void> = [];
+
+    for (const contact of contacts) {
+      tasks.push(() => this.processContact(user, contact));
+    }
+
+    void this.processInChunks(tasks);
+  }
+
+  private async processInChunks(tasks: Array<() => void>): Promise<void> {
+    for (let offset = 0; offset < tasks.length; offset += BATCH_SIZE) {
+      const chunk = tasks.slice(offset, offset + BATCH_SIZE);
+
+      for (const task of chunk) {
+        task();
+      }
+
+      if (offset + BATCH_SIZE < tasks.length) {
+        await this.yieldEventLoop();
       }
     }
   }
 
-  processContacts(user: User, contacts: Partial<Contact>[]): void {
-    for (const contact of contacts) {
-      this.processContact(user, contact);
-    }
+  private yieldEventLoop(): Promise<void> {
+    return new Promise((resolve) => setImmediate(resolve));
   }
 
   private processWAMessage(
