@@ -21,6 +21,7 @@ const SYNC_BATCH_DELAY_MS = 100;
 export class WhatsappEventProcessorService {
   constructor(
     private readonly contactService: WhatsappContactService,
+    @Inject(forwardRef(() => WhatsappChatService))
     private readonly chatService: WhatsappChatService,
     private readonly messageService: WhatsappMessageService,
     private readonly mediaService: WhatsappMediaService,

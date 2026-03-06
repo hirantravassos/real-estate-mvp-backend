@@ -16,13 +16,11 @@ import makeWASocket, {
 import { Boom } from "@hapi/boom";
 import { join } from "path";
 import { existsSync, mkdirSync, promises as fs } from "node:fs";
-import { WhatsappSessionRepository } from "../repositories/whatsapp-session.repository";
 import { WhatsappEventProcessorService } from "./whatsapp-event-processor.service";
 import { User } from "../../users/entities/user.entity";
-import { WhatsappGateway } from "../gateways/whatsapp.gateway";
 import { UserRepository } from "../../users/repositories/user.repository";
-import { WhatsappSession } from "../entities/whatsapp-session.entity";
 import { WhatsappConnectionStatusEnum } from "../enums/whatsapp-connection-status.enum";
+import { WhatsappSessionService } from "./whatsapp-session.service";
 
 @Injectable()
 export class WhatsappSocketService implements OnModuleInit {
@@ -31,10 +29,9 @@ export class WhatsappSocketService implements OnModuleInit {
 
   constructor(
     private readonly userRepository: UserRepository,
-    private readonly sessionRepository: WhatsappSessionRepository,
+    @Inject(forwardRef(() => WhatsappSessionService))
+    private readonly sessionService: WhatsappSessionService,
     private readonly eventProcessor: WhatsappEventProcessorService,
-    @Inject(forwardRef(() => WhatsappGateway))
-    private readonly gateway: WhatsappGateway,
   ) {
     if (!existsSync(this.sessionsDir)) {
       mkdirSync(this.sessionsDir, { recursive: true });
@@ -51,21 +48,7 @@ export class WhatsappSocketService implements OnModuleInit {
 
     for (const user of users) {
       const sessionId = user.session?.id;
-
-      if (!sessionId) {
-        const sessionEntity = new WhatsappSession();
-        sessionEntity.qr = null;
-        sessionEntity.user = user;
-        sessionEntity.name = user.name;
-        sessionEntity.status = WhatsappConnectionStatusEnum.CLOSED;
-        const newSession = await this.sessionRepository.save(sessionEntity);
-
-        await this.start(newSession?.id, user).catch((error) => {
-          console.error("Initial boot failed for " + sessionId, error);
-        });
-        continue;
-      }
-
+      if (!sessionId) continue;
       await this.start(sessionId, user).catch((error) => {
         console.error("Initial boot failed for " + sessionId, error);
       });
@@ -150,10 +133,7 @@ export class WhatsappSocketService implements OnModuleInit {
     if (!userId) {
       throw new BadRequestException("User not provided");
     }
-    const session = await this.sessionRepository.findOne({
-      where: { user: { id: userId }, active: true },
-      relations: { user: true },
-    });
+    const session = await this.sessionService.findOneByUserId(userId);
     if (!session) {
       throw new NotFoundException("Session not found");
     }
@@ -212,21 +192,33 @@ export class WhatsappSocketService implements OnModuleInit {
   ) {
     const { lastDisconnect, qr } = update;
 
-    const connection = update.connection as WhatsappConnectionStatusEnum;
+    const connection = update.connection;
     const socket = this.getSocketOrFail(sessionId);
 
-    const statusPayload = {
-      status: connection,
-      qr: qr ?? null,
-      name: socket?.authState?.creds?.me?.name ?? user.name,
-    };
-
-    if (connection) {
-      void this.sessionRepository.update({ id: sessionId }, statusPayload);
-      this.gateway.emitStatusUpdate(user.id, statusPayload);
+    if (connection === "open") {
+      void this.sessionService.save(user, {
+        status: WhatsappConnectionStatusEnum.CONNECTED,
+      });
+      return;
     }
 
-    if (connection === WhatsappConnectionStatusEnum.CLOSED) {
+    if (connection === "connecting") {
+      void this.sessionService.save(user, {
+        status: WhatsappConnectionStatusEnum.CONNECTING,
+        name: socket?.authState?.creds?.me?.name ?? user.name,
+      });
+      return;
+    }
+
+    if (qr) {
+      void this.sessionService.save(user, {
+        qr: qr ?? null,
+        name: socket?.authState?.creds?.me?.name ?? user.name,
+      });
+      return;
+    }
+
+    if (connection === "close") {
       const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
 
       const isTerminal =

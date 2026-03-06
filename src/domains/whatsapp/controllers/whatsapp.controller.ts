@@ -1,7 +1,9 @@
 import {
   Controller,
   Delete,
+  forwardRef,
   Get,
+  Inject,
   NotFoundException,
   Param,
   Post,
@@ -17,12 +19,14 @@ import { User } from "../../users/entities/user.entity";
 import { WhatsappSocketService } from "../services/whatsapp-socket.service";
 import { WhatsappMessageService } from "../services/whatsapp-message.service";
 import { WhatsappMediaService } from "../services/whatsapp-media.service";
+import { WhatsappSessionService } from "../services/whatsapp-session.service";
 
 @Controller("whatsapp")
 @UseGuards(JwtGuard)
 export class WhatsappController {
   constructor(
     private readonly whatsappService: WhatsappService,
+    @Inject(forwardRef(() => WhatsappSocketService))
     private readonly whatsappSocketService: WhatsappSocketService,
     private readonly whatsappMessageService: WhatsappMessageService,
     private readonly whatsappMediaService: WhatsappMediaService,
@@ -70,11 +74,6 @@ export class WhatsappController {
     );
 
     response.sendFile(absolutePath);
-  }
-
-  @Post("connect")
-  async connect(@GetUser() user: User) {
-    return await this.whatsappService.connect(user);
   }
 
   @Delete("disconnect")

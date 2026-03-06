@@ -10,8 +10,8 @@ export class WhatsappSession extends BaseEntity {
   @JoinColumn()
   user: User;
 
-  @ColumnName({ nullable: true })
-  name: string | null;
+  @ColumnName()
+  name: string;
 
   @Column({ type: "varchar", length: 255, nullable: true })
   qr: string | null;

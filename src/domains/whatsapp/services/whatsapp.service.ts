@@ -1,58 +1,37 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
-import { WhatsappSessionRepository } from "../repositories/whatsapp-session.repository";
+import { Injectable } from "@nestjs/common";
 import { User } from "../../users/entities/user.entity";
+import { WhatsappSessionService } from "./whatsapp-session.service";
+import { WhatsappConnectionStatusEnum } from "../enums/whatsapp-connection-status.enum";
 import { WhatsappSocketService } from "./whatsapp-socket.service";
 
 @Injectable()
 export class WhatsappService {
   constructor(
-    private readonly sessionRepository: WhatsappSessionRepository,
+    private readonly sessionService: WhatsappSessionService,
     private readonly socketService: WhatsappSocketService,
   ) {}
 
-  async connect(user: User) {
-    const found = await this.sessionRepository.findOneBy({
-      user: { id: user.id },
-    });
-
-    if (found) {
-      await this.sessionRepository.delete({ id: found.id });
-    }
-
-    const newSession = await this.sessionRepository.save({
-      user,
-    });
-
-    await this.socketService.start(newSession.id, user);
-
-    return await this.findStatus(user);
-  }
-
   async disconnect(user: User) {
-    const found = await this.sessionRepository
-      .findOneByOrFail({
-        user: { id: user.id },
-      })
-      .catch(() => {
-        throw new NotFoundException("Whatsapp session not found");
-      });
-    await this.sessionRepository.delete({ id: found.id });
+    const found = await this.sessionService.findOne(user);
+    await this.sessionService.save(found.user, {
+      qr: null,
+      name: found.user.name,
+      status: WhatsappConnectionStatusEnum.CLOSED,
+    });
     return found;
   }
 
   async findStatus(user: User) {
-    const session = await this.sessionRepository.findOneBy({
-      user: { id: user.id },
-    });
-
-    if (!session) {
-      return {
-        status: "closed",
-        name: user.name,
+    return await this.sessionService.findOne(user).catch(async () => {
+      const newSession = await this.sessionService.save(user, {
         qr: null,
-      };
-    }
+        status: WhatsappConnectionStatusEnum.CLOSED,
+        name: user.name,
+      });
 
-    return session;
+      await this.socketService.start(newSession.id, user);
+
+      return newSession;
+    });
   }
 }
