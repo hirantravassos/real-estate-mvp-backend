@@ -54,6 +54,8 @@ export class WhatsappSessionService {
     user: User,
     dto: Partial<WhatsappSessionCreateDto>,
   ): Promise<WhatsappSession> {
+    const existingSession = await this.findOne(user).catch(() => null);
+
     await this.sessionRepository.upsert(
       {
         ...dto,
@@ -68,8 +70,12 @@ export class WhatsappSessionService {
       );
     });
 
-    this.whatsappGateway.emitStatusUpdate(user.id, newSession);
+    const hasStatusChanged =
+      !existingSession || existingSession.status !== newSession.status;
 
+    if (hasStatusChanged) {
+      this.whatsappGateway.emitStatusUpdate(user.id, newSession);
+    }
     return newSession;
   }
 }

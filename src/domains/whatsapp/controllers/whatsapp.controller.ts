@@ -6,7 +6,6 @@ import {
   Inject,
   NotFoundException,
   Param,
-  Post,
   Res,
   UseGuards,
 } from "@nestjs/common";
@@ -19,7 +18,6 @@ import { User } from "../../users/entities/user.entity";
 import { WhatsappSocketService } from "../services/whatsapp-socket.service";
 import { WhatsappMessageService } from "../services/whatsapp-message.service";
 import { WhatsappMediaService } from "../services/whatsapp-media.service";
-import { WhatsappSessionService } from "../services/whatsapp-session.service";
 
 @Controller("whatsapp")
 @UseGuards(JwtGuard)
@@ -79,7 +77,6 @@ export class WhatsappController {
   @Delete("disconnect")
   async disconnect(@GetUser() user: User) {
     const fromSession = await this.whatsappService.disconnect(user);
-    await this.whatsappSocketService.destroySession(fromSession.id);
     void this.whatsappSocketService.start(fromSession.id, user);
   }
 }

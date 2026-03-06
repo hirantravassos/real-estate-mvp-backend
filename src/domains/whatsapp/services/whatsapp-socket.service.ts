@@ -9,13 +9,14 @@ import {
 import makeWASocket, {
   Browsers,
   ConnectionState,
+  Contact,
   fetchLatestBaileysVersion,
   useMultiFileAuthState,
   WASocket,
 } from "@whiskeysockets/baileys";
-import { Boom } from "@hapi/boom";
 import { join } from "path";
-import { existsSync, mkdirSync, promises as fs } from "node:fs";
+import * as fs from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { WhatsappEventProcessorService } from "./whatsapp-event-processor.service";
 import { User } from "../../users/entities/user.entity";
 import { UserRepository } from "../../users/repositories/user.repository";
@@ -55,21 +56,16 @@ export class WhatsappSocketService implements OnModuleInit {
     }
   }
 
-  public async start(sessionId: string, user: User): Promise<void> {
+  async start(sessionId: string, user: User): Promise<void> {
     const socket = await this.createSocket(sessionId);
-    const selfName = socket.authState?.creds?.me?.name ?? "";
 
     socket.ev.on("messaging-history.set", (data) => {
-      void this.eventProcessor.processHistorySync(user, selfName, data);
+      void this.eventProcessor.processHistorySync(user, data);
     });
 
     socket.ev.on("messages.upsert", (data) => {
       console.log("EVENT messages.upsert", data);
-      void this.eventProcessor.processMessageUpsert(
-        user,
-        selfName,
-        data.messages,
-      );
+      void this.eventProcessor.processMessages(user, data.messages);
     });
 
     socket.ev.on("messages.update", (data) => {
@@ -79,12 +75,12 @@ export class WhatsappSocketService implements OnModuleInit {
 
     socket.ev.on("chats.upsert", (data) => {
       console.log("chats.upsert CHAT CREATED", data);
-      void this.eventProcessor.processChats(user, data);
+      void this.eventProcessor.processChatsSync(user, data);
     });
 
     socket.ev.on("chats.update", (data) => {
       console.log("chats.update CHAT UPDATED", data);
-      void this.eventProcessor.processChats(user, data);
+      void this.eventProcessor.processChatsSync(user, data);
     });
 
     socket.ev.on("call", (data) => {
@@ -102,19 +98,20 @@ export class WhatsappSocketService implements OnModuleInit {
     });
 
     socket.ev.on("contacts.upsert", (data) => {
-      void this.eventProcessor.processContacts(user, data);
+      void this.eventProcessor.processContactsSync(user, data);
     });
 
     socket.ev.on("contacts.update", (data) => {
-      void this.eventProcessor.processContacts(user, data);
+      void this.eventProcessor.processContactsSync(user, data as Contact[]);
     });
 
     socket.ev.on("connection.update", (data) => {
+      console.warn("connection.update", JSON.stringify(data));
       void this.handleConnectionUpdate(sessionId, user, data);
     });
   }
 
-  public getSocketOrFail(sessionId?: string | null): WASocket {
+  getSocketOrFail(sessionId?: string | null): WASocket {
     if (!sessionId) {
       throw new NotFoundException("Session not found");
     }
@@ -127,9 +124,7 @@ export class WhatsappSocketService implements OnModuleInit {
     return found;
   }
 
-  public async getSocketByUserOrFail(
-    userId?: string | null,
-  ): Promise<WASocket> {
+  async getSocketByUserOrFail(userId?: string | null): Promise<WASocket> {
     if (!userId) {
       throw new BadRequestException("User not provided");
     }
@@ -140,17 +135,9 @@ export class WhatsappSocketService implements OnModuleInit {
     return this.getSocketOrFail(session?.id);
   }
 
-  public async destroySession(
-    sessionId: string,
-    statusCode?: number,
-  ): Promise<void> {
-    const sessionPath = join(this.sessionsDir, sessionId);
-
-    await fs.rm(sessionPath, { recursive: true, force: true });
-
-    console.warn(
-      `Session ${sessionId} KILLED (Code: ${statusCode}). DB record and files removed.`,
-    );
+  async logout(user: User): Promise<void> {
+    const socket = await this.getSocketByUserOrFail(user.id);
+    await socket.logout();
   }
 
   private async createSocket(
@@ -190,49 +177,99 @@ export class WhatsappSocketService implements OnModuleInit {
     user: User,
     update: Partial<ConnectionState>,
   ) {
-    const { lastDisconnect, qr } = update;
+    try {
+      const { isOnline, qr, lastDisconnect, isNewLogin } = update;
 
-    const connection = update.connection;
-    const socket = this.getSocketOrFail(sessionId);
+      const connection = update.connection;
+      const socket = this.getSocketOrFail(sessionId);
+      const sessionPath = join(this.sessionsDir, sessionId);
 
-    if (connection === "open") {
-      void this.sessionService.save(user, {
-        status: WhatsappConnectionStatusEnum.CONNECTED,
-      });
-      return;
-    }
-
-    if (connection === "connecting") {
-      void this.sessionService.save(user, {
-        status: WhatsappConnectionStatusEnum.CONNECTING,
-        name: socket?.authState?.creds?.me?.name ?? user.name,
-      });
-      return;
-    }
-
-    if (qr) {
-      void this.sessionService.save(user, {
-        qr: qr ?? null,
-        name: socket?.authState?.creds?.me?.name ?? user.name,
-      });
-      return;
-    }
-
-    if (connection === "close") {
-      const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
-
-      const isTerminal =
-        statusCode === 401 || statusCode === 405 || statusCode === 411;
-
-      if (isTerminal) {
-        this.destroySession(sessionId, statusCode).catch(console.error);
-        setTimeout(() => {
-          this.start(sessionId, user).catch(console.error);
-        }, 1000);
+      if (isOnline) {
+        void this.sessionService.save(user, {
+          status: WhatsappConnectionStatusEnum.CONNECTED,
+        });
         return;
       }
 
-      this.start(sessionId, user).catch(console.error);
+      if (isNewLogin) {
+        this.start(sessionId, user).catch(console.error);
+        return;
+      }
+
+      if (qr) {
+        void this.sessionService.save(user, {
+          qr: qr ?? null,
+          name: socket?.authState?.creds?.me?.name ?? user.name,
+        });
+        return;
+      }
+
+      if (connection === "connecting") {
+        void this.sessionService.save(user, {
+          status: WhatsappConnectionStatusEnum.CONNECTING,
+          name: socket?.authState?.creds?.me?.name ?? user.name,
+        });
+        return;
+      }
+
+      if (connection === "close") {
+        const isUnauthenticated =
+          // @ts-expect-error: missing types
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+          lastDisconnect?.error?.output?.statusCode === 401;
+
+        if (isUnauthenticated) {
+          void this.sessionService.save(user, {
+            qr: null,
+            status: WhatsappConnectionStatusEnum.CLOSED,
+          });
+
+          fs.promises
+            .rm(sessionPath, { recursive: true, force: true })
+            .then(() => {
+              console.log(`Restarting session files for ${sessionId}`);
+            })
+            .catch((err) => {
+              console.error(
+                `Failed to delete session files for ${sessionId}`,
+                err,
+              );
+            })
+            .finally(() => {
+              this.start(sessionId, user).catch(console.error);
+            });
+          // this.start(sessionId, user).catch(console.error);
+          return;
+        }
+
+        //   const sessionPath = join(this.sessionsDir, sessionId);
+        //
+        //   socket?.logout().catch(() => null);
+        //   this.sockets.delete(sessionId);
+        //   void this.sessionService.save(user, {
+        //     status: WhatsappConnectionStatusEnum.CLOSED,
+        //   });
+        //
+        //   fs.promises
+        //     .rm(sessionPath, { recursive: true, force: true })
+        //     .then(() => {
+        //       console.log(`Restarting session files for ${sessionId}`);
+        //     })
+        //     .catch((err) => {
+        //       console.error(
+        //         `Failed to delete session files for ${sessionId}`,
+        //         err,
+        //       );
+        //     })
+        //     .finally(() => {
+        //       this.start(sessionId, user).catch(console.error);
+        //     });
+      }
+    } catch (error) {
+      console.error("Error handling connection update for " + sessionId, error);
+      setTimeout(() => {
+        void this.start(sessionId, user);
+      }, 5000);
     }
   }
 }

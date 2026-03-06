@@ -73,9 +73,9 @@ export class WhatsappGateway extends BaseSecureGateway {
     @GetUserSocket() user: User,
     payload: { whatsappId: string },
   ) {
-    void this.whatsappChatService.save({
-      user,
-      whatsappId: payload?.whatsappId,
+    const whatsappId = payload?.whatsappId;
+    if (!whatsappId) return;
+    void this.whatsappChatService.save(user, payload?.whatsappId, {
       unread: false,
     });
     await this.emitChatUpdate(user, payload.whatsappId);

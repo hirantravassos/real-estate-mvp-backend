@@ -33,10 +33,10 @@ export abstract class BaseSecureGateway
       if (client?.user?.id) {
         const userRoomName = `user_${client?.user.id}`;
         await client.join(userRoomName);
-        console.log(`User ${client?.user.id} joined room: ${userRoomName}`);
+        // console.log(`User ${client?.user.id} joined room: ${userRoomName}`);
       }
 
-      console.log(`Client authenticated and connected: ${client.id}`);
+      // console.log(`Client authenticated and connected: ${client.id}`);
     } catch (error) {
       console.error(`Unauthorized connection attempt: ${client.id}`, error);
       client.disconnect();

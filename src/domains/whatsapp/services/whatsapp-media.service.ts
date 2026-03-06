@@ -68,7 +68,7 @@ export class WhatsappMediaService {
       console.warn(
         `Media download failed for message ${messageId}:\n`,
         (error as Error)?.message,
-        `\n\nFailed Media Payload Report:\n${JSON.stringify({ rawMessage, mediaInfo }, null, 2)}`
+        `\n\nFailed Media Payload Report:\n${JSON.stringify({ rawMessage, mediaInfo }, null, 2)}`,
       );
     }
   }

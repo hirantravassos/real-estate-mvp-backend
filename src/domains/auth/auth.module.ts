@@ -41,4 +41,4 @@ import { WsJwtGuard } from "./guards/websocket-jwt.guard";
   providers: [AuthService, GoogleStrategy, JwtStrategy, WsJwtGuard],
   exports: [AuthService, JwtModule, WsJwtGuard, UserModule],
 })
-export class AuthModule { }
+export class AuthModule {}

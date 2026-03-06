@@ -7,9 +7,7 @@ import { WhatsappContactService } from "./whatsapp-contact.service";
 import { WhatsappMessageService } from "./whatsapp-message.service";
 import { WhatsappContact } from "../entities/whatsapp-contact.entity";
 
-interface CreateChatDto {
-  user: User;
-  whatsappId: string;
+export interface WhatsappChatCreateDto {
   unread: boolean;
   lastSentAt?: string | null;
 }
@@ -62,15 +60,15 @@ export class WhatsappChatService {
     };
   }
 
-  async save(dto: CreateChatDto): Promise<void> {
-    const { user, whatsappId, unread, lastSentAt } = dto;
-
-    if (!whatsappId) return;
+  async save(
+    user: User,
+    whatsappId: string,
+    dto: WhatsappChatCreateDto,
+  ): Promise<void> {
+    const { unread, lastSentAt } = dto;
 
     const payload: Record<string, unknown> = { user, whatsappId, unread };
     payload.lastSentAt = await this.getLastSentAt(user, whatsappId, lastSentAt);
-
-    console.log("DATABASE: chat updated", payload);
 
     await this.chatRepository.upsert(payload, ["whatsappId", "userId"]);
     void this.gateway.emitChatsUpdate(user);

@@ -3,10 +3,9 @@ import { WhatsappContactRepository } from "../repositories/whatsapp-contact.repo
 import { CustomerRepository } from "../../customers/repositories/customer.repository";
 import { User } from "../../users/entities/user.entity";
 
-interface UpsertContactData {
-  readonly whatsappId: string;
-  readonly phoneNumber?: string | null;
-  readonly name?: string | null;
+export class WhatsappContactCreateDto {
+  phoneNumber?: string | null;
+  name?: string | null;
 }
 
 @Injectable()
@@ -22,37 +21,46 @@ export class WhatsappContactService {
     });
   }
 
-  async upsertContact(user: User, data: UpsertContactData): Promise<void> {
-    if (!data.whatsappId) return;
-
-    const payload: Record<string, unknown> = {
-      user,
-      whatsappId: data.whatsappId,
+  async save(
+    user: User,
+    whatsappId: string,
+    dto: Partial<WhatsappContactCreateDto>,
+  ): Promise<void> {
+    const dataToSave = {
+      whatsappId,
+      userId: user.id,
+      ...(dto.name && { name: dto.name }),
+      ...(dto.phoneNumber && { phoneNumber: dto.phoneNumber }),
     };
 
-    const hasRealName = data.name !== null && data.name !== undefined;
-    const hasRealPhone =
-      data.phoneNumber !== null && data.phoneNumber !== undefined;
+    await this.contactRepository.upsert(dataToSave, ["userId", "whatsappId"]);
 
-    if (hasRealName) payload.name = data.name;
-    if (hasRealPhone) payload.phoneNumber = data.phoneNumber;
-
-    const existingContact = await this.contactRepository.findOneBy({
-      whatsappId: data.whatsappId,
-      userId: user.id,
-    });
-
-    if (existingContact) {
-      if (hasRealName) existingContact.name = data.name;
-      if (hasRealPhone) existingContact.phoneNumber = data.phoneNumber;
-      await this.contactRepository.save(existingContact);
-    } else {
-      await this.contactRepository.upsert(payload, ["whatsappId", "userId"]);
+    if (dto.phoneNumber) {
+      await this.ensurePendingCustomerExists(user, dto.phoneNumber, dto.name);
     }
+  }
 
-    if (hasRealPhone) {
-      void this.ensurePendingCustomerExists(user, data.phoneNumber, data.name);
-    }
+  async updateNameByPhoneNumber(
+    user: User,
+    phoneNumber: string,
+    name: string | null,
+  ) {
+    if (!name) return;
+    if (!phoneNumber) return;
+
+    await this.customerRepository.upsert(
+      {
+        user,
+        phone: phoneNumber,
+        name,
+      },
+      ["user", "phone"],
+    );
+
+    await this.contactRepository.update(
+      { phoneNumber, userId: user.id },
+      { name },
+    );
   }
 
   private async ensurePendingCustomerExists(
@@ -76,10 +84,7 @@ export class WhatsappContactService {
         ignored: false,
       })
       .catch((error) => {
-        console.warn(
-          "Customer auto-create skipped (likely duplicate):",
-          error?.message,
-        );
+        console.warn("Customer auto-create skipped (likely duplicate):", error);
       });
   }
 }

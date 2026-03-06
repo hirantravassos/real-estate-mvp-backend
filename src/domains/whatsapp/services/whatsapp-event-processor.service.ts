@@ -9,13 +9,11 @@ import { WhatsappMediaService } from "./whatsapp-media.service";
 import { WhatsappMessageTypeEnum } from "../enums/whatsapp-message-type.enum";
 import { WhatsappGateway } from "../gateways/whatsapp.gateway";
 import IMessage = proto.IMessage;
-import IHistorySyncMsg = proto.IHistorySyncMsg;
 
-const WHATSAPP_JID_SUFFIX = "@s.whatsapp.net";
+const WHATSAPP_PNID_SUFFIX = "@s.whatsapp.net";
+const WHATSAPP_LID_SUFFIX = "@lid";
 const MINIMUM_PHONE_LENGTH = 10;
 const COUNTRY_CODE_LENGTH = 2;
-const SYNC_BATCH_SIZE = 10;
-const SYNC_BATCH_DELAY_MS = 100;
 
 @Injectable()
 export class WhatsappEventProcessorService {
@@ -29,49 +27,174 @@ export class WhatsappEventProcessorService {
     private readonly gateway: WhatsappGateway,
   ) {}
 
-  processHistorySync(
+  async processHistorySync(
     user: User,
-    selfName: string,
     data: {
       chats: Chat[];
       contacts: Contact[];
       messages: WAMessage[];
+      isLatest?: boolean;
+      progress?: number | null;
+      syncType?: proto.HistorySync.HistorySyncType | null;
+      peerDataRequestSessionId?: string | null;
     },
-  ): void {
-    const tasks: Array<() => Promise<void>> = [];
-
-    for (const chat of data.chats) {
-      tasks.push(() =>
-        this.chatService.save({
-          user,
-          whatsappId: chat?.id as string,
-          unread: this.getChatUnreadCount(chat.unreadCount),
-        }),
-      );
-
-      for (const syncMessage of chat.messages ?? []) {
-        void this.processSyncMessageAsync(user, selfName, syncMessage);
-      }
+  ): Promise<void> {
+    if (data.syncType === proto.HistorySync.HistorySyncType.INITIAL_BOOTSTRAP) {
+      await this.processContactsSync(user, data.contacts);
+      await this.processChatsSync(user, data.chats);
+      return;
     }
 
-    for (const contact of data.contacts) {
-      tasks.push(() => this.processContactAsync(user, contact));
+    if (data.syncType === proto.HistorySync.HistorySyncType.PUSH_NAME) {
+      void this.processContactsSyncNamesOnly(user, data.contacts);
+      return;
     }
 
-    for (const rawMessage of data.messages) {
-      void this.processMessageAsync(user, selfName, rawMessage, false);
+    if (data.syncType === proto.HistorySync.HistorySyncType.RECENT) {
+      void this.processMessages(user, data.messages);
+      return;
     }
 
-    void this.processInChunks(tasks);
+    if (data.syncType === proto.HistorySync.HistorySyncType.FULL) {
+      void this.processMessages(user, data.messages);
+      return;
+    }
+
+    if (data.syncType === proto.HistorySync.HistorySyncType.INITIAL_STATUS_V3) {
+      // No data, only sync meta for connections
+      return;
+    }
+
+    if (data.syncType === proto.HistorySync.HistorySyncType.NON_BLOCKING_DATA) {
+      // No data, only sync meta for connections
+      return;
+    }
+
+    console.warn(`NEW SYNC TYPE!!!!! ${data.syncType}`, JSON.stringify(data));
   }
 
-  processMessageUpsert(
+  async processMessages(user: User, newMessages: WAMessage[]): Promise<void> {
+    for (const message of newMessages) {
+      await new Promise((resolve) => {
+        setTimeout(() => {
+          resolve({});
+        }, 200);
+      });
+
+      const whatsappId = message.key?.remoteJid;
+      const messageId = message.key?.id;
+      const isFromMe = !!message.key?.fromMe;
+      const sentAt = message.messageTimestamp
+        ? dayjs.unix(message.messageTimestamp as number).toISOString()
+        : new Date().toISOString();
+      const protocolMessageType = message?.message?.protocolMessage?.type;
+
+      if (protocolMessageType) continue;
+      if (!whatsappId) continue;
+      if (!messageId) continue;
+
+      if (message.message || message.messageTimestamp) {
+        const unwrapped = this.unwrapMessage(message.message);
+
+        void this.messageService.save(user, {
+          messageId,
+          whatsappId,
+          sentAt,
+          content: this.extractContent(unwrapped),
+          type: this.resolveMessageType(unwrapped),
+          me: isFromMe,
+        });
+
+        if (message.message) {
+          void this.mediaService.downloadAndStore(user, message).then(() => {
+            void this.gateway.emitChatUpdate(user, whatsappId);
+          });
+        }
+      }
+    }
+  }
+
+  async processChatsSync(user: User, newChats: Chat[]): Promise<void> {
+    for (const chat of newChats) {
+      await new Promise((resolve) => {
+        setTimeout(() => {
+          resolve({});
+        }, 200);
+      });
+      const whatsappId = chat?.id;
+      const isLid = chat?.id?.includes(WHATSAPP_LID_SUFFIX);
+      const lastSentAt = chat.lastMessageRecvTimestamp
+        ? new Date(chat.lastMessageRecvTimestamp).toISOString()
+        : undefined;
+
+      if (!whatsappId || !isLid) continue;
+
+      await this.chatService.save(user, whatsappId, {
+        unread: (chat.unreadCount ?? 0) > 0,
+        lastSentAt,
+      });
+    }
+  }
+
+  async processContactsSync(user: User, newContacts: Contact[]): Promise<void> {
+    for (const contact of newContacts) {
+      const phoneNumber = this.extractPhoneNumber(contact?.phoneNumber);
+      const whatsappId = contact?.id;
+      const isLid = whatsappId?.includes("@lid");
+
+      if (isLid && whatsappId && phoneNumber) {
+        await this.contactService.save(user, whatsappId, {
+          phoneNumber,
+          name: contact?.notify ?? null,
+        });
+      }
+    }
+  }
+
+  async processContactsSyncNamesOnly(
     user: User,
-    selfName: string,
-    insertedMessages: WAMessage[],
-  ): void {
-    for (const message of insertedMessages) {
-      this.processRealtimeMessage(user, selfName, message);
+    newContacts: Contact[],
+  ): Promise<void> {
+    for (const contact of newContacts) {
+      const phone = this.extractPhoneNumber(contact?.id);
+      const name = contact?.notify ?? null;
+
+      if (phone) {
+        await this.contactService.updateNameByPhoneNumber(user, phone, name);
+      }
+    }
+  }
+
+  async processContactsUpdate(
+    user: User,
+    newContacts: Contact[],
+  ): Promise<void> {
+    for (const contact of newContacts) {
+      await new Promise((resolve) => {
+        setTimeout(() => {
+          resolve({});
+        }, 200);
+      });
+      const whatsappId = contact?.id;
+      const name = contact?.notify ?? null;
+      const phoneNumber = this.extractPhoneNumber(whatsappId);
+      const isWhatsappIdLidId = !whatsappId?.includes(WHATSAPP_PNID_SUFFIX);
+
+      if (whatsappId && isWhatsappIdLidId) {
+        void this.contactService.save(user, whatsappId, {
+          name,
+          phoneNumber,
+        });
+        continue;
+      }
+
+      if (phoneNumber && !isWhatsappIdLidId) {
+        void this.contactService.updateNameByPhoneNumber(
+          user,
+          phoneNumber,
+          name,
+        );
+      }
     }
   }
 
@@ -80,271 +203,21 @@ export class WhatsappEventProcessorService {
       const whatsappId = message?.key?.remoteJid;
       const unread = message.update.status !== proto.WebMessageInfo.Status.READ;
       if (!whatsappId) return;
-      void this.chatService.save({
-        user,
-        whatsappId,
+      void this.chatService.save(user, whatsappId, {
         unread,
       });
     }
   }
 
-  processChats(user: User, chats: Chat[]): void {
-    for (const chat of chats) {
-      const unread = (chat?.unreadCount ?? 0) > 0;
-      const whatsappId = chat?.id as string;
-      console.log("chat updates from chat");
-      // void this.chatService.upsertChat(user, whatsappId, unread);
-    }
-  }
-
-  processContacts(user: User, contacts: Partial<Contact>[]): void {
-    const tasks: Array<() => Promise<void>> = [];
-
-    for (const contact of contacts) {
-      tasks.push(() => this.processContactAsync(user, contact));
-    }
-
-    void this.processInChunks(tasks);
-  }
-
-  private async processInChunks(
-    tasks: Array<() => Promise<void>>,
-  ): Promise<void> {
-    for (let offset = 0; offset < tasks.length; offset += SYNC_BATCH_SIZE) {
-      const chunk = tasks.slice(offset, offset + SYNC_BATCH_SIZE);
-
-      for (const task of chunk) {
-        await task();
-      }
-
-      if (offset + SYNC_BATCH_SIZE < tasks.length) {
-        await this.delay(SYNC_BATCH_DELAY_MS);
-      }
-    }
-  }
-
-  private delay(milliseconds: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, milliseconds));
-  }
-
-  private processRealtimeMessage(
-    user: User,
-    selfName: string,
-    raw: WAMessage | WAMessageUpdate,
-  ): void {
-    const message = raw as WAMessage;
-    const whatsappId = message.key?.remoteJid;
-    const messageId = message.key?.id;
-    const isFromMe = !!message.key?.fromMe;
-    const name = isFromMe ? null : this.cleanName(selfName, message.pushName);
-    const sentAt = message.messageTimestamp
-      ? dayjs.unix(message.messageTimestamp as number).toISOString()
-      : new Date().toISOString();
-    const phoneNumber =
-      this.extractPhoneNumber(whatsappId) ??
-      this.extractPhoneNumber(message.key?.remoteJidAlt);
-
-    if (!whatsappId || !messageId) {
-      console.warn("WARN [processRealtimeMessage]: Unavailable id", {
-        whatsappId,
-        messageId,
-      });
-      return;
-    }
-
-    void this.contactService.upsertContact(user, {
-      whatsappId,
-      phoneNumber,
-      name,
-    });
-
-    void this.chatService.save({
-      user,
-      whatsappId,
-      unread: true,
-      lastSentAt: sentAt,
-    });
-
-    console.log(
-      "processRealtimeMessage is message?",
-      "message.message || message.messageTimestamp",
-      {
-        message,
-        messageMessage: message?.message,
-        messageTimestamp: message?.messageTimestamp,
-      },
-    );
-
-    if (message.message || message.messageTimestamp) {
-      const unwrapped = this.unwrapMessage(message.message);
-
-      void this.messageService.save(user, {
-        messageId,
-        whatsappId,
-        sentAt,
-        content: this.extractContent(unwrapped),
-        type: this.resolveMessageType(unwrapped),
-        me: !!message.key?.fromMe,
-      });
-
-      if (message.message) {
-        void this.mediaService.downloadAndStore(user, message).then(() => {
-          void this.gateway.emitChatUpdate(user, whatsappId);
-        });
-      }
-    }
-  }
-
-  private async processMessageAsync(
-    user: User,
-    selfName: string,
-    rawMessage: WAMessage | WAMessageUpdate,
-    shouldDownloadMedia: boolean,
-  ): Promise<void> {
-    const whatsappId = rawMessage.key?.remoteJid;
-    const messageId = rawMessage.key?.id;
-
-    if (!whatsappId || !messageId) return;
-
-    const phoneNumber =
-      this.extractPhoneNumber(whatsappId) ??
-      this.extractPhoneNumber(rawMessage.key?.remoteJidAlt);
-    const isFromMe = !!rawMessage.key?.fromMe;
-    const name = isFromMe
-      ? null
-      : this.cleanName(selfName, (rawMessage as WAMessage).pushName);
-    const fullMessage = rawMessage as WAMessage;
-
-    await this.contactService.upsertContact(user, {
-      whatsappId,
-      phoneNumber,
-      name,
-    });
-
-    const sentAt = fullMessage.messageTimestamp
-      ? dayjs.unix(fullMessage.messageTimestamp as number).toISOString()
-      : new Date().toISOString();
-
-    console.log("processMessageAsync", {
-      whatsappId,
-      messageId,
-      sentAt,
-    });
-    await this.chatService.save({
-      user,
-      whatsappId,
-      unread: true,
-      lastSentAt: sentAt,
-    });
-
-    if (fullMessage.message || fullMessage.messageTimestamp) {
-      const unwrapped = this.unwrapMessage(fullMessage.message);
-
-      await this.messageService.save(user, {
-        messageId,
-        whatsappId,
-        sentAt,
-        content: this.extractContent(unwrapped),
-        type: this.resolveMessageType(unwrapped),
-        me: !!fullMessage.key?.fromMe,
-      });
-
-      if (shouldDownloadMedia && fullMessage.message) {
-        await this.mediaService.downloadAndStore(user, fullMessage);
-      }
-    }
-
-    void this.gateway.emitChatsUpdate(user);
-    void this.gateway.emitChatUpdate(user, whatsappId);
-  }
-
-  private async processSyncMessageAsync(
-    user: User,
-    selfName: string,
-    syncMessage: IHistorySyncMsg,
-  ): Promise<void> {
-    const innerMessage = syncMessage.message;
-    if (!innerMessage) return;
-
-    const whatsappId = innerMessage.key?.remoteJid;
-    const messageId = innerMessage.key?.id;
-
-    if (!whatsappId || !messageId) return;
-
-    const phoneNumber =
-      this.extractPhoneNumber(whatsappId) ??
-      this.extractPhoneNumber(innerMessage.key?.remoteJid ?? undefined) ??
-      // @ts-expect-error: missing type
-      this.extractPhoneNumber(innerMessage.key?.remoteJidAlt);
-    const isFromMe = !!innerMessage.key?.fromMe;
-    const name = isFromMe
-      ? null
-      : this.cleanName(selfName, innerMessage.pushName);
-
-    await this.contactService.upsertContact(user, {
-      whatsappId,
-      phoneNumber,
-      name,
-    });
-
-    const sentAt = innerMessage.messageTimestamp
-      ? dayjs.unix(innerMessage.messageTimestamp as number).toISOString()
-      : new Date().toISOString();
-
-    await this.chatService.save({
-      user,
-      whatsappId,
-      unread: true,
-      lastSentAt: sentAt,
-    });
-
-    const unwrapped = this.unwrapMessage(innerMessage.message);
-
-    await this.messageService.save(user, {
-      messageId,
-      whatsappId,
-      sentAt,
-      content: this.extractContent(unwrapped),
-      type: this.resolveMessageType(unwrapped),
-      me: !!innerMessage.key?.fromMe,
-    });
-
-    void this.gateway.emitChatsUpdate(user);
-    void this.gateway.emitChatUpdate(user, whatsappId);
-  }
-
-  private async processContactAsync(
-    user: User,
-    contact: Partial<Contact>,
-  ): Promise<void> {
-    const whatsappId = contact.id;
-    if (!whatsappId) return;
-
-    await this.contactService.upsertContact(user, {
-      whatsappId,
-      phoneNumber: this.extractPhoneNumber(whatsappId),
-      name: contact.notify ?? contact.name ?? null,
-    });
-  }
-
   private extractPhoneNumber(jid?: string | null): string | null {
-    if (!jid?.includes(WHATSAPP_JID_SUFFIX)) return null;
+    if (!jid?.includes(WHATSAPP_PNID_SUFFIX)) return null;
 
     const rawNumber = jid
-      .replace(WHATSAPP_JID_SUFFIX, "")
+      .replace(WHATSAPP_PNID_SUFFIX, "")
       .slice(COUNTRY_CODE_LENGTH);
     if (rawNumber.length < MINIMUM_PHONE_LENGTH) return null;
 
     return rawNumber;
-  }
-
-  private cleanName(
-    selfName: string,
-    possibleName?: string | null,
-  ): string | null {
-    if (!possibleName) return null;
-    const cleaned = possibleName.replaceAll(selfName, "").trim();
-    return cleaned.length > 0 ? cleaned : null;
   }
 
   private unwrapMessage(message: IMessage | null | undefined): IMessage | null {
@@ -514,9 +387,5 @@ export class WhatsappEventProcessorService {
     );
 
     return "";
-  }
-
-  private getChatUnreadCount(count: number | null | undefined): boolean {
-    return (count ?? 1) > 0;
   }
 }

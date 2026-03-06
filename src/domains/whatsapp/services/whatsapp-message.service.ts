@@ -5,13 +5,13 @@ import { WhatsappMessageTypeEnum } from "../enums/whatsapp-message-type.enum";
 import { WhatsappContactRepository } from "../repositories/whatsapp-contact.repository";
 import { WhatsappMessage } from "../entities/whatsapp-message.entity";
 
-interface UpsertMessageData {
-  readonly messageId: string;
-  readonly whatsappId: string;
-  readonly sentAt: string;
-  readonly content: string;
-  readonly type: WhatsappMessageTypeEnum;
-  readonly me: boolean;
+export class WhatsappMessageCreateDto {
+  messageId: string;
+  whatsappId: string;
+  sentAt: string;
+  content: string;
+  type: WhatsappMessageTypeEnum;
+  me: boolean;
 }
 
 @Injectable()
@@ -64,18 +64,18 @@ export class WhatsappMessageService {
     });
   }
 
-  async save(user: User, data: UpsertMessageData): Promise<void> {
-    if (!data.whatsappId || !data.messageId) return;
+  async save(user: User, dto: WhatsappMessageCreateDto): Promise<void> {
+    if (!dto.whatsappId || !dto.messageId) return;
 
     await this.messageRepository.upsert(
       {
         user,
-        messageId: data.messageId,
-        whatsappId: data.whatsappId,
-        sentAt: data.sentAt,
-        content: data.content,
-        type: data.type,
-        me: data.me,
+        messageId: dto.messageId,
+        whatsappId: dto.whatsappId,
+        sentAt: dto.sentAt,
+        content: dto.content,
+        type: dto.type,
+        me: dto.me,
       },
       ["whatsappId", "userId", "messageId"],
     );

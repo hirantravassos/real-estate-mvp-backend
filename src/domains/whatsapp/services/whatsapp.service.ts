@@ -13,6 +13,7 @@ export class WhatsappService {
 
   async disconnect(user: User) {
     const found = await this.sessionService.findOne(user);
+    await this.socketService.logout(user);
     await this.sessionService.save(found.user, {
       qr: null,
       name: found.user.name,
