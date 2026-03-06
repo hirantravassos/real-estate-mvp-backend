@@ -80,7 +80,7 @@ export class WhatsappController {
   @Delete("disconnect")
   async disconnect(@GetUser() user: User) {
     const fromSession = await this.whatsappService.disconnect(user);
-    await this.whatsappSocketService.destroySession(fromSession.id, user);
+    await this.whatsappSocketService.destroySession(fromSession.id);
     void this.whatsappSocketService.start(fromSession.id, user);
   }
 }

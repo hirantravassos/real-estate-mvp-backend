@@ -2,17 +2,11 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { WhatsappSessionRepository } from "../repositories/whatsapp-session.repository";
 import { User } from "../../users/entities/user.entity";
 import { WhatsappSocketService } from "./whatsapp-socket.service";
-import { WhatsappChatRepository } from "../repositories/whatsapp-chat.repository";
-import { WhatsappMessageRepository } from "../repositories/whatsapp-message.repository";
-import { WhatsappContactRepository } from "../repositories/whatsapp-contact.repository";
 
 @Injectable()
 export class WhatsappService {
   constructor(
     private readonly sessionRepository: WhatsappSessionRepository,
-    private readonly chatRepository: WhatsappChatRepository,
-    private readonly messageRepository: WhatsappMessageRepository,
-    private readonly contactRepository: WhatsappContactRepository,
     private readonly socketService: WhatsappSocketService,
   ) {}
 

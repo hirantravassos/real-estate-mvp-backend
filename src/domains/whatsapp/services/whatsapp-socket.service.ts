@@ -14,16 +14,15 @@ import makeWASocket, {
   WASocket,
 } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
-import * as qrcode from "qrcode-terminal";
 import { join } from "path";
 import { existsSync, mkdirSync, promises as fs } from "node:fs";
 import { WhatsappSessionRepository } from "../repositories/whatsapp-session.repository";
-import { WhatsappConnectionStatusEnum } from "../enums/whatsapp-connection-status.enum";
 import { WhatsappEventProcessorService } from "./whatsapp-event-processor.service";
 import { User } from "../../users/entities/user.entity";
 import { WhatsappGateway } from "../gateways/whatsapp.gateway";
 import { UserRepository } from "../../users/repositories/user.repository";
 import { WhatsappSession } from "../entities/whatsapp-session.entity";
+import { WhatsappConnectionStatusEnum } from "../enums/whatsapp-connection-status.enum";
 
 @Injectable()
 export class WhatsappSocketService implements OnModuleInit {
@@ -163,29 +162,14 @@ export class WhatsappSocketService implements OnModuleInit {
 
   public async destroySession(
     sessionId: string,
-    user: User,
     statusCode?: number,
   ): Promise<void> {
     const sessionPath = join(this.sessionsDir, sessionId);
 
     await fs.rm(sessionPath, { recursive: true, force: true });
-    await this.sessionRepository.update(
-      { id: sessionId },
-      { status: WhatsappConnectionStatusEnum.CLOSED },
-    );
-
-    try {
-      this.gateway.emitStatusUpdate(user.id, {
-        status: WhatsappConnectionStatusEnum.CLOSED,
-        name: user.name,
-        qr: null,
-      });
-    } catch (e) {
-      console.error("destroy session error:", e);
-    }
 
     console.warn(
-      `Session ${sessionId} OBLITERATED (Code: ${statusCode}). DB record and files removed.`,
+      `Session ${sessionId} KILLED (Code: ${statusCode}). DB record and files removed.`,
     );
   }
 
@@ -226,46 +210,33 @@ export class WhatsappSocketService implements OnModuleInit {
     user: User,
     update: Partial<ConnectionState>,
   ) {
-    const { connection, lastDisconnect, qr } = update;
+    const { lastDisconnect, qr } = update;
+
+    const connection = update.connection as WhatsappConnectionStatusEnum;
     const socket = this.getSocketOrFail(sessionId);
 
-    if (qr) {
-      qrcode.generate(qr, { small: true });
-      void this.sessionRepository.update(
-        { id: sessionId },
-        { qr, status: WhatsappConnectionStatusEnum.QR },
-      );
-      this.gateway.emitStatusUpdate(user.id, {
-        status: WhatsappConnectionStatusEnum.QR,
-        name: user.name,
-        qr,
-      });
+    const statusPayload = {
+      status: connection,
+      qr: qr ?? null,
+      name: socket?.authState?.creds?.me?.name ?? user.name,
+    };
+
+    if (connection) {
+      void this.sessionRepository.update({ id: sessionId }, statusPayload);
+      this.gateway.emitStatusUpdate(user.id, statusPayload);
     }
 
-    if (connection === "open") {
-      const selfName = socket?.authState?.creds?.me?.name;
-      void this.sessionRepository.update(
-        { id: sessionId },
-        {
-          status: WhatsappConnectionStatusEnum.OPEN,
-          name: selfName,
-        },
-      );
-      this.gateway.emitStatusUpdate(user.id, {
-        status: WhatsappConnectionStatusEnum.OPEN,
-        name: selfName || user.name,
-        qr: null,
-      });
-    }
-
-    if (connection === "close") {
+    if (connection === WhatsappConnectionStatusEnum.CLOSED) {
       const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
 
       const isTerminal =
         statusCode === 401 || statusCode === 405 || statusCode === 411;
 
       if (isTerminal) {
-        this.destroySession(sessionId, user, statusCode).catch(console.error);
+        this.destroySession(sessionId, statusCode).catch(console.error);
+        setTimeout(() => {
+          this.start(sessionId, user).catch(console.error);
+        }, 1000);
         return;
       }
 

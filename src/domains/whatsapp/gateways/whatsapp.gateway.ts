@@ -8,11 +8,11 @@ import { Server, Socket } from "socket.io";
 import { forwardRef, Inject, Logger, UseGuards } from "@nestjs/common";
 import { WhatsappService } from "../services/whatsapp.service";
 import { User } from "../../users/entities/user.entity";
-import { WhatsappConnectionStatusEnum } from "../enums/whatsapp-connection-status.enum";
 import { BaseSecureGateway } from "../../auth/gateways/secure.gateway";
 import { WsJwtGuard } from "../../auth/guards/websocket-jwt.guard";
 import { WhatsappChatService } from "../services/whatsapp-chat.service";
 import { GetUserSocket } from "../../../shared/decorators/get-user-socket.decorator";
+import { WhatsappConnectionStatusEnum } from "../enums/whatsapp-connection-status.enum";
 
 const GATEWAY_KEY = "whatsapp" as const;
 
