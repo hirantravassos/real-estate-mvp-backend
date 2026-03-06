@@ -1,4 +1,11 @@
-import { forwardRef, Inject, Injectable, OnModuleInit } from "@nestjs/common";
+import {
+  BadRequestException,
+  forwardRef,
+  Inject,
+  Injectable,
+  NotFoundException,
+  OnModuleInit,
+} from "@nestjs/common";
 import makeWASocket, {
   Browsers,
   ConnectionState,
@@ -15,6 +22,8 @@ import { WhatsappConnectionStatusEnum } from "../enums/whatsapp-connection-statu
 import { WhatsappEventProcessorService } from "./whatsapp-event-processor.service";
 import { User } from "../../users/entities/user.entity";
 import { WhatsappGateway } from "../gateways/whatsapp.gateway";
+import { UserRepository } from "../../users/repositories/user.repository";
+import { WhatsappSession } from "../entities/whatsapp-session.entity";
 
 @Injectable()
 export class WhatsappSocketService implements OnModuleInit {
@@ -22,6 +31,7 @@ export class WhatsappSocketService implements OnModuleInit {
   private readonly sessionsDir = join(process.cwd(), "sessions");
 
   constructor(
+    private readonly userRepository: UserRepository,
     private readonly sessionRepository: WhatsappSessionRepository,
     private readonly eventProcessor: WhatsappEventProcessorService,
     @Inject(forwardRef(() => WhatsappGateway))
@@ -33,29 +43,32 @@ export class WhatsappSocketService implements OnModuleInit {
   }
 
   async onModuleInit(): Promise<void> {
-    const sessions = await this.sessionRepository.find({
+    const users = await this.userRepository.find({
       where: { active: true },
+      relations: {
+        session: true,
+      },
     });
 
-    for (const session of sessions) {
-      const { user } = await this.sessionRepository
-        .findOneOrFail({
-          where: { id: session.id },
-          relations: {
-            user: true,
-          },
-        })
-        .catch(() => {
-          this.destroySession(session.id, session.user, 404).catch(
-            console.error,
-          );
-          return { user: null };
+    for (const user of users) {
+      const sessionId = user.session?.id;
+
+      if (!sessionId) {
+        const sessionEntity = new WhatsappSession();
+        sessionEntity.qr = null;
+        sessionEntity.user = user;
+        sessionEntity.name = user.name;
+        sessionEntity.status = WhatsappConnectionStatusEnum.CLOSED;
+        const newSession = await this.sessionRepository.save(sessionEntity);
+
+        await this.start(newSession?.id, user).catch((error) => {
+          console.error("Initial boot failed for " + sessionId, error);
         });
+        continue;
+      }
 
-      if (!user) continue;
-
-      await this.start(session.id, user).catch((error) => {
-        console.error("Initial boot failed for " + session.id, error);
+      await this.start(sessionId, user).catch((error) => {
+        console.error("Initial boot failed for " + sessionId, error);
       });
     }
   }
@@ -69,6 +82,7 @@ export class WhatsappSocketService implements OnModuleInit {
     });
 
     socket.ev.on("messages.upsert", (data) => {
+      console.log("EVENT messages.upsert", data);
       void this.eventProcessor.processMessageUpsert(
         user,
         selfName,
@@ -77,22 +91,17 @@ export class WhatsappSocketService implements OnModuleInit {
     });
 
     socket.ev.on("messages.update", (data) => {
-      void this.eventProcessor.processMessageUpdate(user, selfName, data);
-    });
-
-    socket.ev.on("messages.media-update", (data) => {
-      console.log("messages.media-update", data);
-    });
-
-    socket.ev.on("message-receipt.update", (data) => {
-      console.log("message-receipt.update", data);
+      console.log("EVENT messages.update", data);
+      void this.eventProcessor.processMessageUpdate(user, data);
     });
 
     socket.ev.on("chats.upsert", (data) => {
+      console.log("chats.upsert CHAT CREATED", data);
       void this.eventProcessor.processChats(user, data);
     });
 
     socket.ev.on("chats.update", (data) => {
+      console.log("chats.update CHAT UPDATED", data);
       void this.eventProcessor.processChats(user, data);
     });
 
@@ -101,10 +110,12 @@ export class WhatsappSocketService implements OnModuleInit {
     });
 
     socket.ev.on("lid-mapping.update", (data) => {
+      console.log("lid-mapping.update NO IDEA", data);
       console.log("lid-mapping.update", data);
     });
 
     socket.ev.on("presence.update", () => {
+      // console.log("presence.update PERSON IS TYPING", data);
       // Show if a person is typing something to the user
     });
 
@@ -121,8 +132,33 @@ export class WhatsappSocketService implements OnModuleInit {
     });
   }
 
-  public getSocket(sessionId: string): WASocket | undefined {
-    return this.sockets.get(sessionId);
+  public getSocketOrFail(sessionId?: string | null): WASocket {
+    if (!sessionId) {
+      throw new NotFoundException("Session not found");
+    }
+    const found = this.sockets.get(sessionId);
+
+    if (!found) {
+      throw new NotFoundException("Socket not found");
+    }
+
+    return found;
+  }
+
+  public async getSocketByUserOrFail(
+    userId?: string | null,
+  ): Promise<WASocket> {
+    if (!userId) {
+      throw new BadRequestException("User not provided");
+    }
+    const session = await this.sessionRepository.findOne({
+      where: { user: { id: userId }, active: true },
+      relations: { user: true },
+    });
+    if (!session) {
+      throw new NotFoundException("Session not found");
+    }
+    return this.getSocketOrFail(session?.id);
   }
 
   public async destroySession(
@@ -130,15 +166,6 @@ export class WhatsappSocketService implements OnModuleInit {
     user: User,
     statusCode?: number,
   ): Promise<void> {
-    const socket = this.getSocket(sessionId);
-
-    if (socket) {
-      socket.ev.removeAllListeners("connection.update");
-      socket.ev.removeAllListeners("creds.update");
-      socket.end(undefined);
-      this.sockets.delete(sessionId);
-    }
-
     const sessionPath = join(this.sessionsDir, sessionId);
 
     await fs.rm(sessionPath, { recursive: true, force: true });
@@ -200,7 +227,7 @@ export class WhatsappSocketService implements OnModuleInit {
     update: Partial<ConnectionState>,
   ) {
     const { connection, lastDisconnect, qr } = update;
-    const socket = this.getSocket(sessionId);
+    const socket = this.getSocketOrFail(sessionId);
 
     if (qr) {
       qrcode.generate(qr, { small: true });

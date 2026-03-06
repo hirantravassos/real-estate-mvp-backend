@@ -3,7 +3,6 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { WhatsappSession } from "./entities/whatsapp-session.entity";
 import { WhatsappSessionRepository } from "./repositories/whatsapp-session.repository";
 import { WhatsappService } from "./services/whatsapp.service";
-import { WhatsappController } from "./controllers/whatsapp.controller";
 import { WhatsappSocketService } from "./services/whatsapp-socket.service";
 import { WhatsappChat } from "./entities/whatsapp-chat.entity";
 import { WhatsappChatRepository } from "./repositories/whatsapp-chat.repository";
@@ -19,6 +18,8 @@ import { WhatsappMediaService } from "./services/whatsapp-media.service";
 import { CustomerModule } from "../customers/customer.module";
 import { AuthModule } from "../auth/auth.module";
 import { WhatsappGateway } from "./gateways/whatsapp.gateway";
+import { WhatsappController } from "./controllers/whatsapp.controller";
+import { WhatsappChatController } from "./controllers/whatsapp-chat.controller";
 
 @Module({
   imports: [
@@ -31,7 +32,7 @@ import { WhatsappGateway } from "./gateways/whatsapp.gateway";
     CustomerModule,
     AuthModule,
   ],
-  controllers: [WhatsappController],
+  controllers: [WhatsappController, WhatsappChatController],
   providers: [
     WhatsappSessionRepository,
     WhatsappChatRepository,
@@ -56,6 +57,7 @@ import { WhatsappGateway } from "./gateways/whatsapp.gateway";
     WhatsappMessageService,
     WhatsappChatService,
     WhatsappContactService,
+    WhatsappGateway,
   ],
 })
 export class WhatsappModule {}

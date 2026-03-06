@@ -1,5 +1,5 @@
 import { User } from "../entities/user.entity.js";
-import type { UserResponseDto } from "../dtos/user-response.dto.js";
+import { UserResponseDto } from "../dtos/user-response.dto.js";
 import { DateHelper } from "../../../shared/utils/date.util.js";
 import { UserCreateDto } from "../dtos/user-create.dto";
 import { TokenPayload } from "google-auth-library";

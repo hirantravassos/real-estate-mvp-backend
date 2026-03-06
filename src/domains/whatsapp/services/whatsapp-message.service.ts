@@ -3,6 +3,7 @@ import { User } from "../../users/entities/user.entity";
 import { WhatsappMessageRepository } from "../repositories/whatsapp-message.repository";
 import { WhatsappMessageTypeEnum } from "../enums/whatsapp-message-type.enum";
 import { WhatsappContactRepository } from "../repositories/whatsapp-contact.repository";
+import { WhatsappMessage } from "../entities/whatsapp-message.entity";
 
 interface UpsertMessageData {
   readonly messageId: string;
@@ -18,13 +19,16 @@ export class WhatsappMessageService {
   constructor(
     private readonly messageRepository: WhatsappMessageRepository,
     private readonly contactRepository: WhatsappContactRepository,
-  ) { }
+  ) {}
 
-  async findAll(user: User, whatsappId: string) {
+  async findAll(
+    userId: string,
+    whatsappId: string,
+  ): Promise<WhatsappMessage[]> {
     return this.messageRepository.find({
       where: {
-        userId: user.id,
-        whatsappId,
+        userId: userId,
+        whatsappId: whatsappId,
       },
       order: {
         sentAt: "DESC",
@@ -60,7 +64,7 @@ export class WhatsappMessageService {
     });
   }
 
-  async upsertMessage(user: User, data: UpsertMessageData): Promise<void> {
+  async save(user: User, data: UpsertMessageData): Promise<void> {
     if (!data.whatsappId || !data.messageId) return;
 
     await this.messageRepository.upsert(

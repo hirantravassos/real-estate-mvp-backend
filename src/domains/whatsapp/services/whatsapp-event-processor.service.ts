@@ -8,7 +8,6 @@ import { WhatsappMessageService } from "./whatsapp-message.service";
 import { WhatsappMediaService } from "./whatsapp-media.service";
 import { WhatsappMessageTypeEnum } from "../enums/whatsapp-message-type.enum";
 import { WhatsappGateway } from "../gateways/whatsapp.gateway";
-import { Long } from "typeorm";
 import IMessage = proto.IMessage;
 import IHistorySyncMsg = proto.IHistorySyncMsg;
 
@@ -17,7 +16,6 @@ const MINIMUM_PHONE_LENGTH = 10;
 const COUNTRY_CODE_LENGTH = 2;
 const SYNC_BATCH_SIZE = 10;
 const SYNC_BATCH_DELAY_MS = 100;
-const SYNC_MAX_AGE_MONTHS = 6;
 
 @Injectable()
 export class WhatsappEventProcessorService {
@@ -40,28 +38,18 @@ export class WhatsappEventProcessorService {
     },
   ): void {
     const tasks: Array<() => Promise<void>> = [];
-    const cutoffDate = dayjs().subtract(SYNC_MAX_AGE_MONTHS, "month");
 
     for (const chat of data.chats) {
       tasks.push(() =>
-        this.chatService.upsertChat(
+        this.chatService.save({
           user,
-          chat?.id as string,
-          this.getChatUnreadCount(chat.unreadCount),
-        ),
+          whatsappId: chat?.id as string,
+          unread: this.getChatUnreadCount(chat.unreadCount),
+        }),
       );
 
       for (const syncMessage of chat.messages ?? []) {
-        if (
-          this.isWithinThreshold(
-            syncMessage.message?.messageTimestamp as number | Long | null,
-            cutoffDate,
-          )
-        ) {
-          tasks.push(() =>
-            this.processSyncMessageAsync(user, selfName, syncMessage),
-          );
-        }
+        void this.processSyncMessageAsync(user, selfName, syncMessage);
       }
     }
 
@@ -70,16 +58,7 @@ export class WhatsappEventProcessorService {
     }
 
     for (const rawMessage of data.messages) {
-      if (
-        this.isWithinThreshold(
-          rawMessage.messageTimestamp as number | Long | null,
-          cutoffDate,
-        )
-      ) {
-        tasks.push(() =>
-          this.processMessageAsync(user, selfName, rawMessage, false),
-        );
-      }
+      void this.processMessageAsync(user, selfName, rawMessage, false);
     }
 
     void this.processInChunks(tasks);
@@ -88,49 +67,33 @@ export class WhatsappEventProcessorService {
   processMessageUpsert(
     user: User,
     selfName: string,
-    messages: WAMessage[],
+    insertedMessages: WAMessage[],
   ): void {
-    for (const rawMessage of messages) {
-      this.processRealtimeMessage(user, selfName, rawMessage);
+    for (const message of insertedMessages) {
+      this.processRealtimeMessage(user, selfName, message);
     }
   }
 
-  processMessageUpdate(
-    user: User,
-    selfName: string,
-    updates: WAMessageUpdate[],
-  ): void {
-    for (const update of updates) {
-      this.processRealtimeMessage(user, selfName, update);
+  processMessageUpdate(user: User, updatedMessages: WAMessageUpdate[]): void {
+    for (const message of updatedMessages) {
+      const whatsappId = message?.key?.remoteJid;
+      const unread = message.update.status !== proto.WebMessageInfo.Status.READ;
+      if (!whatsappId) return;
+      void this.chatService.save({
+        user,
+        whatsappId,
+        unread,
+      });
     }
   }
 
   processChats(user: User, chats: Chat[]): void {
-    const tasks: Array<() => Promise<void>> = [];
-    const cutoffDate = dayjs().subtract(SYNC_MAX_AGE_MONTHS, "month");
-
     for (const chat of chats) {
-      tasks.push(() =>
-        this.chatService.upsertChat(
-          user,
-          chat?.id as string,
-          this.getChatUnreadCount(chat.unreadCount),
-        ),
-      );
-
-      for (const syncMessage of chat.messages ?? []) {
-        if (
-          this.isWithinThreshold(
-            syncMessage.message?.messageTimestamp as number | Long | null,
-            cutoffDate,
-          )
-        ) {
-          tasks.push(() => this.processSyncMessageAsync(user, "", syncMessage));
-        }
-      }
+      const unread = (chat?.unreadCount ?? 0) > 0;
+      const whatsappId = chat?.id as string;
+      console.log("chat updates from chat");
+      // void this.chatService.upsertChat(user, whatsappId, unread);
     }
-
-    void this.processInChunks(tasks);
   }
 
   processContacts(user: User, contacts: Partial<Contact>[]): void {
@@ -163,35 +126,30 @@ export class WhatsappEventProcessorService {
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
   }
 
-  private isWithinThreshold(
-    timestamp: number | Long | null | undefined,
-    cutoffDate: dayjs.Dayjs,
-  ): boolean {
-    if (!timestamp) return true;
-    return dayjs.unix(Number(timestamp)).isAfter(cutoffDate);
-  }
-
-  /**
-   * Real-time messages: fire-and-forget, includes media download.
-   */
   private processRealtimeMessage(
     user: User,
     selfName: string,
-    rawMessage: WAMessage | WAMessageUpdate,
+    raw: WAMessage | WAMessageUpdate,
   ): void {
-    const whatsappId = rawMessage.key?.remoteJid;
-    const messageId = rawMessage.key?.id;
-
-    if (!whatsappId || !messageId) return;
-
+    const message = raw as WAMessage;
+    const whatsappId = message.key?.remoteJid;
+    const messageId = message.key?.id;
+    const isFromMe = !!message.key?.fromMe;
+    const name = isFromMe ? null : this.cleanName(selfName, message.pushName);
+    const sentAt = message.messageTimestamp
+      ? dayjs.unix(message.messageTimestamp as number).toISOString()
+      : new Date().toISOString();
     const phoneNumber =
       this.extractPhoneNumber(whatsappId) ??
-      this.extractPhoneNumber(rawMessage.key?.remoteJidAlt);
-    const isFromMe = !!rawMessage.key?.fromMe;
-    const name = isFromMe
-      ? null
-      : this.cleanName(selfName, (rawMessage as WAMessage).pushName);
-    const fullMessage = rawMessage as WAMessage;
+      this.extractPhoneNumber(message.key?.remoteJidAlt);
+
+    if (!whatsappId || !messageId) {
+      console.warn("WARN [processRealtimeMessage]: Unavailable id", {
+        whatsappId,
+        messageId,
+      });
+      return;
+    }
 
     void this.contactService.upsertContact(user, {
       whatsappId,
@@ -199,38 +157,43 @@ export class WhatsappEventProcessorService {
       name,
     });
 
-    const sentAt = fullMessage.messageTimestamp
-      ? dayjs.unix(fullMessage.messageTimestamp as number).toISOString()
-      : new Date().toISOString();
+    void this.chatService.save({
+      user,
+      whatsappId,
+      unread: true,
+      lastSentAt: sentAt,
+    });
 
-    void this.chatService.upsertChat(user, whatsappId, true, sentAt);
+    console.log(
+      "processRealtimeMessage is message?",
+      "message.message || message.messageTimestamp",
+      {
+        message,
+        messageMessage: message?.message,
+        messageTimestamp: message?.messageTimestamp,
+      },
+    );
 
-    if (fullMessage.message || fullMessage.messageTimestamp) {
-      const unwrapped = this.unwrapMessage(fullMessage.message);
+    if (message.message || message.messageTimestamp) {
+      const unwrapped = this.unwrapMessage(message.message);
 
-      void this.messageService.upsertMessage(user, {
+      void this.messageService.save(user, {
         messageId,
         whatsappId,
         sentAt,
         content: this.extractContent(unwrapped),
         type: this.resolveMessageType(unwrapped),
-        me: !!fullMessage.key?.fromMe,
+        me: !!message.key?.fromMe,
       });
 
-      if (fullMessage.message) {
-        void this.mediaService.downloadAndStore(user, fullMessage).then(() => {
-          void this.gateway.emitChatUpdate(user.id, whatsappId);
+      if (message.message) {
+        void this.mediaService.downloadAndStore(user, message).then(() => {
+          void this.gateway.emitChatUpdate(user, whatsappId);
         });
       }
     }
-
-    void this.gateway.emitChatsUpdate(user.id);
-    void this.gateway.emitChatUpdate(user.id, whatsappId);
   }
 
-  /**
-   * Sync messages: sequential (awaited), no media download.
-   */
   private async processMessageAsync(
     user: User,
     selfName: string,
@@ -261,12 +224,22 @@ export class WhatsappEventProcessorService {
       ? dayjs.unix(fullMessage.messageTimestamp as number).toISOString()
       : new Date().toISOString();
 
-    await this.chatService.upsertChat(user, whatsappId, true, sentAt);
+    console.log("processMessageAsync", {
+      whatsappId,
+      messageId,
+      sentAt,
+    });
+    await this.chatService.save({
+      user,
+      whatsappId,
+      unread: true,
+      lastSentAt: sentAt,
+    });
 
     if (fullMessage.message || fullMessage.messageTimestamp) {
       const unwrapped = this.unwrapMessage(fullMessage.message);
 
-      await this.messageService.upsertMessage(user, {
+      await this.messageService.save(user, {
         messageId,
         whatsappId,
         sentAt,
@@ -280,8 +253,8 @@ export class WhatsappEventProcessorService {
       }
     }
 
-    void this.gateway.emitChatsUpdate(user.id);
-    void this.gateway.emitChatUpdate(user.id, whatsappId);
+    void this.gateway.emitChatsUpdate(user);
+    void this.gateway.emitChatUpdate(user, whatsappId);
   }
 
   private async processSyncMessageAsync(
@@ -317,11 +290,16 @@ export class WhatsappEventProcessorService {
       ? dayjs.unix(innerMessage.messageTimestamp as number).toISOString()
       : new Date().toISOString();
 
-    await this.chatService.upsertChat(user, whatsappId, true, sentAt);
+    await this.chatService.save({
+      user,
+      whatsappId,
+      unread: true,
+      lastSentAt: sentAt,
+    });
 
     const unwrapped = this.unwrapMessage(innerMessage.message);
 
-    await this.messageService.upsertMessage(user, {
+    await this.messageService.save(user, {
       messageId,
       whatsappId,
       sentAt,
@@ -330,8 +308,8 @@ export class WhatsappEventProcessorService {
       me: !!innerMessage.key?.fromMe,
     });
 
-    void this.gateway.emitChatsUpdate(user.id);
-    void this.gateway.emitChatUpdate(user.id, whatsappId);
+    void this.gateway.emitChatsUpdate(user);
+    void this.gateway.emitChatUpdate(user, whatsappId);
   }
 
   private async processContactAsync(
@@ -348,7 +326,7 @@ export class WhatsappEventProcessorService {
     });
   }
 
-  private extractPhoneNumber(jid?: string): string | null {
+  private extractPhoneNumber(jid?: string | null): string | null {
     if (!jid?.includes(WHATSAPP_JID_SUFFIX)) return null;
 
     const rawNumber = jid
@@ -368,10 +346,6 @@ export class WhatsappEventProcessorService {
     return cleaned.length > 0 ? cleaned : null;
   }
 
-  /**
-   * Recursively unwraps FutureProofMessage wrappers (viewOnce, ephemeral,
-   * documentWithCaption, editedMessage, etc.) to reach the real message content.
-   */
   private unwrapMessage(message: IMessage | null | undefined): IMessage | null {
     if (!message) return null;
 

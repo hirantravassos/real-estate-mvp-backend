@@ -16,6 +16,12 @@ export class WhatsappContactService {
     private readonly customerRepository: CustomerRepository,
   ) {}
 
+  async findOne(user: User, whatsappId: string) {
+    return this.contactRepository.findOne({
+      where: { whatsappId, userId: user.id },
+    });
+  }
+
   async upsertContact(user: User, data: UpsertContactData): Promise<void> {
     if (!data.whatsappId) return;
 

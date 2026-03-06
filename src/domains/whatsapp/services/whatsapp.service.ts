@@ -4,7 +4,6 @@ import { User } from "../../users/entities/user.entity";
 import { WhatsappSocketService } from "./whatsapp-socket.service";
 import { WhatsappChatRepository } from "../repositories/whatsapp-chat.repository";
 import { WhatsappMessageRepository } from "../repositories/whatsapp-message.repository";
-import { WhatsappContact } from "../entities/whatsapp-contact.entity";
 import { WhatsappContactRepository } from "../repositories/whatsapp-contact.repository";
 
 @Injectable()
@@ -61,101 +60,5 @@ export class WhatsappService {
     }
 
     return session;
-  }
-
-  async findAllChats(user: User) {
-    const userId = user.id;
-
-    return await this.chatRepository
-      .createQueryBuilder("chat")
-      .innerJoinAndMapOne(
-        "chat.contact",
-        WhatsappContact,
-        "contact",
-        "contact.whatsappId = chat.whatsappId AND contact.userId = chat.userId AND contact.phoneNumber IS NOT NULL",
-      )
-      .addSelect(
-        "CASE WHEN chat.lastSentAt IS NULL THEN 1 ELSE 0 END",
-        "lastSentAtIsNull",
-      )
-      .where("chat.userId = :userId", { userId })
-      .orderBy("lastSentAtIsNull", "ASC")
-      .addOrderBy("chat.lastSentAt", "DESC")
-      .take(100)
-      .getMany();
-  }
-
-  async findAllMessages(user: User, whatsappId: string) {
-    const chat = await this.chatRepository.findOne({
-      where: { whatsappId, userId: user.id },
-    });
-
-    const contact = await this.contactRepository.findOneBy({
-      whatsappId,
-      userId: user.id,
-    });
-
-    const messages = await this.messageRepository.find({
-      where: {
-        user: { id: user.id },
-        whatsappId,
-      },
-      order: {
-        sentAt: "DESC",
-      },
-      take: 100,
-    });
-
-    return {
-      ...chat,
-      contact,
-      messages,
-    };
-  }
-
-  async markChatAsSeen(user: User, whatsappId: string) {
-    const session = await this.sessionRepository.findOne({
-      where: {
-        user: { id: user.id },
-        active: true,
-      },
-    });
-
-    if (!session) {
-      throw new NotFoundException("Whatsapp session not found");
-    }
-
-    const socket = this.socketService.getSocket(session.id);
-
-    if (!socket) {
-      throw new NotFoundException("Whatsapp connection not active");
-    }
-
-    const messages = await this.messageRepository.find({
-      where: {
-        user: { id: user.id },
-        whatsappId,
-      },
-      order: {
-        sentAt: "DESC",
-      },
-      take: 50,
-    });
-
-    const keys = messages.map((message) => ({
-      remoteJid: whatsappId,
-      id: message.messageId,
-    }));
-
-    if (keys.length > 0) {
-      await socket.readMessages(keys);
-    }
-
-    await this.chatRepository.update(
-      { userId: user.id, whatsappId },
-      { unread: false },
-    );
-
-    return this.findAllMessages(user, whatsappId);
   }
 }

@@ -10,11 +10,11 @@ export class WhatsappSession extends BaseEntity {
   @JoinColumn()
   user: User;
 
-  @ColumnName()
-  name: string;
+  @ColumnName({ nullable: true })
+  name: string | null;
 
-  @Column({ type: "varchar", length: 255 })
-  qr: string;
+  @Column({ type: "varchar", length: 255, nullable: true })
+  qr: string | null;
 
   @Column({ type: "enum", enum: WhatsappConnectionStatusEnum })
   status: WhatsappConnectionStatusEnum;

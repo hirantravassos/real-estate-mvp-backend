@@ -4,7 +4,7 @@ import { WhatsappMessage } from "../entities/whatsapp-message.entity";
 
 @Injectable()
 export class WhatsappMessageRepository extends Repository<WhatsappMessage> {
-  constructor(private dataSource: DataSource) {
+  constructor(private readonly dataSource: DataSource) {
     super(WhatsappMessage, dataSource.createEntityManager());
   }
 }

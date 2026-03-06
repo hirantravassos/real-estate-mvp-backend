@@ -22,9 +22,15 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {
     const clientId = this.configService.get<string>("auth.googleClientId");
-    const refreshSecret = this.configService.get<string>("auth.jwtRefreshSecret");
-    const accessExpiration = this.configService.get<number>("auth.jwtExpirationTime");
-    const refreshExpiration = this.configService.get<number>("auth.jwtRefreshExpirationTime");
+    const refreshSecret = this.configService.get<string>(
+      "auth.jwtRefreshSecret",
+    );
+    const accessExpiration = this.configService.get<number>(
+      "auth.jwtExpirationTime",
+    );
+    const refreshExpiration = this.configService.get<number>(
+      "auth.jwtRefreshExpirationTime",
+    );
 
     if (!clientId) {
       throw new Error("Google Client ID is not defined in the configuration");
@@ -64,17 +70,22 @@ export class AuthService {
       return this.generateTokens(user);
     } catch (error) {
       console.error("Error authenticating with Google:", error);
-      throw new UnauthorizedException("Authentication failed, google expired token");
+      throw new UnauthorizedException(
+        "Authentication failed, google expired token",
+      );
     }
   }
 
   async refreshAccessToken(refreshToken: string): Promise<AccessTokenDto> {
     try {
-      const payload = this.jwtService.verify<{ id: string; email: string }>(refreshToken, {
-        secret: this.refreshSecret,
-      });
+      const payload = this.jwtService.verify<{ id: string; email: string }>(
+        refreshToken,
+        {
+          secret: this.refreshSecret,
+        },
+      );
 
-      const user = await this.userRepository.findById(payload.id);
+      const user = await this.userRepository.findOneBy({ id: payload.id });
 
       if (!user) {
         throw new UnauthorizedException("User not found");
