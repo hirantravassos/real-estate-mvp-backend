@@ -5,10 +5,15 @@ import { KanbanMapper } from "../mappers/kanban.mapper";
 import { User } from "../../users/entities/user.entity";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
+import { WhatsappChatRepository } from "../../whatsapp/repositories/whatsapp-chat.repository";
+import { In } from "typeorm";
 
 @Injectable()
 export class KanbanService {
-  constructor(private readonly kanbanRepository: KanbanRepository) {}
+  constructor(
+    private readonly kanbanRepository: KanbanRepository,
+    private readonly whatsappChatRepository: WhatsappChatRepository,
+  ) { }
 
   async findAll(user: User, pagination: PaginationRequestDto) {
     const response = await this.kanbanRepository.findAndCount({
@@ -26,7 +31,34 @@ export class KanbanService {
       take: pagination.limit,
     });
 
-    return PaginationMapper.toDto(response, pagination);
+    const [kanbans] = response;
+
+    const allPhones = kanbans
+      .flatMap((kanban) => kanban.customers ?? [])
+      .map((customer) => customer.phone)
+      .filter(Boolean);
+
+    const unreadChatPhones = new Set<string>();
+
+    if (allPhones.length > 0) {
+      const unreadChats = await this.whatsappChatRepository.find({
+        where: {
+          userId: user.id,
+          phone: In(allPhones),
+          unread: true,
+        },
+        select: ["phone"],
+      });
+
+      for (const chat of unreadChats) {
+        unreadChatPhones.add(chat.phone);
+      }
+    }
+
+    return {
+      pagination: PaginationMapper.toDto(response, pagination),
+      unreadChatPhones,
+    };
   }
 
   async findOne(user: User, id: string) {

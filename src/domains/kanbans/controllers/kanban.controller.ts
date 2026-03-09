@@ -20,18 +20,19 @@ import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dt
 @Controller("kanbans")
 @UseGuards(JwtGuard)
 export class KanbanController {
-  constructor(private readonly kanbanService: KanbanService) {}
+  constructor(private readonly kanbanService: KanbanService) { }
 
   @Get()
   async findAll(
     @GetUser() user: User,
     @Query() pagination: PaginationRequestDto,
   ) {
-    const result = await this.kanbanService.findAll(user, pagination);
+    const { pagination: result, unreadChatPhones } =
+      await this.kanbanService.findAll(user, pagination);
 
     return {
       ...result,
-      data: KanbanMapper.toListDto(result.data),
+      data: KanbanMapper.toListDto(result.data, unreadChatPhones),
     };
   }
 

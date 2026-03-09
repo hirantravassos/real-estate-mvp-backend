@@ -107,6 +107,18 @@ export class WhatsappEventProcessorService {
           me: isFromMe,
         });
 
+        const phone =
+          this.extractPhoneNumber(message?.key?.remoteJid) ??
+          this.extractPhoneNumber(message?.key?.remoteJidAlt);
+
+        if (phone) {
+          void this.chatService.save(user, whatsappId, {
+            unread: !isFromMe,
+            phone,
+            lastSentAt: sentAt,
+          });
+        }
+
         if (message.message) {
           void this.mediaService.downloadAndStore(user, message).then(() => {
             void this.gateway.emitChatUpdate(user, whatsappId);
@@ -161,16 +173,31 @@ export class WhatsappEventProcessorService {
     }
   }
 
-  processMessageUpdate(user: User, updatedMessages: WAMessageUpdate[]): void {
+  async processMessageUpdate(
+    user: User,
+    updatedMessages: WAMessageUpdate[],
+  ): Promise<void> {
     for (const message of updatedMessages) {
       const whatsappId =
         this.extractLid(message?.key?.remoteJid) ??
         this.extractLid(message?.key?.remoteJidAlt);
-      const unread = message.update.status !== proto.WebMessageInfo.Status.READ;
-      if (!whatsappId) return;
-      // void this.chatService.save(user, whatsappId, {
-      //   unread,
-      // });
+      const status = message.update?.status;
+
+      if (!whatsappId) continue;
+      if (status === undefined || status === null) continue;
+
+      const unread = status !== proto.WebMessageInfo.Status.READ;
+
+      const phone =
+        this.extractPhoneNumber(message?.key?.remoteJid) ??
+        this.extractPhoneNumber(message?.key?.remoteJidAlt);
+
+      if (!phone) continue;
+
+      await this.chatService.save(user, whatsappId, {
+        unread,
+        phone,
+      });
     }
   }
 

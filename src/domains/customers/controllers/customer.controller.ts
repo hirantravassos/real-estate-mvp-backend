@@ -12,7 +12,7 @@ import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dt
 @Controller("customers")
 @UseGuards(JwtGuard)
 export class CustomerController {
-  constructor(private readonly customerService: CustomerService) {}
+  constructor(private readonly customerService: CustomerService) { }
 
   @Get()
   async findAll(
@@ -67,6 +67,15 @@ export class CustomerController {
   @Post(":id/accept")
   async accept(@GetUser() user: User, @Param("id") customerId: string) {
     return await this.customerService.accept(user, customerId);
+  }
+
+  @Patch(":id/move")
+  async moveToKanban(
+    @GetUser() user: User,
+    @Param("id") customerId: string,
+    @Body() body: { kanbanId: string | null },
+  ) {
+    return this.customerService.moveToKanban(user, customerId, body.kanbanId);
   }
 
   @Delete(":id")

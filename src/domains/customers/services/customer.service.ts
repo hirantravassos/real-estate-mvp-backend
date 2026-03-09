@@ -26,7 +26,7 @@ export class CustomerCreateDto {
 
 @Injectable()
 export class CustomerService {
-  constructor(private readonly customerRepository: CustomerRepository) {}
+  constructor(private readonly customerRepository: CustomerRepository) { }
 
   async findAll(user: User, pagination: PaginationRequestDto) {
     const data = await this.customerRepository.findAndCount({
@@ -133,5 +133,18 @@ export class CustomerService {
         pending: false,
       },
     );
+  }
+
+  async moveToKanban(user: User, customerId: string, kanbanId: string | null) {
+    const customer = await this.customerRepository
+      .findOneOrFail({
+        where: { id: customerId, user: { id: user.id } },
+      })
+      .catch(() => {
+        throw new NotFoundException("Customer not found");
+      });
+
+    customer.kanban = kanbanId ? ({ id: kanbanId } as never) : null;
+    return this.customerRepository.save(customer);
   }
 }
