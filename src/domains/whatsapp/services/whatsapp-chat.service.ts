@@ -28,6 +28,7 @@ export class WhatsappChatService {
     private readonly gateway: WhatsappGateway,
     private readonly chatRepository: WhatsappChatRepository,
     private readonly messageService: WhatsappMessageService,
+    @Inject(forwardRef(() => CustomerService))
     private readonly customerService: CustomerService,
   ) {}
 
@@ -69,6 +70,35 @@ export class WhatsappChatService {
       });
 
     const messages = await this.messageService.findAll(user.id, whatsappId);
+
+    if (!customer) return;
+
+    return {
+      ...chat,
+      customer,
+      messages,
+    };
+  }
+
+  async findOneByPhone(user: User, phone: string) {
+    const chat = await this.chatRepository.findOne({
+      where: { phone, userId: user.id },
+    });
+
+    if (!chat) {
+      throw new NotFoundException("Whatsapp chat not found");
+    }
+
+    const customer = await this.customerService
+      .findOneByPhone(user, chat?.phone)
+      .catch(() => {
+        return null;
+      });
+
+    const messages = await this.messageService.findAll(
+      user.id,
+      chat.whatsappId,
+    );
 
     if (!customer) return;
 

@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Inject, Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { WhatsappSession } from "./entities/whatsapp-session.entity";
 import { WhatsappSessionRepository } from "./repositories/whatsapp-session.repository";

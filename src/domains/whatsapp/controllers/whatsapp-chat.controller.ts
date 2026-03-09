@@ -14,6 +14,14 @@ export class WhatsappChatController {
     return this.whatsappChatService.findAll(user);
   }
 
+  @Get("by-phone/:phone")
+  async findOneByPhone(
+    @GetUser() user: User,
+    @Param("phone") phone: string,
+  ) {
+    return this.whatsappChatService.findOneByPhone(user, phone);
+  }
+
   @Get(":whatsappId")
   async findOne(
     @GetUser() user: User,

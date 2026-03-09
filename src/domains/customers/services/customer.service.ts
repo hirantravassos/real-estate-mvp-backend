@@ -73,7 +73,7 @@ export class CustomerService {
   }
 
   async findOne(user: User, id: string) {
-    return this.customerRepository
+    return await this.customerRepository
       .findOneOrFail({
         where: { id, user: { id: user.id } },
         relations: {

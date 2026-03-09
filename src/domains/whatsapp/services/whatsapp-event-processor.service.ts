@@ -18,6 +18,7 @@ const COUNTRY_CODE_LENGTH = 2;
 @Injectable()
 export class WhatsappEventProcessorService {
   constructor(
+    @Inject(forwardRef(() => CustomerService))
     private readonly customerService: CustomerService,
     @Inject(forwardRef(() => WhatsappChatService))
     private readonly chatService: WhatsappChatService,
