@@ -1,7 +1,7 @@
-import { CustomerCreateDto } from "../dtos/customer-create.dto";
 import { Customer } from "../entities/customer.entity";
 import { Kanban } from "../../kanbans/entities/kanban.entity";
 import { CustomerComment } from "../entities/customer-comments.entity";
+import { CustomerCreateDto } from "../services/customer.service";
 
 export class CustomerMapper {
   static toEntity(dto: CustomerCreateDto, id?: string) {

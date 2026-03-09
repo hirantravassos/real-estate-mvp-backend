@@ -64,7 +64,7 @@ export class WhatsappSocketService implements OnModuleInit {
     });
 
     socket.ev.on("messages.upsert", (data) => {
-      console.log("EVENT messages.upsert", data);
+      console.log("EVENT messages.upsert", JSON.stringify(data));
       void this.eventProcessor.processMessages(user, data.messages);
     });
 
@@ -79,7 +79,7 @@ export class WhatsappSocketService implements OnModuleInit {
     });
 
     socket.ev.on("chats.update", (data) => {
-      console.log("chats.update CHAT UPDATED", data);
+      console.log("chats.update CHAT UPDATED", JSON.stringify(data));
       void this.eventProcessor.processChatsSync(user, data);
     });
 
@@ -108,6 +108,10 @@ export class WhatsappSocketService implements OnModuleInit {
     socket.ev.on("connection.update", (data) => {
       console.warn("connection.update", JSON.stringify(data));
       void this.handleConnectionUpdate(sessionId, user, data);
+    });
+
+    socket.ev.on("creds.update", (data) => {
+      console.warn("creds.update", JSON.stringify(data));
     });
   }
 

@@ -37,8 +37,8 @@ export class WhatsappSessionService {
       });
   }
 
-  async findOne(user: User) {
-    return this.sessionRepository
+  async findOne(user: User): Promise<WhatsappSession> {
+    return await this.sessionRepository
       .findOneOrFail({
         where: { user: { id: user.id } },
         relations: {

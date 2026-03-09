@@ -22,6 +22,20 @@ export class WhatsappService {
     return found;
   }
 
+  async refreshStatus(user: User) {
+    return await this.sessionService.findOne(user).catch(async () => {
+      const newSession = await this.sessionService.save(user, {
+        qr: null,
+        status: WhatsappConnectionStatusEnum.CLOSED,
+        name: user.name,
+      });
+
+      await this.socketService.start(newSession.id, user);
+
+      return newSession;
+    });
+  }
+
   async findStatus(user: User) {
     return await this.sessionService.findOne(user).catch(async () => {
       const newSession = await this.sessionService.save(user, {

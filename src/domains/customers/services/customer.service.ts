@@ -1,10 +1,28 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { CustomerRepository } from "../repositories/customer.repository";
-import { CustomerCreateDto } from "../dtos/customer-create.dto";
 import { CustomerMapper } from "../mappers/customer.mapper";
 import { User } from "../../users/entities/user.entity";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
+import { ValidateName } from "../../../shared/decorators/validation/name.decorator";
+import { ValidateBrazilianPhoneNumber } from "../../../shared/decorators/validation/brazilian-phone-number.decorator";
+import { ValidateLongText } from "../../../shared/decorators/validation/long-text.decorator";
+import { IsOptional, IsUUID } from "class-validator";
+
+export class CustomerCreateDto {
+  @ValidateName()
+  name: string;
+
+  @ValidateBrazilianPhoneNumber()
+  phone: string;
+
+  @IsOptional()
+  @IsUUID()
+  kanbanId: string | null;
+
+  @ValidateLongText({ isOptional: true })
+  comment: string | null;
+}
 
 @Injectable()
 export class CustomerService {

@@ -10,9 +10,6 @@ import { WhatsappMessage } from "./entities/whatsapp-message.entity";
 import { WhatsappMessageRepository } from "./repositories/whatsapp-message.repository";
 import { WhatsappMessageService } from "./services/whatsapp-message.service";
 import { WhatsappChatService } from "./services/whatsapp-chat.service";
-import { WhatsappContactService } from "./services/whatsapp-contact.service";
-import { WhatsappContactRepository } from "./repositories/whatsapp-contact.repository";
-import { WhatsappContact } from "./entities/whatsapp-contact.entity";
 import { WhatsappEventProcessorService } from "./services/whatsapp-event-processor.service";
 import { WhatsappMediaService } from "./services/whatsapp-media.service";
 import { CustomerModule } from "../customers/customer.module";
@@ -24,12 +21,7 @@ import { WhatsappSessionService } from "./services/whatsapp-session.service";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      WhatsappSession,
-      WhatsappChat,
-      WhatsappMessage,
-      WhatsappContact,
-    ]),
+    TypeOrmModule.forFeature([WhatsappSession, WhatsappChat, WhatsappMessage]),
     CustomerModule,
     AuthModule,
   ],
@@ -38,14 +30,12 @@ import { WhatsappSessionService } from "./services/whatsapp-session.service";
     WhatsappSessionRepository,
     WhatsappChatRepository,
     WhatsappMessageRepository,
-    WhatsappContactRepository,
     WhatsappService,
     WhatsappSocketService,
     WhatsappEventProcessorService,
     WhatsappMediaService,
     WhatsappMessageService,
     WhatsappChatService,
-    WhatsappContactService,
     WhatsappSessionService,
     WhatsappGateway,
   ],
@@ -54,11 +44,9 @@ import { WhatsappSessionService } from "./services/whatsapp-session.service";
     WhatsappSocketService,
     WhatsappChatRepository,
     WhatsappMessageRepository,
-    WhatsappContactRepository,
     WhatsappMediaService,
     WhatsappMessageService,
     WhatsappChatService,
-    WhatsappContactService,
     WhatsappSessionService,
     WhatsappGateway,
   ],

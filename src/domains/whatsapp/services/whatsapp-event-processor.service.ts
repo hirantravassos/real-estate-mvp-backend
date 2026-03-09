@@ -2,12 +2,12 @@ import { forwardRef, Inject, Injectable } from "@nestjs/common";
 import { Chat, Contact, proto, WAMessage, WAMessageUpdate, } from "@whiskeysockets/baileys";
 import dayjs from "dayjs";
 import { User } from "../../users/entities/user.entity";
-import { WhatsappContactService } from "./whatsapp-contact.service";
 import { WhatsappChatService } from "./whatsapp-chat.service";
 import { WhatsappMessageService } from "./whatsapp-message.service";
 import { WhatsappMediaService } from "./whatsapp-media.service";
 import { WhatsappMessageTypeEnum } from "../enums/whatsapp-message-type.enum";
 import { WhatsappGateway } from "../gateways/whatsapp.gateway";
+import { CustomerService } from "../../customers/services/customer.service";
 import IMessage = proto.IMessage;
 
 const WHATSAPP_PNID_SUFFIX = "@s.whatsapp.net";
@@ -18,7 +18,7 @@ const COUNTRY_CODE_LENGTH = 2;
 @Injectable()
 export class WhatsappEventProcessorService {
   constructor(
-    private readonly contactService: WhatsappContactService,
+    private readonly customerService: CustomerService,
     @Inject(forwardRef(() => WhatsappChatService))
     private readonly chatService: WhatsappChatService,
     private readonly messageService: WhatsappMessageService,
@@ -40,13 +40,12 @@ export class WhatsappEventProcessorService {
     },
   ): Promise<void> {
     if (data.syncType === proto.HistorySync.HistorySyncType.INITIAL_BOOTSTRAP) {
-      await this.processContactsSync(user, data.contacts);
       await this.processChatsSync(user, data.chats);
       return;
     }
 
     if (data.syncType === proto.HistorySync.HistorySyncType.PUSH_NAME) {
-      void this.processContactsSyncNamesOnly(user, data.contacts);
+      void this.processContactsSync(user, data.contacts);
       return;
     }
 
@@ -81,7 +80,9 @@ export class WhatsappEventProcessorService {
         }, 200);
       });
 
-      const whatsappId = message.key?.remoteJid;
+      const whatsappId =
+        this.extractLid(message?.key?.remoteJid) ??
+        this.extractLid(message?.key?.remoteJidAlt);
       const messageId = message.key?.id;
       const isFromMe = !!message.key?.fromMe;
       const sentAt = message.messageTimestamp
@@ -116,96 +117,59 @@ export class WhatsappEventProcessorService {
 
   async processChatsSync(user: User, newChats: Chat[]): Promise<void> {
     for (const chat of newChats) {
-      await new Promise((resolve) => {
-        setTimeout(() => {
-          resolve({});
-        }, 200);
-      });
-      const whatsappId = chat?.id;
-      const isLid = chat?.id?.includes(WHATSAPP_LID_SUFFIX);
-      const lastSentAt = chat.lastMessageRecvTimestamp
-        ? new Date(chat.lastMessageRecvTimestamp).toISOString()
-        : undefined;
+      const timestamp =
+        // @ts-expect-error: missing types
+        (chat.lastMessageRecvTimestamp ?? chat.conversationTimestamp) * 1000;
+      const whatsappId =
+        this.extractLid(chat?.id) ??
+        this.extractLid(chat?.messages?.[0]?.message?.key?.remoteJid);
+      const lastSentAt = new Date(timestamp).toISOString();
+      const name = chat?.messages?.[0]?.message?.pushName;
+      const phone =
+        this.extractPhoneNumber(chat?.id) ??
+        this.extractPhoneNumber(chat?.messages?.[0]?.message?.key?.remoteJid) ??
+        this.extractPhoneNumber(
+          // @ts-expect-error: missing types
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+          chat?.messages?.[0]?.message?.key?.remoteJidAlt,
+        );
 
-      if (!whatsappId || !isLid) continue;
+      if (!whatsappId || !phone) continue;
 
       await this.chatService.save(user, whatsappId, {
         unread: (chat.unreadCount ?? 0) > 0,
+        phone,
         lastSentAt,
       });
     }
   }
 
-  async processContactsSync(user: User, newContacts: Contact[]): Promise<void> {
+  processContactsSync(user: User, newContacts: Contact[]): void {
     for (const contact of newContacts) {
-      const phoneNumber = this.extractPhoneNumber(contact?.phoneNumber);
-      const whatsappId = contact?.id;
-      const isLid = whatsappId?.includes("@lid");
-
-      if (isLid && whatsappId && phoneNumber) {
-        await this.contactService.save(user, whatsappId, {
-          phoneNumber,
-          name: contact?.notify ?? null,
-        });
-      }
-    }
-  }
-
-  async processContactsSyncNamesOnly(
-    user: User,
-    newContacts: Contact[],
-  ): Promise<void> {
-    for (const contact of newContacts) {
-      const phone = this.extractPhoneNumber(contact?.id);
       const name = contact?.notify ?? null;
+      const phone = this.extractPhoneNumber(contact?.phoneNumber);
 
-      if (phone) {
-        await this.contactService.updateNameByPhoneNumber(user, phone, name);
-      }
-    }
-  }
-
-  async processContactsUpdate(
-    user: User,
-    newContacts: Contact[],
-  ): Promise<void> {
-    for (const contact of newContacts) {
-      await new Promise((resolve) => {
-        setTimeout(() => {
-          resolve({});
-        }, 200);
-      });
-      const whatsappId = contact?.id;
-      const name = contact?.notify ?? null;
-      const phoneNumber = this.extractPhoneNumber(whatsappId);
-      const isWhatsappIdLidId = !whatsappId?.includes(WHATSAPP_PNID_SUFFIX);
-
-      if (whatsappId && isWhatsappIdLidId) {
-        void this.contactService.save(user, whatsappId, {
+      if (name && phone) {
+        void this.customerService.save(user, {
           name,
-          phoneNumber,
+          phone,
+          kanbanId: null,
+          comment: "Importado do Whatsapp",
         });
-        continue;
-      }
-
-      if (phoneNumber && !isWhatsappIdLidId) {
-        void this.contactService.updateNameByPhoneNumber(
-          user,
-          phoneNumber,
-          name,
-        );
       }
     }
   }
 
   processMessageUpdate(user: User, updatedMessages: WAMessageUpdate[]): void {
     for (const message of updatedMessages) {
-      const whatsappId = message?.key?.remoteJid;
+      const whatsappId =
+        this.extractLid(message?.key?.remoteJid) ??
+        this.extractLid(message?.key?.remoteJidAlt);
       const unread = message.update.status !== proto.WebMessageInfo.Status.READ;
       if (!whatsappId) return;
-      void this.chatService.save(user, whatsappId, {
-        unread,
-      });
+      // void this.chatService.save(user, whatsappId, {
+      //   unread,
+      // });
     }
   }
 
@@ -218,6 +182,11 @@ export class WhatsappEventProcessorService {
     if (rawNumber.length < MINIMUM_PHONE_LENGTH) return null;
 
     return rawNumber;
+  }
+
+  private extractLid(jid?: string | null): string | null {
+    if (!jid?.includes(WHATSAPP_LID_SUFFIX)) return null;
+    return jid;
   }
 
   private unwrapMessage(message: IMessage | null | undefined): IMessage | null {

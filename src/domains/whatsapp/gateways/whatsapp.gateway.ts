@@ -73,13 +73,13 @@ export class WhatsappGateway extends BaseSecureGateway {
     @GetUserSocket() user: User,
     payload: { whatsappId: string },
   ) {
-    const whatsappId = payload?.whatsappId;
-    if (!whatsappId) return;
-    void this.whatsappChatService.save(user, payload?.whatsappId, {
-      unread: false,
-    });
-    await this.emitChatUpdate(user, payload.whatsappId);
-    await this.emitChatsUpdate(user);
+    // const whatsappId = payload?.whatsappId;
+    // if (!whatsappId) return;
+    // void this.whatsappChatService.save(user, payload?.whatsappId, {
+    //   unread: false,
+    // });
+    // await this.emitChatUpdate(user, payload.whatsappId);
+    // await this.emitChatsUpdate(user);
   }
 
   emitStatusUpdate(
@@ -104,9 +104,9 @@ export class WhatsappGateway extends BaseSecureGateway {
   }
 
   async emitChatUpdate(user: User, whatsappId: string) {
-    const chat = await this.whatsappChatService.findOne(user, whatsappId);
-    this.server
-      .to(`user_${user.id}`)
-      .emit(GATEWAY_WHATSAPP_EVENTS.LISTEN.CHAT, chat);
+    // const chat = await this.whatsappChatService.findOne(user, whatsappId);
+    // this.server
+    //   .to(`user_${user.id}`)
+    //   .emit(GATEWAY_WHATSAPP_EVENTS.LISTEN.CHAT, chat);
   }
 }

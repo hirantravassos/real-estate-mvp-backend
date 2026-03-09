@@ -6,6 +6,7 @@ import {
   Inject,
   NotFoundException,
   Param,
+  Post,
   Res,
   UseGuards,
 } from "@nestjs/common";
@@ -40,7 +41,7 @@ export class WhatsappController {
     @GetUser() user: User,
     @Param("phone") phone: string,
   ) {
-    return this.whatsappMessageService.findAllByPhone(user, phone);
+    return [];
   }
 
   @Get("media/:messageId")
@@ -72,6 +73,11 @@ export class WhatsappController {
     );
 
     response.sendFile(absolutePath);
+  }
+
+  @Post("status-refresh")
+  async refreshStatus(@GetUser() user: User) {
+    return this.whatsappService.refreshStatus(user);
   }
 
   @Delete("disconnect")

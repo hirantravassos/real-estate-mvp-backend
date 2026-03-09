@@ -4037,6 +4037,158 @@ const full = {
   peerDataRequestSessionId: null,
 };
 
+const chatUpdate = [
+  {
+    id: "253716653465766@lid",
+    messages: [
+      {
+        message: {
+          key: {
+            remoteJid: "253716653465766@lid",
+            remoteJidAlt: "5513920001834@s.whatsapp.net",
+            fromMe: true,
+            id: "A5C259E404E2FDBCD6B67316701FAAB7",
+            participant: "",
+            addressingMode: "lid",
+          },
+          messageTimestamp: 1772986655,
+          pushName: "Taaqi",
+          broadcast: false,
+          status: 2,
+          message: { conversation: "Bjs" },
+          verifiedBizName: "Taaqi",
+        },
+      },
+    ],
+    conversationTimestamp: 1772986655,
+  },
+];
+
+const chatUpdateFromUser = [
+  {
+    id: "5513920001834@s.whatsapp.net",
+    messages: [
+      {
+        message: {
+          key: {
+            remoteJid: "5513920001834@s.whatsapp.net",
+            remoteJidAlt: "253716653465766@lid",
+            fromMe: false,
+            id: "3EB0DD87333D847E82C2EC",
+            participant: "",
+            addressingMode: "pn",
+          },
+          messageTimestamp: 1772986763,
+          pushName: "Hiran Travassos",
+          broadcast: false,
+          message: {
+            conversation: "aaaa",
+            messageContextInfo: {
+              deviceListMetadata: {
+                senderKeyHash: "EMj+KVhN/n4HTA==",
+                senderTimestamp: "1771677346",
+                senderAccountType: "E2EE",
+                receiverAccountType: "E2EE",
+                recipientKeyHash: "mbpapGbPysWJ0g==",
+                recipientTimestamp: "1771705798",
+              },
+              deviceListMetadataVersion: 2,
+              messageSecret: "XezAOOnM1+EtzBJvzw8aF/Ph8YIzFhRGzQLx5F9Bbaw=",
+            },
+          },
+        },
+      },
+    ],
+    conversationTimestamp: 1772986763,
+    unreadCount: 1,
+  },
+];
+
+const messageUpsert = {
+  messages: [
+    {
+      key: {
+        remoteJid: "253716653465766@lid",
+        remoteJidAlt: "5513920001834@s.whatsapp.net",
+        fromMe: true,
+        id: "A5C259E404E2FDBCD6B67316701FAAB7",
+        participant: "",
+        addressingMode: "lid",
+      },
+      messageTimestamp: 1772986655,
+      pushName: "Taaqi",
+      broadcast: false,
+      status: 2,
+      message: { conversation: "Bjs" },
+      verifiedBizName: "Taaqi",
+    },
+  ],
+  type: "notify",
+};
+
+const messageUpsertFromUser = {
+  messages: [
+    {
+      key: {
+        remoteJid: "5513920001834@s.whatsapp.net",
+        remoteJidAlt: "253716653465766@lid",
+        fromMe: false,
+        id: "3EB08A006E6D962CACDD80",
+        participant: "",
+        addressingMode: "pn",
+      },
+      messageTimestamp: 1772986748,
+      pushName: "Hiran Travassos",
+      broadcast: false,
+      message: {
+        conversation: "asd",
+        messageContextInfo: {
+          deviceListMetadata: {
+            senderKeyHash: "EMj+KVhN/n4HTA==",
+            senderTimestamp: "1771677346",
+            senderAccountType: "E2EE",
+            receiverAccountType: "E2EE",
+            recipientKeyHash: "mbpapGbPysWJ0g==",
+            recipientTimestamp: "1771705798",
+          },
+          deviceListMetadataVersion: 2,
+          messageSecret: "fc5o2ATYVdBbE3LhNpk/R8ErdsrxXoc9l5VqG3BZfV0=",
+        },
+      },
+      status: 4,
+    },
+    {
+      key: {
+        remoteJid: "5513920001834@s.whatsapp.net",
+        remoteJidAlt: "253716653465766@lid",
+        fromMe: false,
+        id: "3EB0DD87333D847E82C2EC",
+        participant: "",
+        addressingMode: "pn",
+      },
+      messageTimestamp: 1772986763,
+      pushName: "Hiran Travassos",
+      broadcast: false,
+      message: {
+        conversation: "aaaa",
+        messageContextInfo: {
+          deviceListMetadata: {
+            senderKeyHash: "EMj+KVhN/n4HTA==",
+            senderTimestamp: "1771677346",
+            senderAccountType: "E2EE",
+            receiverAccountType: "E2EE",
+            recipientKeyHash: "mbpapGbPysWJ0g==",
+            recipientTimestamp: "1771705798",
+          },
+          deviceListMetadataVersion: 2,
+          messageSecret: "XezAOOnM1+EtzBJvzw8aF/Ph8YIzFhRGzQLx5F9Bbaw=",
+        },
+      },
+    },
+  ],
+  type: "append",
+};
+
 const lastDisconnect = {
   connection: "close",
   lastDisconnect: {

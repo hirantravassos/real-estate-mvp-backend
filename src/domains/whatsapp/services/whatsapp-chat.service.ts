@@ -1,14 +1,21 @@
-import { forwardRef, Inject, Injectable } from "@nestjs/common";
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { WhatsappChatRepository } from "../repositories/whatsapp-chat.repository";
 import { User } from "../../users/entities/user.entity";
 import { WhatsappSocketService } from "./whatsapp-socket.service";
 import { WhatsappGateway } from "../gateways/whatsapp.gateway";
-import { WhatsappContactService } from "./whatsapp-contact.service";
 import { WhatsappMessageService } from "./whatsapp-message.service";
-import { WhatsappContact } from "../entities/whatsapp-contact.entity";
+import { CustomerService } from "../../customers/services/customer.service";
+import { WhatsappChat } from "../entities/whatsapp-chat.entity";
+import { Customer } from "../../customers/entities/customer.entity";
 
 export interface WhatsappChatCreateDto {
   unread: boolean;
+  phone: string;
   lastSentAt?: string | null;
 }
 
@@ -21,7 +28,7 @@ export class WhatsappChatService {
     private readonly gateway: WhatsappGateway,
     private readonly chatRepository: WhatsappChatRepository,
     private readonly messageService: WhatsappMessageService,
-    private readonly contactService: WhatsappContactService,
+    private readonly customerService: CustomerService,
   ) {}
 
   async findAll(user: User) {
@@ -30,10 +37,10 @@ export class WhatsappChatService {
     return await this.chatRepository
       .createQueryBuilder("chat")
       .innerJoinAndMapOne(
-        "chat.contact",
-        WhatsappContact,
-        "contact",
-        "contact.whatsappId = chat.whatsappId AND contact.userId = chat.userId AND contact.phoneNumber IS NOT NULL",
+        "chat.customer",
+        Customer,
+        "customer",
+        "customer.phone = chat.phone AND customer.userId = chat.userId",
       )
       .addSelect(
         "CASE WHEN chat.lastSentAt IS NULL THEN 1 ELSE 0 END",
@@ -50,12 +57,24 @@ export class WhatsappChatService {
     const chat = await this.chatRepository.findOne({
       where: { whatsappId, userId: user.id },
     });
-    const contact = await this.contactService.findOne(user, whatsappId);
+
+    if (!chat) {
+      throw new NotFoundException("Whatsapp chat not found");
+    }
+
+    const customer = await this.customerService
+      .findOneByPhone(user, chat?.phone)
+      .catch(() => {
+        return null;
+      });
+
     const messages = await this.messageService.findAll(user.id, whatsappId);
+
+    if (!customer) return;
 
     return {
       ...chat,
-      contact,
+      customer,
       messages,
     };
   }
@@ -65,12 +84,19 @@ export class WhatsappChatService {
     whatsappId: string,
     dto: WhatsappChatCreateDto,
   ): Promise<void> {
-    const { unread, lastSentAt } = dto;
+    const entity = new WhatsappChat();
 
-    const payload: Record<string, unknown> = { user, whatsappId, unread };
-    payload.lastSentAt = await this.getLastSentAt(user, whatsappId, lastSentAt);
+    entity.unread = dto.unread;
+    entity.phone = dto.phone;
+    entity.whatsappId = whatsappId;
+    entity.userId = user.id;
+    entity.lastSentAt = await this.getLastSentAt(
+      user,
+      whatsappId,
+      dto.lastSentAt,
+    );
 
-    await this.chatRepository.upsert(payload, ["whatsappId", "userId"]);
+    await this.chatRepository.upsert(entity, ["whatsappId", "userId"]);
     void this.gateway.emitChatsUpdate(user);
     void this.gateway.emitChatUpdate(user, whatsappId);
   }
@@ -102,7 +128,7 @@ export class WhatsappChatService {
     user: User,
     whatsappId: string,
     lastSentAt?: string | null,
-  ) {
+  ): Promise<string | null> {
     const existingChat = await this.chatRepository.findOne({
       where: {
         whatsappId: whatsappId,
@@ -112,7 +138,7 @@ export class WhatsappChatService {
 
     const existingTimestamp = existingChat?.lastSentAt;
 
-    if (!lastSentAt) return existingTimestamp;
+    if (!lastSentAt) return existingTimestamp ?? null;
 
     if (!existingTimestamp || lastSentAt > existingTimestamp) {
       return lastSentAt;
