@@ -59,6 +59,8 @@ export class CustomerMapper {
       return {
         id: comment.id,
         comment: comment.comment,
+        createdAt: comment.createdAt,
+        updatedAt: comment.updatedAt,
       };
     });
   }
