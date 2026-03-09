@@ -22,7 +22,7 @@ export class WhatsappSessionService {
     private readonly sessionRepository: WhatsappSessionRepository,
     @Inject(forwardRef(() => WhatsappGateway))
     private readonly whatsappGateway: WhatsappGateway,
-  ) {}
+  ) { }
 
   async findOneByUserId(userId: string) {
     return this.sessionRepository
@@ -73,9 +73,13 @@ export class WhatsappSessionService {
     const hasStatusChanged =
       !existingSession || existingSession.status !== newSession.status;
 
-    if (hasStatusChanged) {
+    const hasQrChanged =
+      !existingSession || existingSession.qr !== newSession.qr;
+
+    if (hasStatusChanged || hasQrChanged) {
       this.whatsappGateway.emitStatusUpdate(user.id, newSession);
     }
+
     return newSession;
   }
 }

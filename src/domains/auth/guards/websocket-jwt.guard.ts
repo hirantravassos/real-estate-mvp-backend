@@ -5,29 +5,19 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import { Socket } from "socket.io";
 import { UserRepository } from "../../users/repositories/user.repository";
-import { User } from "../../users/entities/user.entity";
-
-interface AuthenticatedSocket extends Socket {
-  user?: User;
-}
+import { AuthenticatedSocket } from "../../../shared/types/authenticated-socket.type";
 
 @Injectable()
 export class WsJwtGuard implements CanActivate {
   constructor(
     private readonly jwtService: JwtService,
     private readonly userRepository: UserRepository,
-  ) {}
+  ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const client = context.switchToWs().getClient<AuthenticatedSocket>();
-
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const token =
-      client.handshake?.headers?.authorization?.split(" ")[1] ||
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
-      client.handshake?.auth?.token?.split(" ")[1];
+    const token = this.extractToken(client);
 
     if (!token) {
       throw new UnauthorizedException("Missing authentication token");
@@ -46,5 +36,18 @@ export class WsJwtGuard implements CanActivate {
     } catch {
       throw new UnauthorizedException("Invalid credentials");
     }
+  }
+
+  private extractToken(client: AuthenticatedSocket): string | undefined {
+    const headerToken = client.handshake?.headers?.authorization;
+    const authToken = client.handshake?.auth?.token as string | undefined;
+
+    const rawToken = headerToken ?? authToken;
+
+    if (!rawToken) {
+      return undefined;
+    }
+
+    return rawToken.startsWith("Bearer ") ? rawToken.slice(7) : rawToken;
   }
 }

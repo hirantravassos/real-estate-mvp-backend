@@ -3,47 +3,47 @@ import {
   OnGatewayDisconnect,
   WebSocketServer,
 } from "@nestjs/websockets";
-import { Server, Socket } from "socket.io";
+import { Server } from "socket.io";
 import { ExecutionContextHost } from "@nestjs/core/helpers/execution-context-host";
 import { WsJwtGuard } from "../guards/websocket-jwt.guard";
-import { User } from "../../users/entities/user.entity";
-
-interface AuthenticatedSocket extends Socket {
-  user?: User;
-}
+import { AuthenticatedSocket } from "../../../shared/types/authenticated-socket.type";
+import { ExecutionContext, Logger } from "@nestjs/common";
 
 export abstract class BaseSecureGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
-{
+  implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   protected readonly webSocketServer: Server;
 
-  protected constructor(protected readonly wsJwtGuard: WsJwtGuard) {}
+  private readonly baseLogger = new Logger(BaseSecureGateway.name);
+
+  protected constructor(protected readonly wsJwtGuard: WsJwtGuard) { }
 
   async handleConnection(client: AuthenticatedSocket): Promise<void> {
     try {
-      const context = new ExecutionContextHost([client]);
-      const canConnect = await this.wsJwtGuard.canActivate(context as any);
+      const context: ExecutionContext = new ExecutionContextHost([client]);
+      const canConnect = await this.wsJwtGuard.canActivate(context);
 
       if (!canConnect) {
+        client.emit("connect_error", { message: "Authentication failed" });
         client.disconnect();
         return;
       }
 
       if (client?.user?.id) {
-        const userRoomName = `user_${client?.user.id}`;
+        const userRoomName = `user_${client.user.id}`;
         await client.join(userRoomName);
-        // console.log(`User ${client?.user.id} joined room: ${userRoomName}`);
       }
-
-      // console.log(`Client authenticated and connected: ${client.id}`);
     } catch (error) {
-      console.error(`Unauthorized connection attempt: ${client.id}`, error);
+      this.baseLogger.error(
+        `Unauthorized connection attempt: ${client.id}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      client.emit("connect_error", { message: "Authentication failed" });
       client.disconnect();
     }
   }
 
-  handleDisconnect(client: Socket): void {
-    console.log(`Client disconnected: ${client.id}`);
+  handleDisconnect(client: AuthenticatedSocket): void {
+    this.baseLogger.log(`Client disconnected: ${client.id}`);
   }
 }

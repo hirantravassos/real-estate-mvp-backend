@@ -4,8 +4,8 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from "@nestjs/websockets";
-import { Server, Socket } from "socket.io";
-import { forwardRef, Inject, Logger, UseGuards } from "@nestjs/common";
+import { Server } from "socket.io";
+import { forwardRef, Inject, Logger } from "@nestjs/common";
 import { WhatsappService } from "../services/whatsapp.service";
 import { User } from "../../users/entities/user.entity";
 import { BaseSecureGateway } from "../../auth/gateways/secure.gateway";
@@ -13,6 +13,7 @@ import { WsJwtGuard } from "../../auth/guards/websocket-jwt.guard";
 import { WhatsappChatService } from "../services/whatsapp-chat.service";
 import { GetUserSocket } from "../../../shared/decorators/get-user-socket.decorator";
 import { WhatsappConnectionStatusEnum } from "../enums/whatsapp-connection-status.enum";
+import { Socket } from "socket.io";
 
 const GATEWAY_KEY = "whatsapp" as const;
 
@@ -31,7 +32,7 @@ export const GATEWAY_WHATSAPP_EVENTS = {
 
 @WebSocketGateway({
   cors: {
-    origin: "*",
+    origin: process.env.APP_CORS_ORIGIN ?? "http://localhost:3000",
   },
 })
 export class WhatsappGateway extends BaseSecureGateway {
@@ -50,36 +51,31 @@ export class WhatsappGateway extends BaseSecureGateway {
     super(wsJwtGuard);
   }
 
-  @UseGuards(WsJwtGuard)
   @SubscribeMessage(GATEWAY_WHATSAPP_EVENTS.TRIGGER.STATUS)
   async handleGetStatus(
     @GetUserSocket() user: User,
     @ConnectedSocket() client: Socket,
   ) {
     const status = await this.whatsappService.findStatus(user);
-    console.log("status triggered", user.name, client.id, status);
-    client.emit(GATEWAY_WHATSAPP_EVENTS.TRIGGER.STATUS, status);
+    this.logger.log(`Status triggered for ${user.name} (${client.id})`);
+    client.emit(GATEWAY_WHATSAPP_EVENTS.LISTEN.STATUS, status);
   }
 
-  @UseGuards(WsJwtGuard)
-  @SubscribeMessage(GATEWAY_WHATSAPP_EVENTS.TRIGGER.CHAT)
+  @SubscribeMessage(GATEWAY_WHATSAPP_EVENTS.TRIGGER.CHATS)
   async handleGetChats(@GetUserSocket() user: User) {
     await this.emitChatsUpdate(user);
   }
 
-  @UseGuards(WsJwtGuard)
-  @SubscribeMessage(GATEWAY_WHATSAPP_EVENTS.TRIGGER.CHATS)
+  @SubscribeMessage(GATEWAY_WHATSAPP_EVENTS.TRIGGER.CHAT)
   async handleGetChat(
     @GetUserSocket() user: User,
     payload: { whatsappId: string },
   ) {
-    // const whatsappId = payload?.whatsappId;
-    // if (!whatsappId) return;
-    // void this.whatsappChatService.save(user, payload?.whatsappId, {
-    //   unread: false,
-    // });
-    // await this.emitChatUpdate(user, payload.whatsappId);
-    // await this.emitChatsUpdate(user);
+    const whatsappId = payload?.whatsappId;
+    if (!whatsappId) return;
+
+    await this.emitChatUpdate(user, whatsappId);
+    await this.emitChatsUpdate(user);
   }
 
   emitStatusUpdate(
@@ -90,7 +86,7 @@ export class WhatsappGateway extends BaseSecureGateway {
       qr: string | null;
     },
   ) {
-    console.log("emitting status update", userId, payload);
+    this.logger.log(`Emitting status update to user ${userId}`);
     this.server
       .to(`user_${userId}`)
       .emit(GATEWAY_WHATSAPP_EVENTS.LISTEN.STATUS, payload);
@@ -104,9 +100,9 @@ export class WhatsappGateway extends BaseSecureGateway {
   }
 
   async emitChatUpdate(user: User, whatsappId: string) {
-    // const chat = await this.whatsappChatService.findOne(user, whatsappId);
-    // this.server
-    //   .to(`user_${user.id}`)
-    //   .emit(GATEWAY_WHATSAPP_EVENTS.LISTEN.CHAT, chat);
+    const chat = await this.whatsappChatService.findOne(user, whatsappId);
+    this.server
+      .to(`user_${user.id}`)
+      .emit(GATEWAY_WHATSAPP_EVENTS.LISTEN.CHAT, chat);
   }
 }
