@@ -18,6 +18,8 @@ import { WhatsappGateway } from "./gateways/whatsapp.gateway";
 import { WhatsappController } from "./controllers/whatsapp.controller";
 import { WhatsappChatController } from "./controllers/whatsapp-chat.controller";
 import { WhatsappSessionService } from "./services/whatsapp-session.service";
+import { NotificationService } from "./services/notification.service";
+import { NotificationController } from "./controllers/notification.controller";
 
 @Module({
   imports: [
@@ -25,7 +27,7 @@ import { WhatsappSessionService } from "./services/whatsapp-session.service";
     CustomerModule,
     AuthModule,
   ],
-  controllers: [WhatsappController, WhatsappChatController],
+  controllers: [WhatsappController, WhatsappChatController, NotificationController],
   providers: [
     WhatsappSessionRepository,
     WhatsappChatRepository,
@@ -38,6 +40,7 @@ import { WhatsappSessionService } from "./services/whatsapp-session.service";
     WhatsappChatService,
     WhatsappSessionService,
     WhatsappGateway,
+    NotificationService,
   ],
   exports: [
     WhatsappService,
@@ -51,4 +54,4 @@ import { WhatsappSessionService } from "./services/whatsapp-session.service";
     WhatsappGateway,
   ],
 })
-export class WhatsappModule {}
+export class WhatsappModule { }

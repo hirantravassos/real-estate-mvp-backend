@@ -1,8 +1,9 @@
-import { Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
 import { JwtGuard } from "../../auth/guards/jwt.guard";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { User } from "../../users/entities/user.entity";
 import { WhatsappChatService } from "../services/whatsapp-chat.service";
+import { WhatsappSendMessageDto } from "../dtos/whatsapp-send-message.dto";
 
 @Controller("whatsapp-chats")
 @UseGuards(JwtGuard)
@@ -36,5 +37,18 @@ export class WhatsappChatController {
     @Param("whatsappId") whatsappId: string,
   ) {
     return this.whatsappChatService.markChatAsSeen(user, whatsappId);
+  }
+
+  @Post(":whatsappId/messages")
+  async sendMessage(
+    @GetUser() user: User,
+    @Param("whatsappId") whatsappId: string,
+    @Body() dto: WhatsappSendMessageDto,
+  ) {
+    return this.whatsappChatService.sendTextMessage(
+      user,
+      whatsappId,
+      dto.content,
+    );
   }
 }

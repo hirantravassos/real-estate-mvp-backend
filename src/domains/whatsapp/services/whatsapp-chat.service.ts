@@ -12,6 +12,7 @@ import { WhatsappMessageService } from "./whatsapp-message.service";
 import { CustomerService } from "../../customers/services/customer.service";
 import { WhatsappChat } from "../entities/whatsapp-chat.entity";
 import { Customer } from "../../customers/entities/customer.entity";
+import { WhatsappMessageTypeEnum } from "../enums/whatsapp-message-type.enum";
 
 export interface WhatsappChatCreateDto {
   unread: boolean;
@@ -30,7 +31,7 @@ export class WhatsappChatService {
     private readonly messageService: WhatsappMessageService,
     @Inject(forwardRef(() => CustomerService))
     private readonly customerService: CustomerService,
-  ) {}
+  ) { }
 
   async findAll(user: User) {
     const userId = user.id;
@@ -129,6 +130,7 @@ export class WhatsappChatService {
     await this.chatRepository.upsert(entity, ["whatsappId", "userId"]);
     void this.gateway.emitChatsUpdate(user);
     void this.gateway.emitChatUpdate(user, whatsappId);
+    void this.gateway.emitNotificationCountUpdate(user);
   }
 
   async markChatAsSeen(user: User, whatsappId: string) {
@@ -151,7 +153,49 @@ export class WhatsappChatService {
       { unread: false },
     );
 
+    void this.gateway.emitNotificationCountUpdate(user);
+
     return messages;
+  }
+
+  async sendTextMessage(user: User, whatsappId: string, content: string) {
+    const chat = await this.chatRepository.findOne({
+      where: { whatsappId, userId: user.id },
+    });
+
+    if (!chat) {
+      throw new NotFoundException("Whatsapp chat not found");
+    }
+
+    const socket = await this.socketService.getSocketByUserOrFail(user?.id);
+
+    const result = await socket.sendMessage(whatsappId, {
+      text: content,
+    });
+
+    const messageId =
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      (result as any)?.key?.id ?? new Date().getTime().toString();
+
+    await this.messageService.save(user, {
+      messageId,
+      whatsappId,
+      sentAt: new Date().toISOString(),
+      content,
+      type: WhatsappMessageTypeEnum.TEXT,
+      me: true,
+    });
+
+    await this.save(user, whatsappId, {
+      unread: false,
+      phone: chat.phone,
+      lastSentAt: new Date().toISOString(),
+    });
+
+    return {
+      success: true,
+      messageId,
+    };
   }
 
   private async getLastSentAt(
