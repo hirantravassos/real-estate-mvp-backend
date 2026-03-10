@@ -110,6 +110,7 @@ export class WhatsappEventProcessorService {
         const phone =
           this.extractPhoneNumber(message?.key?.remoteJid) ??
           this.extractPhoneNumber(message?.key?.remoteJidAlt);
+        const pushName = message.pushName ?? null;
 
         if (phone) {
           void this.chatService.save(user, whatsappId, {
@@ -117,6 +118,12 @@ export class WhatsappEventProcessorService {
             phone,
             lastSentAt: sentAt,
           });
+
+          void this.customerService.createPendingIfNotExists(
+            user,
+            phone,
+            pushName,
+          );
         }
 
         if (message.message) {
@@ -154,6 +161,12 @@ export class WhatsappEventProcessorService {
         phone,
         lastSentAt,
       });
+
+      void this.customerService.createPendingIfNotExists(
+        user,
+        phone,
+        name ?? null,
+      );
     }
   }
 

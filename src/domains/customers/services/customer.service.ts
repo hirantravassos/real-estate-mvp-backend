@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { CustomerRepository } from "../repositories/customer.repository";
 import { CustomerMapper } from "../mappers/customer.mapper";
 import { User } from "../../users/entities/user.entity";
+import { Customer } from "../entities/customer.entity";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
 import { ValidateName } from "../../../shared/decorators/validation/name.decorator";
@@ -36,7 +37,7 @@ export class CustomerCreateDto {
 
 @Injectable()
 export class CustomerService {
-  constructor(private readonly customerRepository: CustomerRepository) {}
+  constructor(private readonly customerRepository: CustomerRepository) { }
 
   async findAll(user: User, pagination: PaginationRequestDto) {
     const data = await this.customerRepository.findAndCount({
@@ -157,6 +158,27 @@ export class CustomerService {
         pending: false,
       },
     );
+  }
+
+  async createPendingIfNotExists(
+    user: User,
+    phone: string,
+    name: string | null,
+  ): Promise<void> {
+    const existingCustomer = await this.customerRepository.findOne({
+      where: { phone, user: { id: user.id } },
+    });
+
+    if (existingCustomer) return;
+
+    const entity = new Customer();
+    entity.phone = phone;
+    entity.name = name;
+    entity.user = user;
+    entity.pending = true;
+    entity.ignored = false;
+
+    await this.customerRepository.save(entity);
   }
 
   async moveToKanban(user: User, customerId: string, kanbanId: string | null) {
