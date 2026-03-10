@@ -25,7 +25,8 @@ export class KanbanService {
         customers: true,
       },
       order: {
-        [pagination.sortBy || "createdAt"]: pagination.sortOrder || "DESC",
+        position: "ASC",
+        createdAt: "ASC",
       },
       skip: pagination.skip,
       take: pagination.limit,
@@ -77,7 +78,30 @@ export class KanbanService {
   async save(user: User, dto: KanbanCreateDto, id?: string) {
     const entity = KanbanMapper.toEntity(dto, id);
     entity.user = user;
+
+    if (!id) {
+      const maxPosition = await this.kanbanRepository
+        .createQueryBuilder("kanban")
+        .select("MAX(kanban.position)", "maxPosition")
+        .where("kanban.userId = :userId", { userId: user.id })
+        .andWhere("kanban.active = true")
+        .getRawOne();
+
+      entity.position = (maxPosition?.maxPosition ?? -1) + 1;
+    }
+
     return this.kanbanRepository.save(entity);
+  }
+
+  async reorder(user: User, kanbanIds: string[]) {
+    const updates = kanbanIds.map((kanbanId, index) =>
+      this.kanbanRepository.update(
+        { id: kanbanId, user: { id: user.id } },
+        { position: index },
+      ),
+    );
+
+    await Promise.all(updates);
   }
 
   async remove(user: User, id: string) {

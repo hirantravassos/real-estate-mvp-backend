@@ -29,6 +29,9 @@ export class CustomerMapper {
       phone: entity.phone,
       kanban: entity.kanban,
       comments: this.toComments(entity.comments),
+      createdAt: entity.createdAt,
+      updatedAt: entity.updatedAt,
+      active: entity.active,
     };
   }
 

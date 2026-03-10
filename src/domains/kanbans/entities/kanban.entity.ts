@@ -23,4 +23,7 @@ export class Kanban extends BaseEntity {
 
   @ColumnLongText({ nullable: true })
   description: string | null;
+
+  @Column({ type: "int", default: 0 })
+  position: number;
 }
