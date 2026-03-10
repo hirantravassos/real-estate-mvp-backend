@@ -4,11 +4,15 @@ import { ColumnName } from "../../../shared/decorators/columns/column-name.decor
 import { ColumnEmail } from "../../../shared/decorators/columns/column-email.decorator.js";
 import { Customer } from "../../customers/entities/customer.entity";
 import { WhatsappSession } from "../../whatsapp/entities/whatsapp-session.entity";
+import { Visit } from "../../visits/entities/visit.entity";
 
 @Entity("users")
 export class User extends BaseEntity {
   @OneToMany(() => Customer, (customer) => customer.user)
   customers: Customer[];
+
+  @OneToMany(() => Visit, (visit) => visit.user)
+  visits: Visit[];
 
   @OneToOne(() => WhatsappSession, (session) => session.user, {
     nullable: true,

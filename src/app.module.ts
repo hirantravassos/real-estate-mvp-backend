@@ -15,6 +15,7 @@ import { CustomerModule } from "./domains/customers/customer.module";
 import { KanbanModule } from "./domains/kanbans/kanban.module";
 import { WhatsappModule } from "./domains/whatsapp/whatsapp.module";
 import { AppGateway } from "./app.gateway";
+import { VisitModule } from "./domains/visits/visit.module";
 
 const THROTTLE_TTL_MS = 60_000;
 const THROTTLE_LIMIT = 30;
@@ -53,6 +54,7 @@ const THROTTLE_LIMIT = 30;
     CustomerModule,
     KanbanModule,
     WhatsappModule,
+    VisitModule,
   ],
   providers: [
     AppGateway,
@@ -62,4 +64,4 @@ const THROTTLE_LIMIT = 30;
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

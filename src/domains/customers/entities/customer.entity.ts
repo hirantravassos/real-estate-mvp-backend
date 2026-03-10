@@ -6,6 +6,7 @@ import { User } from "../../users/entities/user.entity";
 import { Kanban } from "../../kanbans/entities/kanban.entity";
 import { CustomerComment } from "./customer-comments.entity";
 import { ColumnBoolean } from "../../../shared/decorators/columns/column-boolean.decorator";
+import { Visit } from "../../visits/entities/visit.entity";
 
 @Entity("customers")
 @Unique(["userId", "phone"])
@@ -28,6 +29,9 @@ export class Customer extends BaseEntity {
     (customerComments) => customerComments.customer,
   )
   comments: CustomerComment[];
+
+  @OneToMany(() => Visit, (visit) => visit.customer)
+  visits: Visit[];
 
   @ColumnName({ nullable: true })
   name: string | null;
