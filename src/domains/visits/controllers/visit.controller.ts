@@ -16,6 +16,12 @@ export class VisitController {
         return VisitMapper.toDto(await this.visitService.create(user, dto));
     }
 
+    @Get()
+    async findAll(@GetUser() user: User) {
+        const visits = await this.visitService.findAll(user);
+        return VisitMapper.toListDto(visits);
+    }
+
     @Get("customer/:customerId")
     async findByCustomer(@GetUser() user: User, @Param("customerId") customerId: string) {
         const visits = await this.visitService.findByCustomer(user, customerId);

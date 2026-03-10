@@ -7,6 +7,8 @@ export class VisitMapper {
         return {
             id: entity.id,
             customerId: entity.customer?.id,
+            customerName: entity.customer?.name,
+            customerPhone: entity.customer?.phone,
             address: entity.address,
             reference: entity.reference,
             startsAt: entity.startsAt,

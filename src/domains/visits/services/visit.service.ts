@@ -58,6 +58,14 @@ export class VisitService {
         return await this.visitRepository.save(visit);
     }
 
+    async findAll(user: User): Promise<Visit[]> {
+        return this.visitRepository.find({
+            where: { user: { id: user.id } },
+            order: { startsAt: "DESC" },
+            relations: ["customer"]
+        });
+    }
+
     async findByCustomer(user: User, customerId: string): Promise<Visit[]> {
         return this.visitRepository.find({
             where: {
