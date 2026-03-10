@@ -80,6 +80,9 @@ export class CustomerService {
           comments: true,
           kanban: true,
         },
+        order: {
+          comments: { createdAt: "ASC" },
+        },
       })
       .catch(() => {
         throw new NotFoundException("Customer not found");
