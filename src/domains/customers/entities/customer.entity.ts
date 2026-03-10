@@ -7,6 +7,7 @@ import { Kanban } from "../../kanbans/entities/kanban.entity";
 import { CustomerComment } from "./customer-comments.entity";
 import { ColumnBoolean } from "../../../shared/decorators/columns/column-boolean.decorator";
 import { Visit } from "../../visits/entities/visit.entity";
+import { ColumnCurrency } from "../../../shared/decorators/columns/column-currency.decorator";
 
 @Entity("customers")
 @Unique(["userId", "phone"])
@@ -38,6 +39,9 @@ export class Customer extends BaseEntity {
 
   @ColumnPhone()
   phone: string;
+
+  @ColumnCurrency({ nullable: true })
+  budget: string | null;
 
   @ColumnBoolean({ default: false })
   ignored: boolean;

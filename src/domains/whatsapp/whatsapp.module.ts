@@ -1,4 +1,4 @@
-import { forwardRef, Inject, Module } from "@nestjs/common";
+import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { WhatsappSession } from "./entities/whatsapp-session.entity";
 import { WhatsappSessionRepository } from "./repositories/whatsapp-session.repository";
@@ -27,7 +27,11 @@ import { NotificationController } from "./controllers/notification.controller";
     CustomerModule,
     AuthModule,
   ],
-  controllers: [WhatsappController, WhatsappChatController, NotificationController],
+  controllers: [
+    WhatsappController,
+    WhatsappChatController,
+    NotificationController,
+  ],
   providers: [
     WhatsappSessionRepository,
     WhatsappChatRepository,
@@ -54,4 +58,4 @@ import { NotificationController } from "./controllers/notification.controller";
     WhatsappGateway,
   ],
 })
-export class WhatsappModule { }
+export class WhatsappModule {}

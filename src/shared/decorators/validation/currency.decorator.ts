@@ -1,6 +1,6 @@
 import { applyDecorators } from "@nestjs/common";
-import { IsNotEmpty, IsNumber, IsOptional, Min } from "class-validator";
-import { CURRENCY_SCALE } from "../../constants/field-lengths.constant.js";
+import { Transform } from "class-transformer";
+import { IsInt, IsNotEmpty, IsOptional, Min } from "class-validator";
 
 interface ValidateCurrencyOptions {
   readonly isOptional?: boolean;
@@ -15,9 +15,18 @@ export function ValidateCurrency(
   options?: ValidateCurrencyOptions,
 ): PropertyDecorator {
   const minValue = options?.minValue ?? 0;
-  const maxDecimalPlaces = options?.maxDecimalPlaces ?? CURRENCY_SCALE;
 
   const decorators: PropertyDecorator[] = [];
+
+  decorators.push(
+    Transform(({ value }) => {
+      if (typeof value === "string") {
+        const parsed = Math.round(parseFloat(value) * 100);
+        return isNaN(parsed) ? value : parsed;
+      }
+      return value as number;
+    }),
+  );
 
   if (options?.isOptional) {
     decorators.push(IsOptional());
@@ -30,14 +39,10 @@ export function ValidateCurrency(
   }
 
   decorators.push(
-    IsNumber(
-      { maxDecimalPlaces },
-      {
-        message:
-          options?.messageType ??
-          `Valor deve ser um número com no máximo ${maxDecimalPlaces} casas decimais`,
-      },
-    ),
+    IsInt({
+      message:
+        options?.messageType ?? "Valor deve ser um número inteiro (centavos)",
+    }),
     Min(minValue, {
       message:
         options?.messageMin ?? `Valor não pode ser menor que ${minValue}`,

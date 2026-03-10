@@ -8,6 +8,11 @@ import { ValidateName } from "../../../shared/decorators/validation/name.decorat
 import { ValidateBrazilianPhoneNumber } from "../../../shared/decorators/validation/brazilian-phone-number.decorator";
 import { ValidateLongText } from "../../../shared/decorators/validation/long-text.decorator";
 import { IsOptional, IsUUID } from "class-validator";
+import { ValidateCurrency } from "../../../shared/decorators/validation/currency.decorator";
+import dayjs from "dayjs";
+import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
+
+dayjs.extend(isSameOrAfter);
 
 export class CustomerCreateDto {
   @ValidateName()
@@ -20,13 +25,18 @@ export class CustomerCreateDto {
   @IsUUID()
   kanbanId: string | null;
 
+  @IsOptional()
+  @ValidateCurrency({ isOptional: true })
+  budget?: string | null;
+
+  @IsOptional()
   @ValidateLongText({ isOptional: true })
   comment: string | null;
 }
 
 @Injectable()
 export class CustomerService {
-  constructor(private readonly customerRepository: CustomerRepository) { }
+  constructor(private readonly customerRepository: CustomerRepository) {}
 
   async findAll(user: User, pagination: PaginationRequestDto) {
     const data = await this.customerRepository.findAndCount({
@@ -39,6 +49,7 @@ export class CustomerService {
       relations: {
         comments: true,
         kanban: true,
+        visits: true,
       },
       order: {
         [pagination.sortBy || "createdAt"]: pagination.sortOrder || "DESC",
@@ -46,6 +57,12 @@ export class CustomerService {
       skip: pagination.skip,
       take: pagination.limit,
     });
+
+    for (const item of data[0]) {
+      item.visits = item.visits.filter((visit) => {
+        return dayjs(visit.startsAt).isSameOrAfter(dayjs());
+      });
+    }
 
     return PaginationMapper.toDto(data, pagination);
   }
@@ -61,6 +78,7 @@ export class CustomerService {
       relations: {
         comments: true,
         kanban: true,
+        visits: true,
       },
       order: {
         [pagination.sortBy || "createdAt"]: pagination.sortOrder || "DESC",
@@ -79,6 +97,7 @@ export class CustomerService {
         relations: {
           comments: true,
           kanban: true,
+          visits: true,
         },
         order: {
           comments: { createdAt: "ASC" },
@@ -102,6 +121,8 @@ export class CustomerService {
   async save(user: User, dto: CustomerCreateDto, id?: string) {
     const entity = CustomerMapper.toEntity(dto, id);
     entity.user = user;
+    entity.pending = false;
+    entity.ignored = false;
     return this.customerRepository.save(entity);
   }
 
