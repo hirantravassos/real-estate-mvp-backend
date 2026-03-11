@@ -4,6 +4,7 @@ import { DateHelper } from "../../../shared/utils/date.util";
 
 export interface WhatsappChatWithContactDto extends WAWebJS.Chat {
   contact: WAWebJS.Contact;
+  profile: string | null;
 }
 
 export interface WhatsappChatMessageDto extends WAWebJS.Message {
@@ -25,6 +26,7 @@ export class WhatsappChatMapper {
           id: chat.id._serialized,
           name,
           phone,
+          profile: chat.profile ?? null,
           lastMessage: {
             message:
               chat.lastMessage.type === MessageTypes.TEXT
@@ -50,6 +52,7 @@ export class WhatsappChatMapper {
       id: data.id._serialized,
       name: this.toName(data, customer),
       phone: this.toPhone(data, customer),
+      profile: data.profile ?? null,
       customer: customer ?? null,
       messages: messages?.map((message) => this.toMessage(message)),
     };

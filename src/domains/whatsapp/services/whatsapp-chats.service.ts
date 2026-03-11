@@ -24,9 +24,11 @@ export class WhatsappChatsService {
 
     for (const chat of chats) {
       const contact = await chat.getContact();
+      const profile = await contact.getProfilePicUrl().catch(() => null);
       chatsWithContacts.push({
         ...chat,
         contact,
+        profile,
       });
     }
 
@@ -64,11 +66,15 @@ export class WhatsappChatsService {
           phone: contact.number.slice(2),
         },
       })) ?? undefined;
+    const profile = await contact.getProfilePicUrl().catch(() => null);
+
+    void client.sendSeen(chat.id._serialized);
 
     return WhatsappChatMapper.toDto(
       {
         ...chat,
         contact,
+        profile,
       },
       messageWithMedia,
       customer,
