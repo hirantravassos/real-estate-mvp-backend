@@ -1,4 +1,4 @@
-import WAWebJS from "whatsapp-web.js";
+import WAWebJS, { MessageTypes } from "whatsapp-web.js";
 import { Customer } from "../../customers/entities/customer.entity";
 import { DateHelper } from "../../../shared/utils/date.util";
 
@@ -27,7 +27,7 @@ export class WhatsappChatMapper {
           phone,
           lastMessage: {
             message:
-              chat.lastMessage.type === "chat"
+              chat.lastMessage.type === MessageTypes.TEXT
                 ? this.toMessageBody(chat.lastMessage)
                 : null,
             fromMe: chat.lastMessage.fromMe,
