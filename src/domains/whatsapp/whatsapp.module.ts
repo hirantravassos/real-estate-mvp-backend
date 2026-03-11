@@ -8,13 +8,23 @@ import { User } from "../users/entities/user.entity";
 import { WhatsappChatsService } from "./services/whatsapp-chats.service";
 import { WhatsappChatController } from "./controllers/whatsapp-chat.controller";
 import { Customer } from "../customers/entities/customer.entity";
+import { WhatsappContactController } from "./controllers/whatsapp-contact.controller";
+import { WhatsappContactService } from "./services/whatsapp-contact.service";
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([WhatsappChat, WhatsappMessage, User, Customer]),
   ],
-  controllers: [WhatsappHostController, WhatsappChatController],
-  providers: [WhatsappHostService, WhatsappChatsService],
-  exports: [WhatsappHostService, WhatsappChatsService],
+  controllers: [
+    WhatsappHostController,
+    WhatsappChatController,
+    WhatsappContactController,
+  ],
+  providers: [
+    WhatsappHostService,
+    WhatsappChatsService,
+    WhatsappContactService,
+  ],
+  exports: [WhatsappHostService, WhatsappChatsService, WhatsappContactService],
 })
 export class WhatsappModule {}
