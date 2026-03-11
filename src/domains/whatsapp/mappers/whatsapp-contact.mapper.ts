@@ -1,27 +1,21 @@
 import { Customer } from "../../customers/entities/customer.entity";
 import { WhatsappHelper } from "../helpers/whatsapp.helper";
-import { WhatsappChatWithContactDto } from "./whatsapp-chat.mapper";
+import { WAWebCustomChatWithContactDto } from "./whatsapp-chat.mapper";
+import { WhatsappChat } from "../entities/whatsapp-chat.entity";
 
 export class WhatsappContactMapper {
-  static toDtoList(data: WhatsappChatWithContactDto[], customers?: Customer[]) {
-    return data
-      .filter((chat) => !chat.isGroup)
-      .map((chat) => {
-        const rawPhone = WhatsappHelper.getPhoneFromChat(chat);
-        const customer = customers?.find(
-          (customer) => customer.phone === rawPhone,
-        );
-        return {
-          id: chat.id._serialized,
-          name: WhatsappHelper.getNameFromChat(chat),
-          phone: WhatsappHelper.getPhoneFromChat(chat),
-          profile: chat.profile ?? null,
-          customer: customer ?? null,
-        };
-      });
+  static toDtoList(data: WhatsappChat[]) {
+    return data.map((chat) => {
+      return {
+        id: chat.id,
+        name: chat?.name,
+        phone: chat?.phone,
+        profile: chat.profileUrl ?? null,
+      };
+    });
   }
 
-  static toDto(chat: WhatsappChatWithContactDto, customer?: Customer) {
+  static toDto(chat: WAWebCustomChatWithContactDto, customer?: Customer) {
     return {
       id: chat.id._serialized,
       name: WhatsappHelper.getNameFromChat(chat, customer),

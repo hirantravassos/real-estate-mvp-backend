@@ -1,9 +1,22 @@
-import { Column, Entity, ManyToOne, PrimaryColumn, Unique } from "typeorm";
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryColumn,
+  Unique,
+} from "typeorm";
 import { User } from "../../users/entities/user.entity";
 import { ColumnPhone } from "../../../shared/decorators/columns/column-phone.decorator";
 import { ColumnName } from "../../../shared/decorators/columns/column-name.decorator";
+import { Customer } from "../../customers/entities/customer.entity";
+import { ColumnBoolean } from "../../../shared/decorators/columns/column-boolean.decorator";
 
-@Entity("whatsapp_chats")
+@Entity("whatsapp_chats", {
+  orderBy: {
+    lastSentAt: "DESC",
+  },
+})
 @Unique(["id", "user"])
 export class WhatsappChat {
   @ManyToOne(() => User, {
@@ -11,6 +24,10 @@ export class WhatsappChat {
     createForeignKeyConstraints: false,
   })
   user: User;
+
+  @ManyToOne(() => Customer, { createForeignKeyConstraints: false })
+  @JoinColumn({ name: "phone", referencedColumnName: "phone" })
+  customer?: Customer;
 
   @PrimaryColumn({ type: "varchar", length: 255 })
   id: string;
@@ -35,4 +52,7 @@ export class WhatsappChat {
 
   @Column({ type: "varchar", nullable: true })
   profileUrl: string | null;
+
+  @ColumnBoolean({ default: false })
+  ignored: boolean;
 }

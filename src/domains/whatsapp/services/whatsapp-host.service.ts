@@ -4,7 +4,7 @@ import {
   NotFoundException,
   OnModuleInit,
 } from "@nestjs/common";
-import WAWebJS, { Client, LocalAuth } from "whatsapp-web.js";
+import WAWebJS, { Client, LocalAuth, WAState } from "whatsapp-web.js";
 import { Repository } from "typeorm";
 import { InjectRepository } from "@nestjs/typeorm";
 import { User } from "../../users/entities/user.entity";
@@ -43,16 +43,28 @@ export class WhatsappHostService implements OnModuleInit {
   }
 
   async getStatus(user: User) {
-    const client = this.getClientOrThrow(user);
+    const client = await this.getClientOrThrow(user);
     const state = await client.getState();
     return WhatsappHostMapper.toDto(state);
   }
 
-  getClientOrThrow(user: User): Client {
+  async getClientOrThrow(user: User): Promise<Client> {
     const client = this.clients.get(user.id);
+
     if (!client) {
       throw new NotFoundException(`Client not found for user: ${user.id}`);
     }
+
+    const state = await client.getState();
+
+    if (state !== WAState.CONNECTED) {
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve(client);
+        }, 5000);
+      });
+    }
+
     return client;
   }
 
@@ -67,19 +79,44 @@ export class WhatsappHostService implements OnModuleInit {
     const chats = await client.getChats();
 
     for (const chat of chats) {
-      const contact = await chat.getContact();
-      const profile = await contact.getProfilePicUrl().catch(() => null);
-      const entity = WhatsappChatMapper.toEntity(
-        {
-          ...chat,
-          contact,
-          profile,
-        },
-        user,
-      );
-      this.logger.log(`[${userId}]`, `Syncing chat: ${entity.id}`);
-      await this.whatsappChatRepository.upsert(entity, ["user", "id"]);
+      void this.syncChat(chat, user);
     }
+  }
+
+  private async syncChat(chat: WAWebJS.Chat, user: User) {
+    if (chat.isGroup) {
+      this.logger.log(
+        `[${user.id}]`,
+        `Skipped chat (group): ${chat.id._serialized}`,
+      );
+      return;
+    }
+
+    const contact = await chat.getContact();
+    const profile = await contact.getProfilePicUrl().catch(() => null);
+    const entity = WhatsappChatMapper.toEntity(
+      {
+        ...chat,
+        contact,
+        profile,
+      },
+      user,
+    );
+    this.logger.log(`[${user.id}]`, `Syncing chat: ${entity.id}`);
+    await this.whatsappChatRepository.upsert(entity, ["user", "id"]);
+  }
+
+  private async syncMessage(userId: string, message: WAWebJS.Message) {
+    const user = await this.userRepository.findOneBy({ id: userId });
+
+    if (!user) return;
+
+    const chat = await message.getChat();
+    this.logger.log(
+      `[${user.id}]`,
+      `Syncing chat from message: ${chat.id._serialized}`,
+    );
+    void this.syncChat(chat, user);
   }
 
   private async restoreSessions(): Promise<void> {
@@ -125,8 +162,8 @@ export class WhatsappHostService implements OnModuleInit {
       void this.syncChats(clientId, client);
     });
 
-    client.on("message", () => {
-      // this.logger.log(`[${clientId}] Message received.`, { data });
+    client.on("message", (message) => {
+      void this.syncMessage(clientId, message);
     });
 
     client.on("authenticated", () => {

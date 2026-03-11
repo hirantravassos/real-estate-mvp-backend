@@ -6,17 +6,20 @@ import { User } from "../../users/entities/user.entity";
 import { WhatsappChat } from "../entities/whatsapp-chat.entity";
 import dayjs from "dayjs";
 
-export interface WhatsappChatWithContactDto extends WAWebJS.Chat {
+export interface WAWebCustomChatWithContactDto extends WAWebJS.Chat {
   contact: WAWebJS.Contact;
   profile: string | null;
 }
 
-export interface WhatsappChatMessageDto extends WAWebJS.Message {
+export interface WAWebCustomMessageDto extends WAWebJS.Message {
   media: WAWebJS.MessageMedia | null;
 }
 
 export class WhatsappChatMapper {
-  static toEntity(chat: WhatsappChatWithContactDto, user: User): WhatsappChat {
+  static toEntity(
+    chat: WAWebCustomChatWithContactDto,
+    user: User,
+  ): WhatsappChat {
     const entity = new WhatsappChat();
     entity.phone = WhatsappHelper.getPhoneFromChat(chat) as string;
     entity.name = WhatsappHelper.getNameFromChat(chat);
@@ -38,11 +41,8 @@ export class WhatsappChatMapper {
     return entity;
   }
 
-  static toDtoList(entities: WhatsappChat[], customers?: Customer[]) {
+  static toDtoList(entities: WhatsappChat[]) {
     return entities.map((chat) => {
-      const customer = customers?.find((customer) => {
-        return customer.phone === chat.phone;
-      });
       return {
         id: chat.id,
         name: chat.name,
@@ -52,19 +52,19 @@ export class WhatsappChatMapper {
           message: chat.lastMessage,
           sentAt: chat.lastSentAt,
         },
-        customer,
+        customer: chat.customer ?? null,
         unread: chat.unread,
       };
     });
   }
 
   static toDto(
-    chat: WhatsappChatWithContactDto,
-    messages: WhatsappChatMessageDto[],
+    chat: WAWebCustomChatWithContactDto,
+    messages: WAWebCustomMessageDto[],
     customer?: Customer,
   ) {
     return {
-      id: chat.id,
+      id: chat.id?._serialized,
       name: WhatsappHelper.getNameFromChat(chat, customer),
       phone: WhatsappHelper.getPhoneFromChat(chat, customer),
       profile: chat.profile ?? null,
@@ -73,7 +73,7 @@ export class WhatsappChatMapper {
     };
   }
 
-  private static toMessage(message: WhatsappChatMessageDto) {
+  private static toMessage(message: WAWebCustomMessageDto) {
     return {
       id: message.id._serialized,
       fromMe: message.fromMe,

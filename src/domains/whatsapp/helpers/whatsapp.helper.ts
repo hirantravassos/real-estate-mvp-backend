@@ -1,10 +1,10 @@
 import { Customer } from "../../customers/entities/customer.entity";
 import WAWebJS from "whatsapp-web.js";
-import { WhatsappChatWithContactDto } from "../mappers/whatsapp-chat.mapper";
+import { WAWebCustomChatWithContactDto } from "../mappers/whatsapp-chat.mapper";
 
 export class WhatsappHelper {
   static getNameFromChat(
-    chat: WhatsappChatWithContactDto,
+    chat: WAWebCustomChatWithContactDto,
     customer?: Customer,
   ): string {
     if (customer?.name) return customer.name;
@@ -19,7 +19,7 @@ export class WhatsappHelper {
   }
 
   static getPhoneFromChat(
-    chat: WhatsappChatWithContactDto,
+    chat: WAWebCustomChatWithContactDto,
     customer?: Customer,
   ): string | null {
     if (chat?.contact?.number) return chat?.contact?.number?.slice(2);
