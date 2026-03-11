@@ -4,3 +4,4 @@ dist
 sessions
 .env
 storage
+.wwebjs_cache
