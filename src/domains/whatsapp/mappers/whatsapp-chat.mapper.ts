@@ -26,13 +26,16 @@ export class WhatsappChatMapper {
           name,
           phone,
           lastMessage: {
-            message: this.toMessageBody(chat.lastMessage),
+            message:
+              chat.lastMessage.type === "chat"
+                ? this.toMessageBody(chat.lastMessage)
+                : null,
             fromMe: chat.lastMessage.fromMe,
             sentAt: DateHelper.formatDateTime(
               chat.lastMessage.timestamp * 1000,
             ),
           },
-          customerId: customerFound?.id,
+          customer: customerFound,
           unread: chat.unreadCount > 0,
         };
       });
@@ -47,7 +50,7 @@ export class WhatsappChatMapper {
       id: data.id._serialized,
       name: this.toName(data, customer),
       phone: this.toPhone(data, customer),
-      customerId: customer?.id,
+      customer: customer ?? null,
       messages: messages?.map((message) => this.toMessage(message)),
     };
   }
@@ -58,7 +61,8 @@ export class WhatsappChatMapper {
       fromMe: message.fromMe,
       body: this.toMessageBody(message),
       type: message.type,
-      media: message.media,
+      media: message.hasMedia ? message.media : null,
+      location: message?.location ?? null,
       sentAt: DateHelper.formatDateTime(message.timestamp * 1000),
     };
   }

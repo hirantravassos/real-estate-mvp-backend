@@ -64,6 +64,7 @@ export class WhatsappChatsService {
           phone: contact.number.slice(2),
         },
       })) ?? undefined;
+
     return WhatsappChatMapper.toDto(
       {
         ...chat,
