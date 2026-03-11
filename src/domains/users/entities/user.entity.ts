@@ -1,9 +1,8 @@
-import { Column, Entity, OneToMany, OneToOne } from "typeorm";
+import { Column, Entity, OneToMany } from "typeorm";
 import { BaseEntity } from "../../../shared/entities/base.entity.js";
 import { ColumnName } from "../../../shared/decorators/columns/column-name.decorator.js";
 import { ColumnEmail } from "../../../shared/decorators/columns/column-email.decorator.js";
 import { Customer } from "../../customers/entities/customer.entity";
-import { WhatsappSession } from "../../whatsapp/entities/whatsapp-session.entity";
 import { Visit } from "../../visits/entities/visit.entity";
 
 @Entity("users")
@@ -13,11 +12,6 @@ export class User extends BaseEntity {
 
   @OneToMany(() => Visit, (visit) => visit.user)
   visits: Visit[];
-
-  @OneToOne(() => WhatsappSession, (session) => session.user, {
-    nullable: true,
-  })
-  session: WhatsappSession | null;
 
   @ColumnEmail({ unique: true })
   email: string;

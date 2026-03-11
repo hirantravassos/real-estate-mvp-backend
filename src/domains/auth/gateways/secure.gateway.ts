@@ -10,13 +10,14 @@ import { AuthenticatedSocket } from "../../../shared/types/authenticated-socket.
 import { ExecutionContext, Logger } from "@nestjs/common";
 
 export abstract class BaseSecureGateway
-  implements OnGatewayConnection, OnGatewayDisconnect {
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   protected readonly webSocketServer: Server;
 
   private readonly baseLogger = new Logger(BaseSecureGateway.name);
 
-  protected constructor(protected readonly wsJwtGuard: WsJwtGuard) { }
+  protected constructor(protected readonly wsJwtGuard: WsJwtGuard) {}
 
   async handleConnection(client: AuthenticatedSocket): Promise<void> {
     try {
@@ -24,7 +25,7 @@ export abstract class BaseSecureGateway
       const canConnect = await this.wsJwtGuard.canActivate(context);
 
       if (!canConnect) {
-        client.emit("connect_error", { message: "Authentication failed" });
+        // client.emit("connect_error", { message: "Authentication failed" });
         client.disconnect();
         return;
       }
@@ -38,7 +39,7 @@ export abstract class BaseSecureGateway
         `Unauthorized connection attempt: ${client.id}`,
         error instanceof Error ? error.stack : undefined,
       );
-      client.emit("connect_error", { message: "Authentication failed" });
+      // client.emit("connect_error", { message: "Authentication failed" });
       client.disconnect();
     }
   }

@@ -1,5 +1,5 @@
 import { CustomerComment } from "../entities/customer-comments.entity";
-import { CustomerCommentCreateDto } from "../dtos/customer-comment-create.dto";
+import { CustomerCommentCreateDto } from "../services/customer-comment.service";
 
 export class CustomerCommentMapper {
   static toEntity(dto: CustomerCommentCreateDto, id?: string) {

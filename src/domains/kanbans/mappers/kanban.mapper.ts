@@ -20,27 +20,23 @@ export class KanbanMapper {
     };
   }
 
-  static toListDto(entities: Kanban[], unreadChatPhones: Set<string>) {
+  static toListDto(entities: Kanban[]) {
     return entities.map((entity) => {
       return {
         id: entity.id,
         name: entity.name,
         description: entity.description,
-        customers: this.toCustomerDto(entity.customers, unreadChatPhones),
+        customers: this.toCustomerDto(entity.customers),
       };
     });
   }
 
-  private static toCustomerDto(
-    customers: Customer[],
-    unreadChatPhones: Set<string>,
-  ) {
+  private static toCustomerDto(customers: Customer[]) {
     return customers.map((entity) => {
       return {
         id: entity.id,
         name: entity.name,
         phone: entity.phone,
-        hasUnreadChat: unreadChatPhones.has(entity.phone),
         comments: this.toCustomerCommentDto(entity.comments),
       };
     });

@@ -14,8 +14,10 @@ import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { User } from "../../users/entities/user.entity";
 import { CustomerCommentMapper } from "../mappers/customer-comment.mapper";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
-import { CustomerCommentService } from "../services/customer-comment.service";
-import { CustomerCommentCreateDto } from "../dtos/customer-comment-create.dto";
+import {
+  CustomerCommentCreateDto,
+  CustomerCommentService,
+} from "../services/customer-comment.service";
 
 @Controller("customer-comments/:customerId")
 @UseGuards(JwtGuard)
