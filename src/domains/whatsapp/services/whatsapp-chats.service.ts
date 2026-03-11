@@ -14,14 +14,63 @@ export class WhatsappChatsService {
     private readonly customerRepository: Repository<Customer>,
   ) {}
 
-  async findAllChats(user: User) {
+  async findAll(user: User) {
     const client = this.whatsappHostService.getClientOrThrow(user);
     const customers = await this.customerRepository.find({
       where: { active: true, user: { id: user.id } },
     });
-    const chats = await client.getChats().then((chat) => {
-      return WhatsappChatMapper.toDto(chat, customers);
-    });
-    return chats;
+    const chats = await client.getChats();
+    const chatsWithContacts = [];
+
+    for (const chat of chats) {
+      const contact = await chat.getContact();
+      chatsWithContacts.push({
+        ...chat,
+        contact,
+      });
+    }
+
+    return WhatsappChatMapper.toDtoList(chatsWithContacts, customers);
+  }
+
+  async findOne(user: User, chatId: string) {
+    const client = this.whatsappHostService.getClientOrThrow(user);
+    const chat = await client.getChatById(chatId);
+    const contact = await chat.getContact();
+    const messages = await chat.fetchMessages({ limit: 100 });
+
+    const messageWithMedia = [];
+
+    for (const message of messages) {
+      if (message.hasMedia) {
+        const media = await message.downloadMedia();
+        messageWithMedia.push({
+          ...message,
+          media,
+        });
+      } else {
+        messageWithMedia.push({
+          ...message,
+          media: null,
+        });
+      }
+    }
+
+    const customer =
+      (await this.customerRepository.findOne({
+        where: {
+          active: true,
+          user: { id: user.id },
+          phone: contact.number.slice(2),
+        },
+      })) ?? undefined;
+    return WhatsappChatMapper.toDto(
+      {
+        ...chat,
+        contact,
+      },
+      messageWithMedia,
+      customer,
+    );
   }
 }

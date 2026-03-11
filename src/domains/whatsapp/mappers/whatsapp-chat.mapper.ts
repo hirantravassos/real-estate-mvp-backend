@@ -2,47 +2,87 @@ import WAWebJS from "whatsapp-web.js";
 import { Customer } from "../../customers/entities/customer.entity";
 import { DateHelper } from "../../../shared/utils/date.util";
 
+export interface WhatsappChatWithContactDto extends WAWebJS.Chat {
+  contact: WAWebJS.Contact;
+}
+
+export interface WhatsappChatMessageDto extends WAWebJS.Message {
+  media: WAWebJS.MessageMedia | null;
+}
+
 export class WhatsappChatMapper {
-  static toDto(data: WAWebJS.Chat[], customers?: Customer[]) {
+  static toDtoList(data: WhatsappChatWithContactDto[], customers?: Customer[]) {
     return data
       .filter((chat) => !chat.isGroup)
       .map((chat) => {
-        const rawPhone = this.getPhone(chat);
+        const rawPhone = this.toPhone(chat);
         const customerFound = customers?.find(
           (customer) => customer.phone === rawPhone,
         );
-        const phone = this.getPhone(chat, customerFound);
-        const name = this.getName(chat, customerFound);
+        const phone = this.toPhone(chat, customerFound);
+        const name = this.toName(chat, customerFound);
         return {
           id: chat.id._serialized,
           name,
           phone,
           lastMessage: {
-            message: chat.lastMessage.body,
+            message: this.toMessageBody(chat.lastMessage),
             fromMe: chat.lastMessage.fromMe,
             sentAt: DateHelper.formatDateTime(
               chat.lastMessage.timestamp * 1000,
             ),
           },
+          customerId: customerFound?.id,
           unread: chat.unreadCount > 0,
         };
       });
   }
 
-  private static getName(chat: WAWebJS.Chat, customer?: Customer): string {
+  static toDto(
+    data: WhatsappChatWithContactDto,
+    messages: WhatsappChatMessageDto[],
+    customer?: Customer,
+  ) {
+    return {
+      id: data.id._serialized,
+      name: this.toName(data, customer),
+      phone: this.toPhone(data, customer),
+      customerId: customer?.id,
+      messages: messages?.map((message) => this.toMessage(message)),
+    };
+  }
+
+  private static toMessage(message: WhatsappChatMessageDto) {
+    return {
+      id: message.id._serialized,
+      fromMe: message.fromMe,
+      body: this.toMessageBody(message),
+      type: message.type,
+      media: message.media,
+      sentAt: DateHelper.formatDateTime(message.timestamp * 1000),
+    };
+  }
+
+  private static toName(
+    chat: WhatsappChatWithContactDto,
+    customer?: Customer,
+  ): string {
     if (customer?.name) return customer.name;
 
     const isNameAPhone = /\d/.test(chat.name || "");
 
     if (chat.name && !isNameAPhone) return chat.name;
 
+    if (chat?.contact?.verifiedName) return chat?.contact?.verifiedName;
+
     return chat.name ?? "Unknown";
   }
 
-  private static getPhone(
-    chat: WAWebJS.Chat,
+  private static toPhone(
+    chat: WhatsappChatWithContactDto,
     customer?: Customer,
   ): string | null {
+    if (chat?.contact?.number) return chat?.contact?.number?.slice(2);
     if (customer?.phone) return customer.phone;
 
     let rawUser = "";
@@ -54,5 +94,10 @@ export class WhatsappChatMapper {
     }
 
     return rawUser.startsWith("55") ? rawUser.slice(2) : rawUser;
+  }
+
+  private static toMessageBody(message: WAWebJS.Message): string | null {
+    if (message.body === "") return null;
+    return message.body;
   }
 }
