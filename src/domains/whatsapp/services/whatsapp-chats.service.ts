@@ -5,6 +5,9 @@ import { WhatsappChatMapper } from "../mappers/whatsapp-chat.mapper";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Customer } from "../../customers/entities/customer.entity";
+import { WhatsappChat } from "../entities/whatsapp-chat.entity";
+import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
+import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
 
 @Injectable()
 export class WhatsappChatsService {
@@ -12,37 +15,39 @@ export class WhatsappChatsService {
     private readonly whatsappHostService: WhatsappHostService,
     @InjectRepository(Customer)
     private readonly customerRepository: Repository<Customer>,
+    @InjectRepository(WhatsappChat)
+    private readonly whatsappChatRepository: Repository<WhatsappChat>,
   ) {}
 
-  async findAll(user: User) {
-    const client = this.whatsappHostService.getClientOrThrow(user);
+  async findAll(user: User, pagination: PaginationRequestDto) {
+    const [data, count] = await this.whatsappChatRepository.findAndCount({
+      where: {
+        user: { id: user.id },
+      },
+      order: {
+        lastSentAt: pagination.sortOrder || "DESC",
+      },
+      skip: pagination.skip,
+      take: pagination.limit,
+    });
+
     const customers = await this.customerRepository.find({
       where: { active: true, user: { id: user.id } },
       relations: {
         kanban: true,
       },
     });
-    const chats = await client.getChats();
-    const chatsWithContacts = [];
 
-    for (const chat of chats) {
-      const contact = await chat.getContact();
-      const profile = await contact.getProfilePicUrl().catch(() => null);
-      chatsWithContacts.push({
-        ...chat,
-        contact,
-        profile,
-      });
-    }
+    const chats = WhatsappChatMapper.toDtoList(data, customers);
 
-    return WhatsappChatMapper.toDtoList(chatsWithContacts, customers);
+    return PaginationMapper.toDto([chats, count], pagination);
   }
 
   async findOne(user: User, chatId: string) {
     const client = this.whatsappHostService.getClientOrThrow(user);
     const chat = await client.getChatById(chatId);
     const contact = await chat.getContact();
-    const messages = await chat.fetchMessages({ limit: 100 });
+    const messages = await chat.fetchMessages({ limit: 50 });
 
     const messageWithMedia = [];
 
@@ -72,6 +77,7 @@ export class WhatsappChatsService {
           kanban: true,
         },
       })) ?? undefined;
+
     const profile = await contact.getProfilePicUrl().catch(() => null);
 
     void client.sendSeen(chat.id._serialized);

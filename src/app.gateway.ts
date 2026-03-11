@@ -26,7 +26,7 @@ export class AppGateway extends BaseSecureGateway {
     @GetUserSocket() user: User,
     @MessageBody() data: string,
   ) {
-    this.logger.log(`Received message from user ${user.id}: ${data}`);
+    this.logger.log(`Received message from user ${user.id}`);
     return { event: "private_response", data: "Verified access only" };
   }
 

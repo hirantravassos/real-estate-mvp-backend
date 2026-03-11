@@ -4,12 +4,14 @@ import {
   NotFoundException,
   OnModuleInit,
 } from "@nestjs/common";
-import { Client, LocalAuth } from "whatsapp-web.js";
+import WAWebJS, { Client, LocalAuth } from "whatsapp-web.js";
 import { Repository } from "typeorm";
 import { InjectRepository } from "@nestjs/typeorm";
 import { User } from "../../users/entities/user.entity";
 import qrcode from "qrcode-terminal";
 import { WhatsappHostMapper } from "../mappers/whatsapp-host.mapper";
+import { WhatsappChat } from "../entities/whatsapp-chat.entity";
+import { WhatsappChatMapper } from "../mappers/whatsapp-chat.mapper";
 
 @Injectable()
 export class WhatsappHostService implements OnModuleInit {
@@ -19,7 +21,8 @@ export class WhatsappHostService implements OnModuleInit {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-
+    @InjectRepository(WhatsappChat)
+    private readonly whatsappChatRepository: Repository<WhatsappChat>,
   ) {}
 
   async onModuleInit() {
@@ -53,6 +56,32 @@ export class WhatsappHostService implements OnModuleInit {
     return client;
   }
 
+  private async syncChats(userId: string, client: WAWebJS.Client) {
+    const user = await this.userRepository.findOneBy({ id: userId });
+
+    if (!user) {
+      this.logger.error("syncChats.error", "user not found", { userId });
+      return;
+    }
+
+    const chats = await client.getChats();
+
+    for (const chat of chats) {
+      const contact = await chat.getContact();
+      const profile = await contact.getProfilePicUrl().catch(() => null);
+      const entity = WhatsappChatMapper.toEntity(
+        {
+          ...chat,
+          contact,
+          profile,
+        },
+        user,
+      );
+      this.logger.log(`[${userId}]`, `Syncing chat: ${entity.id}`);
+      await this.whatsappChatRepository.upsert(entity, ["user", "id"]);
+    }
+  }
+
   private async restoreSessions(): Promise<void> {
     this.logger.log("Restoring previous WhatsApp sessions...");
 
@@ -82,15 +111,22 @@ export class WhatsappHostService implements OnModuleInit {
 
     client.on("qr", (qr: string) => {
       qrcode.generate(qr, { small: true });
+      void this.userRepository.update(
+        { id: clientId },
+        {
+          qr,
+        },
+      );
       this.logger.log(`[${clientId}] Scan the QR code above.`);
     });
 
     client.on("ready", () => {
       this.logger.log(`[${clientId}] Client is fully connected and ready.`);
+      void this.syncChats(clientId, client);
     });
 
-    client.on("message", (data) => {
-      this.logger.log(`[${clientId}] Message received.`, { data });
+    client.on("message", () => {
+      // this.logger.log(`[${clientId}] Message received.`, { data });
     });
 
     client.on("authenticated", () => {

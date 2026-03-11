@@ -1,7 +1,10 @@
-import WAWebJS, { MessageTypes } from "whatsapp-web.js";
+import WAWebJS from "whatsapp-web.js";
 import { Customer } from "../../customers/entities/customer.entity";
 import { DateHelper } from "../../../shared/utils/date.util";
 import { WhatsappHelper } from "../helpers/whatsapp.helper";
+import { User } from "../../users/entities/user.entity";
+import { WhatsappChat } from "../entities/whatsapp-chat.entity";
+import dayjs from "dayjs";
 
 export interface WhatsappChatWithContactDto extends WAWebJS.Chat {
   contact: WAWebJS.Contact;
@@ -13,47 +16,58 @@ export interface WhatsappChatMessageDto extends WAWebJS.Message {
 }
 
 export class WhatsappChatMapper {
-  static toDtoList(data: WhatsappChatWithContactDto[], customers?: Customer[]) {
-    return data
-      .filter((chat) => !chat.isGroup)
-      .map((chat) => {
-        const rawPhone = WhatsappHelper.getPhoneFromChat(chat);
-        const customerFound = customers?.find(
-          (customer) => customer.phone === rawPhone,
-        );
-        const phone = WhatsappHelper.getPhoneFromChat(chat, customerFound);
-        const name = WhatsappHelper.getNameFromChat(chat, customerFound);
-        return {
-          id: chat.id._serialized,
-          name,
-          phone,
-          profile: chat.profile ?? null,
-          lastMessage: {
-            message:
-              chat.lastMessage.type === MessageTypes.TEXT
-                ? WhatsappHelper.getMessageBody(chat.lastMessage)
-                : null,
-            fromMe: chat.lastMessage.fromMe,
-            sentAt: DateHelper.formatDateTime(
-              chat.lastMessage.timestamp * 1000,
-            ),
-          },
-          customer: customerFound,
-          unread: chat.unreadCount > 0,
-        };
+  static toEntity(chat: WhatsappChatWithContactDto, user: User): WhatsappChat {
+    const entity = new WhatsappChat();
+    entity.phone = WhatsappHelper.getPhoneFromChat(chat) as string;
+    entity.name = WhatsappHelper.getNameFromChat(chat);
+    entity.unread = chat.unreadCount > 0;
+
+    if (chat?.lastMessage?.timestamp) {
+      entity.lastSentAt = dayjs(
+        chat.lastMessage.timestamp * 1000,
+      ).toISOString();
+      entity.lastMessage = WhatsappHelper.getMessageBody(chat.lastMessage);
+    } else {
+      entity.lastSentAt = null;
+      entity.lastMessage = null;
+    }
+
+    entity.profileUrl = chat?.profile ?? null;
+    entity.user = user;
+    entity.id = chat.id._serialized;
+    return entity;
+  }
+
+  static toDtoList(entities: WhatsappChat[], customers?: Customer[]) {
+    return entities.map((chat) => {
+      const customer = customers?.find((customer) => {
+        return customer.phone === chat.phone;
       });
+      return {
+        id: chat.id,
+        name: chat.name,
+        phone: chat.phone,
+        profile: chat.profileUrl ?? null,
+        lastMessage: {
+          message: chat.lastMessage,
+          sentAt: chat.lastSentAt,
+        },
+        customer,
+        unread: chat.unread,
+      };
+    });
   }
 
   static toDto(
-    data: WhatsappChatWithContactDto,
+    chat: WhatsappChatWithContactDto,
     messages: WhatsappChatMessageDto[],
     customer?: Customer,
   ) {
     return {
-      id: data.id._serialized,
-      name: WhatsappHelper.getNameFromChat(data, customer),
-      phone: WhatsappHelper.getPhoneFromChat(data, customer),
-      profile: data.profile ?? null,
+      id: chat.id,
+      name: WhatsappHelper.getNameFromChat(chat, customer),
+      phone: WhatsappHelper.getPhoneFromChat(chat, customer),
+      profile: chat.profile ?? null,
       customer: customer ?? null,
       messages: messages?.map((message) => this.toMessage(message)),
     };

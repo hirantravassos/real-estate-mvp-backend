@@ -21,4 +21,7 @@ export class User extends BaseEntity {
 
   @Column({ type: "varchar", length: 1000 })
   googleId: string;
+
+  @Column({ type: "varchar", length: 1000 })
+  qr: string | null;
 }

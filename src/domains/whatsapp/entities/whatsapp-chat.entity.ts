@@ -1,25 +1,25 @@
-import { Column, Entity, ManyToOne, Unique } from "typeorm";
-import { BaseEntity } from "../../../shared/entities/base.entity";
+import { Column, Entity, ManyToOne, PrimaryColumn, Unique } from "typeorm";
 import { User } from "../../users/entities/user.entity";
 import { ColumnPhone } from "../../../shared/decorators/columns/column-phone.decorator";
+import { ColumnName } from "../../../shared/decorators/columns/column-name.decorator";
 
 @Entity("whatsapp_chats")
-@Unique(["whatsappId", "userId"])
-export class WhatsappChat extends BaseEntity {
+@Unique(["id", "user"])
+export class WhatsappChat {
   @ManyToOne(() => User, {
     nullable: false,
     createForeignKeyConstraints: false,
   })
   user: User;
 
-  @Column({ type: "varchar", length: 255 })
-  userId: string;
-
-  @Column({ type: "varchar", length: 255 })
-  whatsappId: string;
+  @PrimaryColumn({ type: "varchar", length: 255 })
+  id: string;
 
   @ColumnPhone()
   phone: string;
+
+  @ColumnName()
+  name: string;
 
   @Column({
     type: "boolean",
@@ -29,4 +29,10 @@ export class WhatsappChat extends BaseEntity {
 
   @Column({ type: "datetime", nullable: true })
   lastSentAt: string | null;
+
+  @Column({ type: "varchar", nullable: true })
+  lastMessage: string | null;
+
+  @Column({ type: "varchar", nullable: true })
+  profileUrl: string | null;
 }
