@@ -21,7 +21,6 @@ export class KanbanService {
       },
       order: {
         position: "ASC",
-        createdAt: "ASC",
       },
       skip: pagination.skip,
       take: pagination.limit,

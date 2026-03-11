@@ -18,6 +18,9 @@ export class WhatsappChatsService {
     const client = this.whatsappHostService.getClientOrThrow(user);
     const customers = await this.customerRepository.find({
       where: { active: true, user: { id: user.id } },
+      relations: {
+        kanban: true,
+      },
     });
     const chats = await client.getChats();
     const chatsWithContacts = [];
@@ -64,6 +67,9 @@ export class WhatsappChatsService {
           active: true,
           user: { id: user.id },
           phone: contact.number.slice(2),
+        },
+        relations: {
+          kanban: true,
         },
       })) ?? undefined;
     const profile = await contact.getProfilePicUrl().catch(() => null);
