@@ -8,6 +8,7 @@ import { CustomerComment } from "./customer-comments.entity";
 import { ColumnBoolean } from "../../../shared/decorators/columns/column-boolean.decorator";
 import { Visit } from "../../visits/entities/visit.entity";
 import { ColumnCurrency } from "../../../shared/decorators/columns/column-currency.decorator";
+import { WhatsappChat } from "../../whatsapp/entities/whatsapp-chat.entity";
 
 @Entity("customers")
 @Unique(["userId", "phone"])
@@ -16,6 +17,9 @@ export class Customer extends BaseEntity {
     nullable: false,
   })
   user: User;
+
+  @OneToMany(() => WhatsappChat, (whatsappChat) => whatsappChat.customer)
+  chats?: WhatsappChat[];
 
   @Column({ type: "varchar", length: 255 })
   userId: string;

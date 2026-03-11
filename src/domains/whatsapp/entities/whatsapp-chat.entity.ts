@@ -26,7 +26,10 @@ export class WhatsappChat {
   user: User;
 
   @ManyToOne(() => Customer, { createForeignKeyConstraints: false })
-  @JoinColumn({ name: "phone", referencedColumnName: "phone" })
+  @JoinColumn([
+    { name: "phone", referencedColumnName: "phone" },
+    { name: "userId", referencedColumnName: "userId" },
+  ])
   customer?: Customer;
 
   @PrimaryColumn({ type: "varchar", length: 255 })

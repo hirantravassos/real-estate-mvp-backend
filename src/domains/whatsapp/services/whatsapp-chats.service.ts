@@ -17,8 +17,6 @@ import WAWebJS from "whatsapp-web.js";
 export class WhatsappChatsService {
   constructor(
     private readonly whatsappHostService: WhatsappHostService,
-    @InjectRepository(Customer)
-    private readonly customerRepository: Repository<Customer>,
     @InjectRepository(WhatsappChat)
     private readonly whatsappChatRepository: Repository<WhatsappChat>,
   ) {}
@@ -70,6 +68,11 @@ export class WhatsappChatsService {
         user: { id: user.id },
         id: chatId,
       },
+      relations: {
+        customer: {
+          kanban: true,
+        },
+      },
     });
 
     if (!foundChat) {
@@ -84,18 +87,10 @@ export class WhatsappChatsService {
       chat.fetchMessages({ limit: 50 }),
     ]);
 
-    const [messageWithMedia, customer, profile] = await Promise.all([
+    const [messageWithMedia, profile] = await Promise.all([
       Promise.all(
         messages?.map((message) => this.syncMessageWithMedia(message)),
       ),
-      this.customerRepository.findOne({
-        where: {
-          active: true,
-          user: { id: user.id },
-          phone: contact.number.slice(2),
-        },
-        relations: { kanban: true },
-      }),
       contact.getProfilePicUrl().catch(() => null),
     ]);
 
@@ -104,7 +99,7 @@ export class WhatsappChatsService {
     return WhatsappChatMapper.toDto(
       { ...chat, contact, profile },
       messageWithMedia,
-      customer ?? undefined,
+      foundChat?.customer,
     );
   }
 

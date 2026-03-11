@@ -2,7 +2,17 @@ import {
   CustomerCreateDto,
   CustomerService,
 } from "../services/customer.service";
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards, } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from "@nestjs/common";
 import { JwtGuard } from "../../auth/guards/jwt.guard";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { User } from "../../users/entities/user.entity";
@@ -12,7 +22,7 @@ import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dt
 @Controller("customers")
 @UseGuards(JwtGuard)
 export class CustomerController {
-  constructor(private readonly customerService: CustomerService) { }
+  constructor(private readonly customerService: CustomerService) {}
 
   @Get()
   async findAll(

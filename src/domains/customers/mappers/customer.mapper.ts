@@ -3,6 +3,7 @@ import { Kanban } from "../../kanbans/entities/kanban.entity";
 import { CustomerComment } from "../entities/customer-comments.entity";
 import { CustomerCreateDto } from "../services/customer.service";
 import { Visit } from "../../visits/entities/visit.entity";
+import { WhatsappChatMapper } from "../../whatsapp/mappers/whatsapp-chat.mapper";
 
 export class CustomerMapper {
   static toEntity(dto: CustomerCreateDto, id?: string) {

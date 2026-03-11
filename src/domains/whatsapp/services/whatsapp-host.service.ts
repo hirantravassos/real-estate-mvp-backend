@@ -111,7 +111,16 @@ export class WhatsappHostService implements OnModuleInit {
 
     if (!user) return;
 
-    const chat = await message.getChat();
+    const chat = await message.getChat().catch(() => null);
+
+    if (!chat) {
+      this.logger.error(
+        `[${user.id}]`,
+        `Syncing chat from message failed: ${message.id._serialized}`,
+      );
+      return;
+    }
+
     this.logger.log(
       `[${user.id}]`,
       `Syncing chat from message: ${chat.id._serialized}`,
