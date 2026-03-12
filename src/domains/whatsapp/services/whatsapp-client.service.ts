@@ -12,7 +12,6 @@ import { WhatsappChat } from "../entities/whatsapp-chat.entity";
 import { WhatsappChatMapper } from "../mappers/whatsapp-chat.mapper";
 import { WhatsappStatus } from "../entities/whatsapp-status.entity";
 import { WhatsappClientStatusEnum } from "../enums/whatsapp-client-status.enum";
-import { error } from "qrcode-terminal";
 
 interface WhatsappStatusDto {
   status: WhatsappClientStatusEnum;
@@ -180,8 +179,17 @@ export class WhatsappClientService implements OnModuleInit {
     );
   }
 
-  private initializeClient(clientId: string): void {
+  private async initializeClient(clientId: string): Promise<void> {
     this.logger.log(`[${clientId}] Initializing client...`);
+
+    const user = await this.userRepository.findOneBy({ id: clientId });
+
+    if (!user) {
+      this.logger.warn(
+        `[${clientId}] While initializing client, user not found. Skipping...`,
+      );
+      return;
+    }
 
     const client = new Client({
       authStrategy: new LocalAuth({
@@ -217,6 +225,14 @@ export class WhatsappClientService implements OnModuleInit {
         hasUpdates: true,
       });
       void this.syncMessage(clientId, message);
+    });
+
+    client.on("unread_count", (chat) => {
+      void this.updateConnectionStatus(clientId, {
+        status: WhatsappClientStatusEnum.CONNECTED,
+        hasUpdates: true,
+      });
+      void this.syncChat(chat, user);
     });
 
     client.on("authenticated", () => {
