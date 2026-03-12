@@ -37,9 +37,9 @@ export class WhatsappChatController {
   async findOne(
     @GetUser() user: User,
     @Param("id") id: string,
-    @Query() pagination: PaginationRequestDto,
+    @Query("limit") limit: number,
   ) {
-    return this.whatsappChatsService.findOne(user, id);
+    return this.whatsappChatsService.findOne(user, id, limit);
   }
 
   @Post(":id/ignore")

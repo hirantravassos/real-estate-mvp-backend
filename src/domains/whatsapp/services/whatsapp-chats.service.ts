@@ -57,7 +57,7 @@ export class WhatsappChatsService {
     return data?.length;
   }
 
-  async findOne(user: User, chatId: string) {
+  async findOne(user: User, chatId: string, limit = 30) {
     const foundChat = await this.whatsappChatRepository.findOne({
       where: {
         user: { id: user.id },
@@ -77,7 +77,6 @@ export class WhatsappChatsService {
     const client = await this.whatsappHostService.getClientOrThrow(user);
     const chat = await client.getChatById(foundChat.id);
 
-    const limit = 40;
     const [contact, messages] = await Promise.all([
       chat.getContact(),
       chat.fetchMessages({ limit }),
