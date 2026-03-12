@@ -23,7 +23,7 @@ import { CustomerMapper } from "../../customers/mappers/customer.mapper";
 @Controller("kanbans")
 @UseGuards(JwtGuard)
 export class KanbanController {
-  constructor(private readonly kanbanService: KanbanService) { }
+  constructor(private readonly kanbanService: KanbanService) {}
 
   @Get()
   async findAll(

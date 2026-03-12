@@ -6,4 +6,3 @@ export class WhatsappSendMessageDto {
   @MaxLength(4096)
   content: string;
 }
-

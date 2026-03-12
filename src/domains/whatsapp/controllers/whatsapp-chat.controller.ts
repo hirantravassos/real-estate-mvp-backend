@@ -4,11 +4,21 @@ import { User } from "../../users/entities/user.entity";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { WhatsappChatsService } from "../services/whatsapp-chats.service";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
+import { SkipThrottle } from "@nestjs/throttler";
 
 @Controller("whatsapp-chats")
 @UseGuards(JwtGuard)
 export class WhatsappChatController {
   constructor(private readonly whatsappChatsService: WhatsappChatsService) {}
+
+  @SkipThrottle()
+  @Get("messages/:messageId/media")
+  async findMedia(
+    @GetUser() user: User,
+    @Param("messageId") messageId: string,
+  ) {
+    return this.whatsappChatsService.findMessageMedia(user, messageId);
+  }
 
   @Get("unread")
   async findAllUnread(@GetUser() user: User) {
@@ -24,12 +34,16 @@ export class WhatsappChatController {
   }
 
   @Get(":id")
-  async findOne(@GetUser() user: User, @Param("id") id: string) {
+  async findOne(
+    @GetUser() user: User,
+    @Param("id") id: string,
+    @Query() pagination: PaginationRequestDto,
+  ) {
     return this.whatsappChatsService.findOne(user, id);
   }
 
   @Post(":id/ignore")
   async ignore(@GetUser() user: User, @Param("id") id: string) {
-    return this.whatsappChatsService.ignore(user, id)
+    return this.whatsappChatsService.ignore(user, id);
   }
 }

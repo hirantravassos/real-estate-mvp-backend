@@ -64,4 +64,4 @@ const THROTTLE_LIMIT = 30;
     },
   ],
 })
-export class AppModule { }
+export class AppModule {}

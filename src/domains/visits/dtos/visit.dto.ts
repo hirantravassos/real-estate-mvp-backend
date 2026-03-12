@@ -1,23 +1,29 @@
-import { IsDateString, IsNotEmpty, IsOptional, IsString, IsUUID } from "class-validator";
+import {
+  IsDateString,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from "class-validator";
 
 export class CreateVisitDto {
-    @IsUUID()
-    @IsNotEmpty()
-    customerId: string;
+  @IsUUID()
+  @IsNotEmpty()
+  customerId: string;
 
-    @IsString()
-    @IsNotEmpty()
-    address: string;
+  @IsString()
+  @IsNotEmpty()
+  address: string;
 
-    @IsString()
-    @IsOptional()
-    reference?: string;
+  @IsString()
+  @IsOptional()
+  reference?: string;
 
-    @IsDateString()
-    @IsNotEmpty()
-    startsAt: string;
+  @IsDateString()
+  @IsNotEmpty()
+  startsAt: string;
 
-    @IsDateString()
-    @IsNotEmpty()
-    endsAt: string;
+  @IsDateString()
+  @IsNotEmpty()
+  endsAt: string;
 }

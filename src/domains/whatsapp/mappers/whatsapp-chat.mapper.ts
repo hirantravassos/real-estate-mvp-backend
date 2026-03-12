@@ -11,10 +11,6 @@ export interface WAWebCustomChatWithContactDto extends WAWebJS.Chat {
   profile: string | null;
 }
 
-export interface WAWebCustomMessageDto extends WAWebJS.Message {
-  media: WAWebJS.MessageMedia | null;
-}
-
 export class WhatsappChatMapper {
   static toEntity(
     chat: WAWebCustomChatWithContactDto,
@@ -60,7 +56,7 @@ export class WhatsappChatMapper {
 
   static toDto(
     chat: WAWebCustomChatWithContactDto,
-    messages: WAWebCustomMessageDto[],
+    messages: WAWebJS.Message[],
     customer?: Customer,
   ) {
     return {
@@ -73,13 +69,13 @@ export class WhatsappChatMapper {
     };
   }
 
-  private static toMessage(message: WAWebCustomMessageDto) {
+  private static toMessage(message: WAWebJS.Message) {
     return {
       id: message.id._serialized,
       fromMe: message.fromMe,
       body: WhatsappHelper.getMessageBody(message),
       type: message.type,
-      media: message.hasMedia ? message.media : null,
+      hasMedia: message.hasMedia,
       location: message?.location ?? null,
       sentAt: DateHelper.formatDateTime(message.timestamp * 1000),
     };

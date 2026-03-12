@@ -1,3 +1,3 @@
 export class AccessTokenDto {
-    readonly accessToken: string;
+  readonly accessToken: string;
 }

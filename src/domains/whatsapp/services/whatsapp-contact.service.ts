@@ -29,7 +29,8 @@ export class WhatsappContactService {
         { userId: user.id },
       )
       .where("chat.userId = :userId", { userId: user.id })
-      .andWhere("customer.id IS NULL") // This finds "pending imports"
+      .andWhere("customer.id IS NULL")
+      .andWhere("chat.ignored = false")
       .orderBy("chat.lastSentAt", "DESC")
       .skip(pagination.skip)
       .take(pagination.limit)

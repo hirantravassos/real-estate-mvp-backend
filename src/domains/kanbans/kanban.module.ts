@@ -12,4 +12,4 @@ import { WhatsappModule } from "../whatsapp/whatsapp.module";
   providers: [KanbanService, KanbanRepository],
   exports: [KanbanService, KanbanRepository],
 })
-export class KanbanModule { }
+export class KanbanModule {}

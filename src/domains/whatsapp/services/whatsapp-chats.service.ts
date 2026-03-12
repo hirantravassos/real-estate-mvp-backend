@@ -1,17 +1,12 @@
 import { ForbiddenException, Injectable } from "@nestjs/common";
 import { WhatsappHostService } from "./whatsapp-host.service";
 import { User } from "../../users/entities/user.entity";
-import {
-  WAWebCustomMessageDto,
-  WhatsappChatMapper,
-} from "../mappers/whatsapp-chat.mapper";
+import { WhatsappChatMapper } from "../mappers/whatsapp-chat.mapper";
 import { InjectRepository } from "@nestjs/typeorm";
 import { IsNull, Repository } from "typeorm";
-import { Customer } from "../../customers/entities/customer.entity";
 import { WhatsappChat } from "../entities/whatsapp-chat.entity";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
-import WAWebJS from "whatsapp-web.js";
 
 @Injectable()
 export class WhatsappChatsService {
@@ -82,25 +77,46 @@ export class WhatsappChatsService {
     const client = await this.whatsappHostService.getClientOrThrow(user);
     const chat = await client.getChatById(foundChat.id);
 
+    const limit = 40;
     const [contact, messages] = await Promise.all([
       chat.getContact(),
-      chat.fetchMessages({ limit: 50 }),
+      chat.fetchMessages({ limit }),
     ]);
 
-    const [messageWithMedia, profile] = await Promise.all([
-      Promise.all(
-        messages?.map((message) => this.syncMessageWithMedia(message)),
-      ),
-      contact.getProfilePicUrl().catch(() => null),
-    ]);
+    const profile = await contact.getProfilePicUrl().catch(() => null);
 
-    void client.sendSeen(foundChat.id);
+    void this.markAsRead(user, foundChat.id);
 
     return WhatsappChatMapper.toDto(
       { ...chat, contact, profile },
-      messageWithMedia,
+      messages,
       foundChat?.customer,
     );
+  }
+
+  async findMessageMedia(user: User, messageId: string) {
+    const client = await this.whatsappHostService
+      .getClientOrThrow(user)
+      .catch(() => {
+        return null;
+      });
+
+    if (!client) return null;
+
+    const message = await client.getMessageById(messageId);
+
+    if (!message || !message.hasMedia) {
+      return null;
+    }
+
+    const media = await message.downloadMedia();
+
+    return {
+      data: media.data,
+      mimetype: media.mimetype,
+      filename: media.filename,
+      filesize: media.filesize,
+    };
   }
 
   async ignore(user: User, chatId: string) {
@@ -115,27 +131,25 @@ export class WhatsappChatsService {
     );
   }
 
-  private async syncMessageWithMedia(
-    message: WAWebJS.Message,
-  ): Promise<WAWebCustomMessageDto> {
-    if (!message.hasMedia) {
-      return { ...message, media: null };
-    }
-
-    const timeoutPromise: Promise<null> = new Promise((resolve) =>
-      setTimeout(() => resolve(null), 5000),
+  async markAsRead(user: User, chatId: string) {
+    await this.whatsappChatRepository.update(
+      {
+        user: { id: user.id },
+        id: chatId,
+      },
+      {
+        unread: false,
+      },
     );
 
-    try {
-      const media = await Promise.race<WAWebJS.MessageMedia | null>([
-        message.downloadMedia(),
-        timeoutPromise,
-      ]);
+    const client = await this.whatsappHostService
+      .getClientOrThrow(user)
+      .catch(() => {
+        return null;
+      });
 
-      return { ...message, media };
-    } catch (error) {
-      console.warn("Error downloading media:", error);
-      return { ...message, media: null };
-    }
+    if (!client) return;
+
+    await client.sendSeen(chatId);
   }
 }

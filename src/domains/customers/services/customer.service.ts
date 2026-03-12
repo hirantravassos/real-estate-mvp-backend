@@ -37,7 +37,7 @@ export class CustomerCreateDto {
 
 @Injectable()
 export class CustomerService {
-  constructor(private readonly customerRepository: CustomerRepository) { }
+  constructor(private readonly customerRepository: CustomerRepository) {}
 
   async findAll(user: User, pagination: PaginationRequestDto) {
     const data = await this.customerRepository.findAndCount({
