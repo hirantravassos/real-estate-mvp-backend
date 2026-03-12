@@ -3,7 +3,7 @@ import { CustomerRepository } from "../repositories/customer.repository";
 import { CustomerMapper } from "../mappers/customer.mapper";
 import { User } from "../../users/entities/user.entity";
 import { Customer } from "../entities/customer.entity";
-import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
+import { FindOptionsWhere, ILike } from "typeorm";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
 import { ValidateName } from "../../../shared/decorators/validation/name.decorator";
 import { ValidateBrazilianPhoneNumber } from "../../../shared/decorators/validation/brazilian-phone-number.decorator";
@@ -12,6 +12,7 @@ import { IsOptional, IsUUID } from "class-validator";
 import { ValidateCurrency } from "../../../shared/decorators/validation/currency.decorator";
 import dayjs from "dayjs";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
+import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 
 dayjs.extend(isSameOrAfter);
 
@@ -35,18 +36,44 @@ export class CustomerCreateDto {
   comment: string | null;
 }
 
+export class CustomerFilterDto {
+  @IsOptional()
+  @IsUUID()
+  search: string | null;
+
+  @IsOptional()
+  @IsUUID()
+  kanban: string | null;
+}
+
 @Injectable()
 export class CustomerService {
   constructor(private readonly customerRepository: CustomerRepository) {}
 
-  async findAll(user: User, pagination: PaginationRequestDto) {
+  async findAll(
+    user: User,
+    filter: CustomerFilterDto,
+    pagination: PaginationRequestDto,
+  ) {
+    const where: FindOptionsWhere<Customer> = {
+      user: { id: user.id },
+      active: true,
+      ignored: false,
+      pending: false,
+    };
+
+    if (filter.search) {
+      const search = `%${filter.search}%`;
+      where.name = ILike(search);
+    }
+
     const [data, total] = await this.customerRepository.findAndCount({
-      where: {
-        user: { id: user.id },
-        active: true,
-        ignored: false,
-        pending: false,
-      },
+      where: filter.search
+        ? [
+            { ...where, name: ILike(`%${filter.search}%`) },
+            { ...where, phone: ILike(`%${filter.search}%`) },
+          ]
+        : where,
       relations: {
         comments: true,
         kanban: true,
@@ -71,14 +98,25 @@ export class CustomerService {
     );
   }
 
-  async findAllPending(user: User, pagination: PaginationRequestDto) {
+  async findAllPending(
+    user: User,
+    filter: CustomerFilterDto,
+    pagination: PaginationRequestDto,
+  ) {
+    const where: FindOptionsWhere<Customer> = {
+      user: { id: user.id },
+      active: true,
+      ignored: false,
+      pending: true,
+    };
+
     const [data, total] = await this.customerRepository.findAndCount({
-      where: {
-        user: { id: user.id },
-        active: true,
-        ignored: false,
-        pending: true,
-      },
+      where: filter.search
+        ? [
+            { ...where, name: ILike(`%${filter.search}%`) },
+            { ...where, phone: ILike(`%${filter.search}%`) },
+          ]
+        : where,
       relations: {
         comments: true,
         kanban: true,

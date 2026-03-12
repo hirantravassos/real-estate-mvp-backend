@@ -1,5 +1,6 @@
 import {
   CustomerCreateDto,
+  CustomerFilterDto,
   CustomerService,
 } from "../services/customer.service";
 import {
@@ -16,8 +17,8 @@ import {
 import { JwtGuard } from "../../auth/guards/jwt.guard";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { User } from "../../users/entities/user.entity";
+import { CustomerFilterQueryDto } from "../dtos/customer-filter-query.dto";
 import { CustomerMapper } from "../mappers/customer.mapper";
-import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 
 @Controller("customers")
 @UseGuards(JwtGuard)
@@ -27,22 +28,23 @@ export class CustomerController {
   @Get()
   async findAll(
     @GetUser() user: User,
-    @Query() pagination: PaginationRequestDto,
+    @Query() pagination: CustomerFilterQueryDto,
+    @Query() filter: CustomerFilterDto,
   ) {
-    return await this.customerService.findAll(user, pagination);
+    return await this.customerService.findAll(user, filter, pagination);
   }
 
   @Get("pending")
   async findAllPending(
     @GetUser() user: User,
-    @Query() pagination: PaginationRequestDto,
+    @Query() pagination: CustomerFilterQueryDto,
   ) {
     return await this.customerService.findAllPending(user, pagination);
   }
 
   @Get(":id")
   async findOne(@GetUser() user: User, @Param("id") id: string) {
-    return await this.customerService.findOne(user, id)
+    return await this.customerService.findOne(user, id);
   }
 
   @Post()
