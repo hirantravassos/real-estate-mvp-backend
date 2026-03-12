@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable } from "@nestjs/common";
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { WhatsappClientService } from "./whatsapp-client.service";
 import { User } from "../../users/entities/user.entity";
 import { WhatsappChatMapper } from "../mappers/whatsapp-chat.mapper";
@@ -8,12 +12,13 @@ import { WhatsappChat } from "../entities/whatsapp-chat.entity";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
 import { WhatsappStatusService } from "./whatsapp-status.service";
+import { Customer } from "../../customers/entities/customer.entity";
 
 @Injectable()
 export class WhatsappChatsService {
   constructor(
     private readonly whatsappStatusService: WhatsappStatusService,
-    private readonly whatsappHostService: WhatsappClientService,
+    private readonly whatsappClientService: WhatsappClientService,
     @InjectRepository(WhatsappChat)
     private readonly whatsappChatRepository: Repository<WhatsappChat>,
   ) {}
@@ -65,43 +70,49 @@ export class WhatsappChatsService {
   async findOne(user: User, chatId: string, limit = 30) {
     void this.whatsappStatusService.clearUpdateStatus(user);
 
-    const foundChat = await this.whatsappChatRepository.findOne({
-      where: {
-        user: { id: user.id },
-        id: chatId,
-      },
-      relations: {
-        customer: {
-          kanban: true,
-        },
-      },
+    const client = await this.whatsappClientService.getClientOrThrow(user);
+    const chatClient = await client.getChatById(chatId).catch(() => {
+      throw new ForbiddenException(
+        "[findOne.findOne] Chat not found for this user",
+      );
     });
 
-    if (!foundChat) {
-      throw new ForbiddenException("Chat not found for this user");
-    }
+    await this.whatsappClientService.syncChat(chatClient, user);
 
-    const client = await this.whatsappHostService.getClientOrThrow(user);
-    const chat = await client.getChatById(foundChat.id);
-
-    const [contact, messages] = await Promise.all([
-      chat.getContact(),
-      chat.fetchMessages({ limit }),
+    const [contact, messages, chat] = await Promise.all([
+      chatClient.getContact().catch(() => null),
+      chatClient.fetchMessages({ limit }).catch(() => []),
+      this.whatsappChatRepository.findOne({
+        where: {
+          user: { id: user.id },
+          id: chatId,
+        },
+        relations: {
+          customer: {
+            kanban: true,
+          },
+        },
+      }),
     ]);
+
+    if (!contact) {
+      console.warn("[WhatsappChat.findOne] Contact not found for this chat");
+      throw new NotFoundException("Contact not found for this chat");
+    }
 
     const profile = await contact.getProfilePicUrl().catch(() => null);
 
-    void this.markAsRead(user, foundChat.id);
+    void this.markAsRead(user, chatId);
 
     return WhatsappChatMapper.toDto(
-      { ...chat, contact, profile },
+      { ...chatClient, contact, profile },
       messages,
-      foundChat?.customer,
+      chat?.customer,
     );
   }
 
   async findMessageMedia(user: User, messageId: string) {
-    const client = await this.whatsappHostService
+    const client = await this.whatsappClientService
       .getClientOrThrow(user)
       .catch(() => {
         return null;
@@ -148,7 +159,7 @@ export class WhatsappChatsService {
       },
     );
 
-    const client = await this.whatsappHostService
+    const client = await this.whatsappClientService
       .getClientOrThrow(user)
       .catch(() => {
         return null;

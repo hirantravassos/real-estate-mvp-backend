@@ -48,7 +48,7 @@ export class WhatsappClientService implements OnModuleInit {
       };
     }
 
-    this.initializeClient(clientId);
+    void this.initializeClient(clientId);
   }
 
   async requestLogout(userId: string) {
@@ -85,6 +85,38 @@ export class WhatsappClientService implements OnModuleInit {
     return client;
   }
 
+  async syncChat(chat: WAWebJS.Chat, user: User) {
+    if (chat.isGroup) {
+      this.logger.log(
+        `[${user.id}]`,
+        `Skipped chat (group): ${chat.id._serialized}`,
+      );
+      return;
+    }
+
+    const contact = await chat.getContact().catch(() => null);
+
+    if (!contact) {
+      this.logger.warn(
+        `[${user.id}]`,
+        "Syncing chat failed: getContact failure",
+      );
+      return;
+    }
+
+    const profile = await contact.getProfilePicUrl().catch(() => null);
+    const entity = WhatsappChatMapper.toEntity(
+      {
+        ...chat,
+        contact,
+        profile,
+      },
+      user,
+    );
+    this.logger.log(`[${user.id}]`, `Syncing chat: ${entity.id}`);
+    await this.whatsappChatRepository.upsert(entity, ["user", "id"]);
+  }
+
   private async syncChats(userId: string, client: WAWebJS.Client) {
     const user = await this.userRepository.findOneBy({ id: userId });
 
@@ -108,29 +140,6 @@ export class WhatsappClientService implements OnModuleInit {
         isSyncing: false,
       });
     });
-  }
-
-  private async syncChat(chat: WAWebJS.Chat, user: User) {
-    if (chat.isGroup) {
-      this.logger.log(
-        `[${user.id}]`,
-        `Skipped chat (group): ${chat.id._serialized}`,
-      );
-      return;
-    }
-
-    const contact = await chat.getContact();
-    const profile = await contact.getProfilePicUrl().catch(() => null);
-    const entity = WhatsappChatMapper.toEntity(
-      {
-        ...chat,
-        contact,
-        profile,
-      },
-      user,
-    );
-    this.logger.log(`[${user.id}]`, `Syncing chat: ${entity.id}`);
-    await this.whatsappChatRepository.upsert(entity, ["user", "id"]);
   }
 
   private async syncMessage(userId: string, message: WAWebJS.Message) {
