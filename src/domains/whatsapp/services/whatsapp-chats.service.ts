@@ -12,7 +12,6 @@ import { WhatsappChat } from "../entities/whatsapp-chat.entity";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
 import { WhatsappStatusService } from "./whatsapp-status.service";
-import { Customer } from "../../customers/entities/customer.entity";
 
 @Injectable()
 export class WhatsappChatsService {

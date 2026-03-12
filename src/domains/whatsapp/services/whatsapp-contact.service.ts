@@ -12,9 +12,6 @@ import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dt
 @Injectable()
 export class WhatsappContactService {
   constructor(
-    private readonly whatsappHostService: WhatsappClientService,
-    @InjectRepository(Customer)
-    private readonly customerRepository: Repository<Customer>,
     @InjectRepository(WhatsappChat)
     private readonly whatsappChatRepository: Repository<WhatsappChat>,
   ) {}
