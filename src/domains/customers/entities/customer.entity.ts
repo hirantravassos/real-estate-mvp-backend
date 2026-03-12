@@ -1,4 +1,11 @@
-import { Column, Entity, ManyToOne, OneToMany, Unique } from "typeorm";
+import {
+  Column,
+  Entity,
+  ManyToOne,
+  OneToMany,
+  OneToOne,
+  Unique,
+} from "typeorm";
 import { BaseEntity } from "../../../shared/entities/base.entity";
 import { ColumnName } from "../../../shared/decorators/columns/column-name.decorator";
 import { ColumnPhone } from "../../../shared/decorators/columns/column-phone.decorator";
@@ -18,8 +25,10 @@ export class Customer extends BaseEntity {
   })
   user: User;
 
-  @OneToMany(() => WhatsappChat, (whatsappChat) => whatsappChat.customer)
-  chats?: WhatsappChat[];
+  @OneToOne(() => WhatsappChat, (whatsappChat) => whatsappChat.customer, {
+    nullable: true,
+  })
+  chat: WhatsappChat | null;
 
   @Column({ type: "varchar", length: 255 })
   userId: string;

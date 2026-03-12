@@ -22,9 +22,4 @@ export class WhatsappContactController {
       pagination,
     );
   }
-
-  @Get()
-  async findAll(@GetUser() user: User) {
-    return this.whatsappContactService.findAll(user);
-  }
 }

@@ -29,12 +29,7 @@ export class CustomerController {
     @GetUser() user: User,
     @Query() pagination: PaginationRequestDto,
   ) {
-    const result = await this.customerService.findAll(user, pagination);
-
-    return {
-      ...result,
-      data: CustomerMapper.toListDto(result.data),
-    };
+    return await this.customerService.findAll(user, pagination);
   }
 
   @Get("pending")
@@ -42,17 +37,12 @@ export class CustomerController {
     @GetUser() user: User,
     @Query() pagination: PaginationRequestDto,
   ) {
-    const result = await this.customerService.findAllPending(user, pagination);
-
-    return {
-      ...result,
-      data: CustomerMapper.toListDto(result.data),
-    };
+    return await this.customerService.findAllPending(user, pagination);
   }
 
   @Get(":id")
   async findOne(@GetUser() user: User, @Param("id") id: string) {
-    return CustomerMapper.toDto(await this.customerService.findOne(user, id));
+    return await this.customerService.findOne(user, id)
   }
 
   @Post()

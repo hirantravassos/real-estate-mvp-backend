@@ -3,6 +3,7 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToOne,
   PrimaryColumn,
   Unique,
 } from "typeorm";
@@ -25,7 +26,7 @@ export class WhatsappChat {
   })
   user: User;
 
-  @ManyToOne(() => Customer, { createForeignKeyConstraints: false })
+  @OneToOne(() => Customer, { createForeignKeyConstraints: false })
   @JoinColumn([
     { name: "phone", referencedColumnName: "phone" },
     { name: "userId", referencedColumnName: "userId" },

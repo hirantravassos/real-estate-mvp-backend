@@ -36,31 +36,4 @@ export class WhatsappContactService {
     const data = WhatsappContactMapper.toDtoList(chats);
     return PaginationMapper.toDto([data, total], pagination);
   }
-
-  async findAll(user: User) {
-    // const client = await this.whatsappHostService.getClientOrThrow(user);
-    // const customers = await this.customerRepository.find({
-    //   where: { active: true, user: { id: user.id } },
-    // });
-    // const chats = await client.getChats();
-    // const chatsWithContacts = [];
-    //
-    // for (const chat of chats) {
-    //   const contact = await chat.getContact();
-    //   const profile = await contact.getProfilePicUrl().catch(() => null);
-    //   chatsWithContacts.push({
-    //     ...chat,
-    //     contact,
-    //     profile,
-    //   });
-    // }
-    //
-    // return WhatsappContactMapper.toDtoList(
-    //   chatsWithContacts,
-    //   customers,
-    // )?.filter((item) => {
-    //   return !item.customer?.id;
-    // });
-    return [];
-  }
 }

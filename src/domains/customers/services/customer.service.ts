@@ -40,7 +40,7 @@ export class CustomerService {
   constructor(private readonly customerRepository: CustomerRepository) {}
 
   async findAll(user: User, pagination: PaginationRequestDto) {
-    const data = await this.customerRepository.findAndCount({
+    const [data, total] = await this.customerRepository.findAndCount({
       where: {
         user: { id: user.id },
         active: true,
@@ -59,17 +59,20 @@ export class CustomerService {
       take: pagination.limit,
     });
 
-    for (const item of data[0]) {
+    for (const item of data) {
       item.visits = item.visits.filter((visit) => {
         return dayjs(visit.startsAt).isSameOrAfter(dayjs());
       });
     }
 
-    return PaginationMapper.toDto(data, pagination);
+    return PaginationMapper.toDto(
+      [CustomerMapper.toListDto(data), total],
+      pagination,
+    );
   }
 
   async findAllPending(user: User, pagination: PaginationRequestDto) {
-    const data = await this.customerRepository.findAndCount({
+    const [data, total] = await this.customerRepository.findAndCount({
       where: {
         user: { id: user.id },
         active: true,
@@ -88,35 +91,31 @@ export class CustomerService {
       take: pagination.limit,
     });
 
-    return PaginationMapper.toDto(data, pagination);
+    return PaginationMapper.toDto(
+      [CustomerMapper.toListDto(data), total],
+      pagination,
+    );
   }
 
   async findOne(user: User, id: string) {
-    return await this.customerRepository
-      .findOneOrFail({
-        where: { id, user: { id: user.id } },
-        relations: {
-          comments: true,
-          kanban: true,
-          visits: true,
-        },
-        order: {
-          comments: { createdAt: "ASC" },
-        },
-      })
-      .catch(() => {
-        throw new NotFoundException("Customer not found");
-      });
-  }
-
-  async findOneByPhone(user: User, phone: string) {
-    return this.customerRepository
-      .findOneOrFail({
-        where: { phone, user: { id: user.id } },
-      })
-      .catch(() => {
-        throw new NotFoundException("Customer not found");
-      });
+    return CustomerMapper.toDto(
+      await this.customerRepository
+        .findOneOrFail({
+          where: { id, user: { id: user.id } },
+          relations: {
+            comments: true,
+            kanban: true,
+            visits: true,
+            chat: true,
+          },
+          order: {
+            comments: { createdAt: "ASC" },
+          },
+        })
+        .catch(() => {
+          throw new NotFoundException("Customer not found");
+        }),
+    );
   }
 
   async save(user: User, dto: CustomerCreateDto, id?: string) {
