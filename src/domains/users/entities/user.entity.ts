@@ -1,12 +1,16 @@
-import { Column, Entity, OneToMany } from "typeorm";
+import { Column, Entity, OneToMany, OneToOne } from "typeorm";
 import { BaseEntity } from "../../../shared/entities/base.entity.js";
 import { ColumnName } from "../../../shared/decorators/columns/column-name.decorator.js";
 import { ColumnEmail } from "../../../shared/decorators/columns/column-email.decorator.js";
 import { Customer } from "../../customers/entities/customer.entity";
 import { Visit } from "../../visits/entities/visit.entity";
+import { WhatsappStatus } from "../../whatsapp/entities/whatsapp-status.entity";
 
 @Entity("users")
 export class User extends BaseEntity {
+  @OneToOne(() => WhatsappStatus, (whatsappStatus) => whatsappStatus.user)
+  whatsappStatus: WhatsappStatus;
+
   @OneToMany(() => Customer, (customer) => customer.user)
   customers: Customer[];
 
@@ -21,7 +25,4 @@ export class User extends BaseEntity {
 
   @Column({ type: "varchar", length: 1000 })
   googleId: string;
-
-  @Column({ type: "varchar", length: 1000 })
-  qr: string | null;
 }

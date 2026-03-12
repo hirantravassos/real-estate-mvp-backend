@@ -9,7 +9,6 @@ export class UserMapper {
       id: user.id,
       email: user.email,
       name: user.name,
-      qr: user.qr,
       createdAt: DateHelper.formatUtcToIso(user.createdAt),
       updatedAt: DateHelper.formatUtcToIso(user.updatedAt),
     };

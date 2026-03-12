@@ -21,8 +21,11 @@ export class WhatsappChatController {
   }
 
   @Get("unread")
-  async findAllUnread(@GetUser() user: User) {
-    return this.whatsappChatsService.findAllUnread(user);
+  async findAllUnread(
+    @GetUser() user: User,
+    @Query() pagination: PaginationRequestDto,
+  ) {
+    return this.whatsappChatsService.findAllUnread(user, pagination);
   }
 
   @Get()

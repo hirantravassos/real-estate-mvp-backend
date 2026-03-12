@@ -1,27 +1,39 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { WhatsappChat } from "./entities/whatsapp-chat.entity";
-import { WhatsappHostController } from "./controllers/whatsapp-host.controller";
-import { WhatsappHostService } from "./services/whatsapp-host.service";
+import { WhatsappClientController } from "./controllers/whatsapp-client.controller";
+import { WhatsappClientService } from "./services/whatsapp-client.service";
 import { User } from "../users/entities/user.entity";
 import { WhatsappChatsService } from "./services/whatsapp-chats.service";
 import { WhatsappChatController } from "./controllers/whatsapp-chat.controller";
 import { Customer } from "../customers/entities/customer.entity";
 import { WhatsappContactController } from "./controllers/whatsapp-contact.controller";
 import { WhatsappContactService } from "./services/whatsapp-contact.service";
+import { WhatsappStatus } from "./entities/whatsapp-status.entity";
+import { WhatsappStatusController } from "./controllers/whatsapp-status.controller";
+import { WhatsappStatusService } from "./services/whatsapp-status.service";
 
 @Module({
-  imports: [TypeOrmModule.forFeature([WhatsappChat, User, Customer])],
+  imports: [
+    TypeOrmModule.forFeature([WhatsappStatus, WhatsappChat, User, Customer]),
+  ],
   controllers: [
-    WhatsappHostController,
+    WhatsappClientController,
+    WhatsappStatusController,
     WhatsappChatController,
     WhatsappContactController,
   ],
   providers: [
-    WhatsappHostService,
+    WhatsappClientService,
+    WhatsappStatusService,
     WhatsappChatsService,
     WhatsappContactService,
   ],
-  exports: [WhatsappHostService, WhatsappChatsService, WhatsappContactService],
+  exports: [
+    WhatsappClientService,
+    WhatsappStatusService,
+    WhatsappChatsService,
+    WhatsappContactService,
+  ],
 })
 export class WhatsappModule {}

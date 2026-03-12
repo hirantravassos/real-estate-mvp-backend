@@ -1,22 +1,26 @@
 import { ForbiddenException, Injectable } from "@nestjs/common";
-import { WhatsappHostService } from "./whatsapp-host.service";
+import { WhatsappClientService } from "./whatsapp-client.service";
 import { User } from "../../users/entities/user.entity";
 import { WhatsappChatMapper } from "../mappers/whatsapp-chat.mapper";
 import { InjectRepository } from "@nestjs/typeorm";
-import { IsNull, Repository } from "typeorm";
+import { Repository } from "typeorm";
 import { WhatsappChat } from "../entities/whatsapp-chat.entity";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
+import { WhatsappStatusService } from "./whatsapp-status.service";
 
 @Injectable()
 export class WhatsappChatsService {
   constructor(
-    private readonly whatsappHostService: WhatsappHostService,
+    private readonly whatsappStatusService: WhatsappStatusService,
+    private readonly whatsappHostService: WhatsappClientService,
     @InjectRepository(WhatsappChat)
     private readonly whatsappChatRepository: Repository<WhatsappChat>,
   ) {}
 
   async findAll(user: User, pagination: PaginationRequestDto) {
+    void this.whatsappStatusService.clearUpdateStatus(user);
+
     const [data, total] = await this.whatsappChatRepository.findAndCount({
       where: { user: { id: user.id }, ignored: false },
       relations: {
@@ -36,28 +40,31 @@ export class WhatsappChatsService {
     return PaginationMapper.toDto([chats, total], pagination);
   }
 
-  async findAllUnread(user: User) {
-    const data = await this.whatsappChatRepository.find({
-      where: [
-        {
-          user: { id: user.id },
-          customer: { ignored: false },
-          ignored: false,
-          unread: true,
+  async findAllUnread(user: User, pagination: PaginationRequestDto) {
+    void this.whatsappStatusService.clearUpdateStatus(user);
+
+    const [data, total] = await this.whatsappChatRepository.findAndCount({
+      where: { user: { id: user.id }, ignored: false, unread: true },
+      relations: {
+        customer: {
+          kanban: true,
         },
-        {
-          user: { id: user.id },
-          customer: IsNull(),
-          ignored: false,
-          unread: true,
-        },
-      ],
+      },
+      order: {
+        lastSentAt: pagination.sortOrder || "DESC",
+      },
+      skip: pagination.skip,
+      take: pagination.limit,
     });
 
-    return data?.length;
+    const chats = WhatsappChatMapper.toDtoList(data);
+
+    return PaginationMapper.toDto([chats, total], pagination);
   }
 
   async findOne(user: User, chatId: string, limit = 30) {
+    void this.whatsappStatusService.clearUpdateStatus(user);
+
     const foundChat = await this.whatsappChatRepository.findOne({
       where: {
         user: { id: user.id },

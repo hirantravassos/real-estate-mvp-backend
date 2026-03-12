@@ -8,14 +8,22 @@ import WAWebJS, { Client, LocalAuth, WAState } from "whatsapp-web.js";
 import { Repository } from "typeorm";
 import { InjectRepository } from "@nestjs/typeorm";
 import { User } from "../../users/entities/user.entity";
-import qrcode from "qrcode-terminal";
-import { WhatsappHostMapper } from "../mappers/whatsapp-host.mapper";
 import { WhatsappChat } from "../entities/whatsapp-chat.entity";
 import { WhatsappChatMapper } from "../mappers/whatsapp-chat.mapper";
+import { WhatsappStatus } from "../entities/whatsapp-status.entity";
+import { WhatsappClientStatusEnum } from "../enums/whatsapp-client-status.enum";
+import { error } from "qrcode-terminal";
+
+interface WhatsappStatusDto {
+  status: WhatsappClientStatusEnum;
+  qr?: string | null;
+  isSyncing: boolean;
+  hasUpdates: boolean;
+}
 
 @Injectable()
-export class WhatsappHostService implements OnModuleInit {
-  private readonly logger = new Logger(WhatsappHostService.name);
+export class WhatsappClientService implements OnModuleInit {
+  private readonly logger = new Logger(WhatsappClientService.name);
   private clients: Map<string, Client> = new Map();
 
   constructor(
@@ -23,6 +31,8 @@ export class WhatsappHostService implements OnModuleInit {
     private readonly userRepository: Repository<User>,
     @InjectRepository(WhatsappChat)
     private readonly whatsappChatRepository: Repository<WhatsappChat>,
+    @InjectRepository(WhatsappStatus)
+    private readonly whatsappStatusRepository: Repository<WhatsappStatus>,
   ) {}
 
   async onModuleInit() {
@@ -42,10 +52,14 @@ export class WhatsappHostService implements OnModuleInit {
     this.initializeClient(clientId);
   }
 
-  async getStatus(user: User) {
-    const client = await this.getClientOrThrow(user);
-    const state = await client.getState();
-    return WhatsappHostMapper.toDto(state);
+  async requestLogout(userId: string) {
+    this.logger.log(`[${userId}] Client was logged out by user request`);
+    void this.updateConnectionStatus(userId, {
+      status: WhatsappClientStatusEnum.ERROR,
+      qr: null,
+    });
+    const client = this.clients.get(userId);
+    await client?.logout();
   }
 
   async getClientOrThrow(user: User): Promise<Client> {
@@ -65,6 +79,10 @@ export class WhatsappHostService implements OnModuleInit {
       });
     }
 
+    void this.updateConnectionStatus(user.id, {
+      status: WhatsappClientStatusEnum.CONNECTED,
+    });
+
     return client;
   }
 
@@ -76,11 +94,21 @@ export class WhatsappHostService implements OnModuleInit {
       return;
     }
 
+    void this.updateConnectionStatus(user.id, {
+      isSyncing: true,
+    });
+
     const chats = await client.getChats();
 
-    for (const chat of chats) {
-      void this.syncChat(chat, user);
-    }
+    const syncPromises: Promise<void>[] = chats.map((chat) =>
+      this.syncChat(chat, user),
+    );
+
+    void Promise.all(syncPromises).finally(() => {
+      void this.updateConnectionStatus(userId, {
+        isSyncing: false,
+      });
+    });
   }
 
   private async syncChat(chat: WAWebJS.Chat, user: User) {
@@ -139,7 +167,22 @@ export class WhatsappHostService implements OnModuleInit {
     }
   }
 
+  private async updateConnectionStatus(
+    userId: string,
+    dto: Partial<WhatsappStatusDto>,
+  ) {
+    await this.whatsappStatusRepository.upsert(
+      {
+        user: { id: userId },
+        ...dto,
+      },
+      ["user"],
+    );
+  }
+
   private initializeClient(clientId: string): void {
+    this.logger.log(`[${clientId}] Initializing client...`);
+
     const client = new Client({
       authStrategy: new LocalAuth({
         clientId: clientId,
@@ -156,36 +199,47 @@ export class WhatsappHostService implements OnModuleInit {
     this.clients.set(clientId, client);
 
     client.on("qr", (qr: string) => {
-      qrcode.generate(qr, { small: true });
-      void this.userRepository.update(
-        { id: clientId },
-        {
-          qr,
-        },
-      );
-      this.logger.log(`[${clientId}] Scan the QR code above.`);
+      void this.updateConnectionStatus(clientId, {
+        status: WhatsappClientStatusEnum.PENDING,
+        qr,
+      });
     });
 
     client.on("ready", () => {
-      this.logger.log(`[${clientId}] Client is fully connected and ready.`);
+      void this.updateConnectionStatus(clientId, {
+        status: WhatsappClientStatusEnum.CONNECTED,
+      });
       void this.syncChats(clientId, client);
     });
 
     client.on("message", (message) => {
+      void this.updateConnectionStatus(clientId, {
+        hasUpdates: true,
+      });
       void this.syncMessage(clientId, message);
     });
 
     client.on("authenticated", () => {
+      void this.updateConnectionStatus(clientId, {
+        status: WhatsappClientStatusEnum.AUTHENTICATED,
+      });
       this.logger.log(`[${clientId}] Session authenticated.`);
     });
 
     client.on("auth_failure", (message: string) => {
-      this.logger.error(`[${clientId}] Authentication failure: ${message}`);
-      this.clients.delete(clientId); // Clean up bad instance
+      this.logger.warn(`[${clientId}] Authentication failure: ${message}`);
+      void this.updateConnectionStatus(clientId, {
+        status: WhatsappClientStatusEnum.ERROR,
+      });
+      this.clients.delete(clientId);
     });
 
     client.on("disconnected", (reason: string) => {
       this.logger.warn(`[${clientId}] Client was logged out: ${reason}`);
+      void this.updateConnectionStatus(clientId, {
+        status: WhatsappClientStatusEnum.ERROR,
+        qr: null,
+      });
       this.clients.delete(clientId);
     });
 

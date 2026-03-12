@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { WhatsappHostService } from "./whatsapp-host.service";
+import { WhatsappClientService } from "./whatsapp-client.service";
 import { User } from "../../users/entities/user.entity";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -12,7 +12,7 @@ import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dt
 @Injectable()
 export class WhatsappContactService {
   constructor(
-    private readonly whatsappHostService: WhatsappHostService,
+    private readonly whatsappHostService: WhatsappClientService,
     @InjectRepository(Customer)
     private readonly customerRepository: Repository<Customer>,
     @InjectRepository(WhatsappChat)

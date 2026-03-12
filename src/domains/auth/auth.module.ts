@@ -9,7 +9,6 @@ import { UserModule } from "../users/user.module";
 import { User } from "../users/entities/user.entity";
 import { GoogleStrategy } from "./strategies/google.strategy";
 import { JwtStrategy } from "./strategies/jwt.strategy";
-import { WsJwtGuard } from "./guards/websocket-jwt.guard";
 
 @Module({
   imports: [
@@ -38,7 +37,7 @@ import { WsJwtGuard } from "./guards/websocket-jwt.guard";
     forwardRef(() => UserModule),
   ],
   controllers: [AuthController],
-  providers: [AuthService, GoogleStrategy, JwtStrategy, WsJwtGuard],
-  exports: [AuthService, JwtModule, WsJwtGuard, UserModule],
+  providers: [AuthService, GoogleStrategy, JwtStrategy],
+  exports: [AuthService, JwtModule, UserModule],
 })
 export class AuthModule {}
