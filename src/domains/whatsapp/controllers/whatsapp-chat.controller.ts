@@ -11,10 +11,10 @@ import { JwtGuard } from "../../auth/guards/jwt.guard";
 import { User } from "../../users/entities/user.entity";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import {
+  WhatsappChatFilterDto,
   WhatsappChatSendMessageDto,
   WhatsappChatService,
 } from "../services/whatsapp-chat.service";
-import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 
 @Controller("whatsapp-chats")
 @UseGuards(JwtGuard)
@@ -29,20 +29,9 @@ export class WhatsappChatController {
     return this.whatsappChatsService.findMessageMedia(user, messageId);
   }
 
-  @Get("unread")
-  async findAllUnread(
-    @GetUser() user: User,
-    @Query() pagination: PaginationRequestDto,
-  ) {
-    return this.whatsappChatsService.findAllUnread(user, pagination);
-  }
-
   @Get()
-  async findAll(
-    @GetUser() user: User,
-    @Query() pagination: PaginationRequestDto,
-  ) {
-    return this.whatsappChatsService.findAll(user, pagination);
+  async findAll(@GetUser() user: User, @Query() filter: WhatsappChatFilterDto) {
+    return this.whatsappChatsService.findAll(user, filter);
   }
 
   @Get(":id")

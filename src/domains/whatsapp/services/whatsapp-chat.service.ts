@@ -7,16 +7,31 @@ import { WhatsappClientService } from "./whatsapp-client.service";
 import { User } from "../../users/entities/user.entity";
 import { WhatsappChatMapper } from "../mappers/whatsapp-chat.mapper";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { FindOptionsWhere, ILike, Repository } from "typeorm";
 import { WhatsappChat } from "../entities/whatsapp-chat.entity";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
 import { WhatsappStatusService } from "./whatsapp-status.service";
-import { IsString } from "class-validator";
+import { IsOptional, IsString, IsUUID } from "class-validator";
+import { ValidateBoolean } from "../../../shared/decorators/validation/boolean.decorator";
 
 export class WhatsappChatSendMessageDto {
   @IsString()
   message: string;
+}
+
+export class WhatsappChatFilterDto extends PaginationRequestDto {
+  @IsOptional()
+  @IsString()
+  search: string | null;
+
+  @IsOptional()
+  @IsUUID()
+  kanban: string | null;
+
+  @IsOptional()
+  @ValidateBoolean({})
+  unread: boolean | null;
 }
 
 @Injectable()
@@ -28,48 +43,28 @@ export class WhatsappChatService {
     private readonly whatsappChatRepository: Repository<WhatsappChat>,
   ) {}
 
-  async findAll(user: User, pagination: PaginationRequestDto) {
+  async findAll(user: User, dto: WhatsappChatFilterDto) {
     void this.whatsappStatusService.clearUpdateStatus(user);
 
+    console.log(this.getWhereClause(user, dto));
+
     const [data, total] = await this.whatsappChatRepository.findAndCount({
-      where: { user: { id: user.id }, ignored: false },
+      where: this.getWhereClause(user, dto),
       relations: {
         customer: {
           kanban: true,
         },
       },
       order: {
-        lastSentAt: pagination.sortOrder || "DESC",
+        lastSentAt: dto.sortOrder || "DESC",
       },
-      skip: pagination.skip,
-      take: pagination.limit,
+      skip: dto.skip,
+      take: dto.limit,
     });
 
     const chats = WhatsappChatMapper.toDtoList(data);
 
-    return PaginationMapper.toDto([chats, total], pagination);
-  }
-
-  async findAllUnread(user: User, pagination: PaginationRequestDto) {
-    void this.whatsappStatusService.clearUpdateStatus(user);
-
-    const [data, total] = await this.whatsappChatRepository.findAndCount({
-      where: { user: { id: user.id }, ignored: false, unread: true },
-      relations: {
-        customer: {
-          kanban: true,
-        },
-      },
-      order: {
-        lastSentAt: pagination.sortOrder || "DESC",
-      },
-      skip: pagination.skip,
-      take: pagination.limit,
-    });
-
-    const chats = WhatsappChatMapper.toDtoList(data);
-
-    return PaginationMapper.toDto([chats, total], pagination);
+    return PaginationMapper.toDto([chats, total], dto);
   }
 
   async findOne(user: User, chatId: string, limit = 20) {
@@ -207,5 +202,36 @@ export class WhatsappChatService {
     if (!client) return;
 
     await client.sendSeen(chatId);
+  }
+
+  private getWhereClause(
+    user: User,
+    dto: WhatsappChatFilterDto,
+  ): FindOptionsWhere<WhatsappChat> | FindOptionsWhere<WhatsappChat>[] {
+    const baseWhere: FindOptionsWhere<WhatsappChat> = {
+      user: { id: user.id },
+      ignored: false,
+    };
+
+    let where:
+      | FindOptionsWhere<WhatsappChat>
+      | FindOptionsWhere<WhatsappChat>[] = baseWhere;
+
+    if (dto.kanban) {
+      baseWhere.customer = { kanban: { id: dto.kanban } };
+    }
+
+    if (dto.unread !== null && dto.unread !== undefined) {
+      baseWhere.unread = dto.unread;
+    }
+
+    if (dto.search) {
+      where = [
+        { ...baseWhere, name: ILike(`%${dto.search}%`) },
+        { ...baseWhere, phone: ILike(`%${dto.search}%`) },
+      ];
+    }
+
+    return where;
   }
 }

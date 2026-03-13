@@ -1,9 +1,7 @@
 import { Injectable } from "@nestjs/common";
-import { WhatsappClientService } from "./whatsapp-client.service";
 import { User } from "../../users/entities/user.entity";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
-import { Customer } from "../../customers/entities/customer.entity";
 import { WhatsappContactMapper } from "../mappers/whatsapp-contact.mapper";
 import { WhatsappChat } from "../entities/whatsapp-chat.entity";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";

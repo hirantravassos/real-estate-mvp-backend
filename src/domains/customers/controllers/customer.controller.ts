@@ -26,12 +26,8 @@ export class CustomerController {
   constructor(private readonly customerService: CustomerService) {}
 
   @Get()
-  async findAll(
-    @GetUser() user: User,
-    @Query() pagination: PaginationRequestDto,
-    @Query() filter: CustomerFilterDto,
-  ) {
-    return await this.customerService.findAll(user, filter, pagination);
+  async findAll(@GetUser() user: User, @Query() filter: CustomerFilterDto) {
+    return await this.customerService.findAll(user, filter);
   }
 
   @Get("pending")

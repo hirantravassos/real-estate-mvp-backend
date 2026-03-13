@@ -8,11 +8,12 @@ import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
 import { ValidateName } from "../../../shared/decorators/validation/name.decorator";
 import { ValidateBrazilianPhoneNumber } from "../../../shared/decorators/validation/brazilian-phone-number.decorator";
 import { ValidateLongText } from "../../../shared/decorators/validation/long-text.decorator";
-import { IsOptional, IsUUID } from "class-validator";
+import { IsOptional, IsString, IsUUID } from "class-validator";
 import { ValidateCurrency } from "../../../shared/decorators/validation/currency.decorator";
 import dayjs from "dayjs";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
+import { WhatsappChat } from "../../whatsapp/entities/whatsapp-chat.entity";
 
 dayjs.extend(isSameOrAfter);
 
@@ -36,9 +37,9 @@ export class CustomerCreateDto {
   comment: string | null;
 }
 
-export class CustomerFilterDto {
+export class CustomerFilterDto extends PaginationRequestDto {
   @IsOptional()
-  @IsUUID()
+  @IsString()
   search: string | null;
 
   @IsOptional()
@@ -50,40 +51,41 @@ export class CustomerFilterDto {
 export class CustomerService {
   constructor(private readonly customerRepository: CustomerRepository) {}
 
-  async findAll(
-    user: User,
-    filter: CustomerFilterDto,
-    pagination: PaginationRequestDto,
-  ) {
-    const where: FindOptionsWhere<Customer> = {
+  async findAll(user: User, dto: CustomerFilterDto) {
+    const baseWhere: FindOptionsWhere<Customer> = {
       user: { id: user.id },
       active: true,
       ignored: false,
       pending: false,
     };
 
-    if (filter.search) {
-      const search = `%${filter.search}%`;
-      where.name = ILike(search);
+    let where:
+      | FindOptionsWhere<WhatsappChat>
+      | FindOptionsWhere<WhatsappChat>[] = baseWhere;
+
+    if (dto.kanban) {
+      baseWhere.kanban = { id: dto.kanban };
+    }
+
+    if (dto.search) {
+      where = [
+        { ...baseWhere, name: ILike(`%${dto.search}%`) },
+        { ...baseWhere, phone: ILike(`%${dto.search}%`) },
+      ];
     }
 
     const [data, total] = await this.customerRepository.findAndCount({
-      where: filter.search
-        ? [
-            { ...where, name: ILike(`%${filter.search}%`) },
-            { ...where, phone: ILike(`%${filter.search}%`) },
-          ]
-        : where,
+      where,
       relations: {
         comments: true,
         kanban: true,
         visits: true,
       },
       order: {
-        [pagination.sortBy || "createdAt"]: pagination.sortOrder || "DESC",
+        [dto.sortBy || "createdAt"]: dto.sortOrder || "DESC",
       },
-      skip: pagination.skip,
-      take: pagination.limit,
+      skip: dto.skip,
+      take: dto.limit,
     });
 
     for (const item of data) {
@@ -92,10 +94,7 @@ export class CustomerService {
       });
     }
 
-    return PaginationMapper.toDto(
-      [CustomerMapper.toListDto(data), total],
-      pagination,
-    );
+    return PaginationMapper.toDto([CustomerMapper.toListDto(data), total], dto);
   }
 
   async findAllPending(
