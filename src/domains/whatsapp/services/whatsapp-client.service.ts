@@ -113,7 +113,7 @@ export class WhatsappClientService implements OnModuleInit {
       },
       user,
     );
-    this.logger.log(`[${user.id}]`, `Syncing chat: ${entity.id}`);
+    // this.logger.log(`[${user.id}]`, `Syncing chat: ${entity.id}`);
     await this.whatsappChatRepository.upsert(entity, ["user", "id"]);
   }
 

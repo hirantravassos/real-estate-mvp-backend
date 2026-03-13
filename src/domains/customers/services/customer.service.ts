@@ -157,6 +157,7 @@ export class CustomerService {
 
   async save(user: User, dto: CustomerCreateDto, id?: string) {
     const entity = CustomerMapper.toEntity(dto, id);
+    console.log("Saving entity with ID:", entity.id);
     entity.user = user;
     entity.pending = false;
     entity.ignored = false;
