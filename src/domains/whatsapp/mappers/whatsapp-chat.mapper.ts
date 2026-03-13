@@ -7,8 +7,8 @@ import { WhatsappChat } from "../entities/whatsapp-chat.entity";
 import dayjs from "dayjs";
 
 export interface WAWebCustomChatWithContactDto extends WAWebJS.Chat {
-  contact: WAWebJS.Contact;
-  profile: string | null;
+  contact?: WAWebJS.Contact | null;
+  profile?: string | null;
 }
 
 export class WhatsappChatMapper {

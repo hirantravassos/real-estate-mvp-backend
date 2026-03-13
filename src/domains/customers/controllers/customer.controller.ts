@@ -17,8 +17,8 @@ import {
 import { JwtGuard } from "../../auth/guards/jwt.guard";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { User } from "../../users/entities/user.entity";
-import { CustomerFilterQueryDto } from "../dtos/customer-filter-query.dto";
 import { CustomerMapper } from "../mappers/customer.mapper";
+import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 
 @Controller("customers")
 @UseGuards(JwtGuard)
@@ -28,7 +28,7 @@ export class CustomerController {
   @Get()
   async findAll(
     @GetUser() user: User,
-    @Query() pagination: CustomerFilterQueryDto,
+    @Query() pagination: PaginationRequestDto,
     @Query() filter: CustomerFilterDto,
   ) {
     return await this.customerService.findAll(user, filter, pagination);
@@ -37,9 +37,10 @@ export class CustomerController {
   @Get("pending")
   async findAllPending(
     @GetUser() user: User,
-    @Query() pagination: CustomerFilterQueryDto,
+    @Query() pagination: PaginationRequestDto,
+    @Query() filter: CustomerFilterDto,
   ) {
-    return await this.customerService.findAllPending(user, pagination);
+    return await this.customerService.findAllPending(user, filter, pagination);
   }
 
   @Get(":id")

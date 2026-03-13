@@ -66,7 +66,7 @@ export class WhatsappChatsService {
     return PaginationMapper.toDto([chats, total], pagination);
   }
 
-  async findOne(user: User, chatId: string, limit = 30) {
+  async findOne(user: User, chatId: string, limit = 20) {
     void this.whatsappStatusService.clearUpdateStatus(user);
 
     const client = await this.whatsappClientService.getClientOrThrow(user);
@@ -94,12 +94,12 @@ export class WhatsappChatsService {
       }),
     ]);
 
-    if (!contact) {
-      console.warn("[WhatsappChat.findOne] Contact not found for this chat");
-      throw new NotFoundException("Contact not found for this chat");
-    }
+    // if (!contact) {
+    //   console.warn("[WhatsappChat.findOne] Contact not found for this chat");
+    //   throw new NotFoundException("Contact not found for this chat");
+    // }
 
-    const profile = await contact.getProfilePicUrl().catch(() => null);
+    const profile = await contact?.getProfilePicUrl().catch(() => null);
 
     void this.markAsRead(user, chatId);
 
