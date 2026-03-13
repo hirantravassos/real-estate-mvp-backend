@@ -46,8 +46,6 @@ export class WhatsappChatService {
   async findAll(user: User, dto: WhatsappChatFilterDto) {
     void this.whatsappStatusService.clearUpdateStatus(user);
 
-    console.log(this.getWhereClause(user, dto));
-
     const [data, total] = await this.whatsappChatRepository.findAndCount({
       where: this.getWhereClause(user, dto),
       relations: {
