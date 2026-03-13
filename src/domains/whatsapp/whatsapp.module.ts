@@ -4,7 +4,7 @@ import { WhatsappChat } from "./entities/whatsapp-chat.entity";
 import { WhatsappClientController } from "./controllers/whatsapp-client.controller";
 import { WhatsappClientService } from "./services/whatsapp-client.service";
 import { User } from "../users/entities/user.entity";
-import { WhatsappChatsService } from "./services/whatsapp-chats.service";
+import { WhatsappChatService } from "./services/whatsapp-chat.service";
 import { WhatsappChatController } from "./controllers/whatsapp-chat.controller";
 import { Customer } from "../customers/entities/customer.entity";
 import { WhatsappContactController } from "./controllers/whatsapp-contact.controller";
@@ -26,13 +26,13 @@ import { WhatsappStatusService } from "./services/whatsapp-status.service";
   providers: [
     WhatsappClientService,
     WhatsappStatusService,
-    WhatsappChatsService,
+    WhatsappChatService,
     WhatsappContactService,
   ],
   exports: [
     WhatsappClientService,
     WhatsappStatusService,
-    WhatsappChatsService,
+    WhatsappChatService,
     WhatsappContactService,
   ],
 })

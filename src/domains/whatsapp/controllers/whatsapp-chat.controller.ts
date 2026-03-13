@@ -1,17 +1,26 @@
-import { Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from "@nestjs/common";
 import { JwtGuard } from "../../auth/guards/jwt.guard";
 import { User } from "../../users/entities/user.entity";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
-import { WhatsappChatsService } from "../services/whatsapp-chats.service";
+import {
+  WhatsappChatSendMessageDto,
+  WhatsappChatService,
+} from "../services/whatsapp-chat.service";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
-import { SkipThrottle } from "@nestjs/throttler";
 
 @Controller("whatsapp-chats")
 @UseGuards(JwtGuard)
 export class WhatsappChatController {
-  constructor(private readonly whatsappChatsService: WhatsappChatsService) {}
+  constructor(private readonly whatsappChatsService: WhatsappChatService) {}
 
-  @SkipThrottle()
   @Get("messages/:messageId/media")
   async findMedia(
     @GetUser() user: User,
@@ -43,6 +52,15 @@ export class WhatsappChatController {
     @Query("limit") limit: number,
   ) {
     return this.whatsappChatsService.findOne(user, id, limit);
+  }
+
+  @Post(":id/messages")
+  async sendMessage(
+    @GetUser() user: User,
+    @Param("id") id: string,
+    @Body() dto: WhatsappChatSendMessageDto,
+  ) {
+    await this.whatsappChatsService.sendMessage(user, id, dto);
   }
 
   @Post(":id/ignore")

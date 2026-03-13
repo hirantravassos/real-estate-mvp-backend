@@ -12,9 +12,15 @@ import { WhatsappChat } from "../entities/whatsapp-chat.entity";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
 import { WhatsappStatusService } from "./whatsapp-status.service";
+import { IsString } from "class-validator";
+
+export class WhatsappChatSendMessageDto {
+  @IsString()
+  message: string;
+}
 
 @Injectable()
-export class WhatsappChatsService {
+export class WhatsappChatService {
   constructor(
     private readonly whatsappStatusService: WhatsappStatusService,
     private readonly whatsappClientService: WhatsappClientService,
@@ -133,6 +139,40 @@ export class WhatsappChatsService {
       filename: media.filename,
       filesize: media.filesize,
     };
+  }
+
+  async sendMessage(
+    user: User,
+    chatId: string,
+    dto: WhatsappChatSendMessageDto,
+  ) {
+    const client = await this.whatsappClientService.getClientOrThrow(user);
+
+    const [chat, isAuthorized] = await Promise.all([
+      client.getChatById(chatId).catch(() => null),
+      this.whatsappChatRepository.exists({
+        where: { id: chatId, user: { id: user.id } },
+      }),
+    ]);
+
+    if (!chat) {
+      console.warn("[WhatsappChat.sendMessage]: ChatId not found", {
+        chatId,
+        dto,
+        user,
+      });
+      throw new NotFoundException("Chat not found");
+    }
+
+    if (!isAuthorized) {
+      console.warn(
+        "[WhatsappChat.sendMessage]: ChatId not found for this user",
+        { chatId, dto, user },
+      );
+      throw new ForbiddenException("Chat doesn't belong to this user");
+    }
+
+    await chat.sendMessage(dto.message);
   }
 
   async ignore(user: User, chatId: string) {

@@ -41,12 +41,12 @@ const THROTTLE_LIMIT = 30;
         logging: false,
       }),
     }),
-    ThrottlerModule.forRoot([
-      {
-        ttl: THROTTLE_TTL_MS,
-        limit: THROTTLE_LIMIT,
-      },
-    ]),
+    // ThrottlerModule.forRoot([
+    //   {
+    //     ttl: THROTTLE_TTL_MS,
+    //     limit: THROTTLE_LIMIT,
+    //   },
+    // ]),
     MailModule,
     UserModule,
     AuthModule,
@@ -55,11 +55,11 @@ const THROTTLE_LIMIT = 30;
     WhatsappModule,
     VisitModule,
   ],
-  providers: [
-    {
-      provide: APP_GUARD,
-      useClass: ThrottlerGuard,
-    },
-  ],
+  // providers: [
+  //   {
+  //     provide: APP_GUARD,
+  //     useClass: ThrottlerGuard,
+  //   },
+  // ],
 })
 export class AppModule {}
