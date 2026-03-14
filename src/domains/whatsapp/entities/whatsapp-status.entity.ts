@@ -12,7 +12,7 @@ export class WhatsappStatus extends BaseEntity {
   @JoinColumn({ name: "userId" })
   user: User;
 
-  @Column({type: "varchar", nullable: false})
+  @Column({ type: "varchar", nullable: false })
   userId: string;
 
   @Column({ type: "varchar", length: 500, nullable: true })

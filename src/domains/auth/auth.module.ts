@@ -11,10 +11,12 @@ import { GoogleStrategy } from "./strategies/google.strategy";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { Kanban } from "../kanbans/entities/kanban.entity";
 import { WhatsappStatus } from "../whatsapp/entities/whatsapp-status.entity";
+import { WhatsappModule } from "../whatsapp/whatsapp.module";
 
 @Module({
   imports: [
     ConfigModule,
+    WhatsappModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

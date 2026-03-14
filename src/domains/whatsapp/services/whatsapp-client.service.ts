@@ -138,6 +138,7 @@ export class WhatsappClientService implements OnModuleInit {
     void Promise.all(syncPromises).finally(() => {
       void this.updateConnectionStatus(userId, {
         isSyncing: false,
+        hasUpdates: true,
       });
     });
   }
