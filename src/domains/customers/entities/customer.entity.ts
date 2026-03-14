@@ -6,6 +6,7 @@ import {
   OneToMany,
   OneToOne,
   Unique,
+  VirtualColumn,
 } from "typeorm";
 import { BaseEntity } from "../../../shared/entities/base.entity";
 import { ColumnName } from "../../../shared/decorators/columns/column-name.decorator";

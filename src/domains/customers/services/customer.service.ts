@@ -74,19 +74,17 @@ export class CustomerService {
       ];
     }
 
-    const [data, total] = await this.customerRepository.findAndCount({
-      where,
-      relations: {
-        comments: true,
-        kanban: true,
-        visits: true,
-      },
-      order: {
-        [dto.sortBy || "createdAt"]: dto.sortOrder || "DESC",
-      },
-      skip: dto.skip,
-      take: dto.limit,
-    });
+    const [data, total] = await this.customerRepository
+      .createQueryBuilder("customer")
+      .leftJoinAndSelect("customer.kanban", "kanban")
+      .leftJoinAndSelect("customer.comments", "comments")
+      .leftJoinAndSelect("customer.visits", "visits")
+      .where(where)
+      .orderBy("kanban.order", "DESC")
+      .addOrderBy("customer.name", "ASC")
+      .skip(dto.skip)
+      .take(dto.limit)
+      .getManyAndCount();
 
     for (const item of data) {
       item.visits = item.visits.filter((visit) => {

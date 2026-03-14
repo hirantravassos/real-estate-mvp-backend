@@ -63,6 +63,7 @@ export class CustomerMapper {
       id: kanban.id,
       name: kanban.name,
       description: kanban.description,
+      order: kanban.order,
     };
   }
 
