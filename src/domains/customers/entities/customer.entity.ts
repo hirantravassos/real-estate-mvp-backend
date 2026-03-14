@@ -1,6 +1,7 @@
 import {
   Column,
   Entity,
+  JoinColumn,
   ManyToOne,
   OneToMany,
   OneToOne,
@@ -22,16 +23,18 @@ import { WhatsappChat } from "../../whatsapp/entities/whatsapp-chat.entity";
 export class Customer extends BaseEntity {
   @ManyToOne(() => User, (user) => user.customers, {
     nullable: false,
+    onDelete: "CASCADE",
   })
+  @JoinColumn({ name: "userId" })
   user: User;
+
+  @Column({ type: "varchar", nullable: false })
+  userId: string;
 
   @OneToOne(() => WhatsappChat, (whatsappChat) => whatsappChat.customer, {
     nullable: true,
   })
   chat: WhatsappChat | null;
-
-  @Column({ type: "varchar", length: 255 })
-  userId: string;
 
   @ManyToOne(() => Kanban, (kanban) => kanban.customers, {
     nullable: true,

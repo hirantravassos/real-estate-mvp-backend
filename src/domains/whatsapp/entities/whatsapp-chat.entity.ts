@@ -18,13 +18,17 @@ import { ColumnBoolean } from "../../../shared/decorators/columns/column-boolean
     lastSentAt: "DESC",
   },
 })
-@Unique(["id", "user"])
+@Unique(["id", "userId"])
 export class WhatsappChat {
   @ManyToOne(() => User, {
     nullable: false,
     createForeignKeyConstraints: false,
   })
+  @JoinColumn({ name: "userId" })
   user: User;
+
+  @Column({ type: "varchar", nullable: false })
+  userId: string;
 
   @OneToOne(() => Customer, { createForeignKeyConstraints: false })
   @JoinColumn([

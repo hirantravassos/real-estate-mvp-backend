@@ -1,12 +1,19 @@
 import { BaseEntity } from "../../../shared/entities/base.entity";
-import { Column, Entity, ManyToOne } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
 import { User } from "../../users/entities/user.entity";
 import { Customer } from "../../customers/entities/customer.entity";
 
 @Entity("visits")
 export class Visit extends BaseEntity {
-  @ManyToOne(() => User, (user) => user.visits, { nullable: false })
+  @ManyToOne(() => User, (user) => user.visits, {
+    nullable: false,
+    onDelete: "CASCADE",
+  })
+  @JoinColumn({ name: "userId" })
   user: User;
+
+  @Column({ type: "varchar", nullable: false })
+  userId: string;
 
   @ManyToOne(() => Customer, (customer) => customer.visits, { nullable: false })
   customer: Customer;

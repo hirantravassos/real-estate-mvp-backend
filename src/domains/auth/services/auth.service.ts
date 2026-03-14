@@ -1,5 +1,5 @@
 import { OAuth2Client, TokenPayload } from "google-auth-library";
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import { User } from "../../users/entities/user.entity";
 import { ConfigService } from "@nestjs/config";
 import { UserRepository } from "../../users/repositories/user.repository";
@@ -7,9 +7,16 @@ import { UserMapper } from "../../users/mappers/user.mapper";
 import { JwtService } from "@nestjs/jwt";
 import { TokenDto } from "../dtos/token.dto";
 import { AccessTokenDto } from "../dtos/access-token.dto";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Kanban } from "../../kanbans/entities/kanban.entity";
+import { WhatsappStatus } from "../../whatsapp/entities/whatsapp-status.entity";
+import { WhatsappClientStatusEnum } from "../../whatsapp/enums/whatsapp-client-status.enum";
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   private readonly googleClient: OAuth2Client;
   private readonly googleClientId: string;
   private readonly refreshSecret: string;
@@ -20,6 +27,10 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly userRepository: UserRepository,
     private readonly jwtService: JwtService,
+    @InjectRepository(Kanban)
+    private readonly kanbanRepository: Repository<Kanban>,
+    @InjectRepository(WhatsappStatus)
+    private readonly whatsappStatusRepository: Repository<WhatsappStatus>,
   ) {
     const clientId = this.configService.get<string>("auth.googleClientId");
     const refreshSecret = this.configService.get<string>(
@@ -65,6 +76,7 @@ export class AuthService {
 
       if (!user) {
         user = await this.userRepository.save(payloadUser);
+        await this.onboardNewUser(user);
       }
 
       return this.generateTokens(user);
@@ -121,5 +133,44 @@ export class AuthService {
       accessToken,
       refreshToken,
     };
+  }
+
+  private async onboardNewUser(user: User): Promise<void> {
+    try {
+      await this.kanbanRepository.save([
+        {
+          user,
+          name: "Leads",
+          active: true,
+          order: 0,
+        },
+        {
+          user,
+          name: "Atendimento",
+          active: true,
+          order: 1,
+        },
+        {
+          user,
+          name: "Propostas",
+          active: true,
+          order: 2,
+        },
+      ]);
+      await this.whatsappStatusRepository.save([
+        {
+          user,
+          status: WhatsappClientStatusEnum.ERROR,
+          hasUpdates: false,
+          isSyncing: false,
+          qr: null,
+        },
+      ]);
+    } catch (error) {
+      this.logger.error(
+        "[AuthService.onboardNewUser]: Error onboarding new user]",
+        error,
+      );
+    }
   }
 }
