@@ -32,6 +32,10 @@ export class WhatsappChatFilterDto extends PaginationRequestDto {
   @IsOptional()
   @ValidateBoolean({})
   unread: boolean | null;
+
+  @IsOptional()
+  @ValidateBoolean({})
+  ignored: boolean | null;
 }
 
 @Injectable()
@@ -208,7 +212,7 @@ export class WhatsappChatService {
   ): FindOptionsWhere<WhatsappChat> | FindOptionsWhere<WhatsappChat>[] {
     const baseWhere: FindOptionsWhere<WhatsappChat> = {
       user: { id: user.id },
-      ignored: false,
+      ignored: dto.ignored ?? false,
     };
 
     let where:

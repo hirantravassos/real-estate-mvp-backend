@@ -11,6 +11,7 @@ export class WhatsappContactMapper {
         name: chat?.name,
         phone: chat?.phone,
         profile: chat.profileUrl ?? null,
+        lastSentAt: chat.lastSentAt ?? null,
       };
     });
   }
