@@ -6,6 +6,13 @@ import { WhatsappContactMapper } from "../mappers/whatsapp-contact.mapper";
 import { WhatsappChat } from "../entities/whatsapp-chat.entity";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
+import { IsOptional, IsString } from "class-validator";
+
+export class WhatsappContactFilterDto extends PaginationRequestDto {
+  @IsOptional()
+  @IsString()
+  search?: string;
+}
 
 @Injectable()
 export class WhatsappContactService {
@@ -14,7 +21,7 @@ export class WhatsappContactService {
     private readonly whatsappChatRepository: Repository<WhatsappChat>,
   ) {}
 
-  async findAllContactsToImport(user: User, pagination: PaginationRequestDto) {
+  async findAllContactsToImport(user: User, dto: WhatsappContactFilterDto) {
     const [chats, total] = await this.whatsappChatRepository
       .createQueryBuilder("chat")
       .leftJoin(
@@ -24,14 +31,18 @@ export class WhatsappContactService {
         { userId: user.id },
       )
       .where("chat.userId = :userId", { userId: user.id })
+      .andWhere("LENGTH(chat.phone) >= :minimumLength", { minimumLength: 10 })
       .andWhere("customer.id IS NULL")
       .andWhere("chat.ignored = false")
+      .andWhere("chat.name LIKE :name", {
+        name: `%${dto?.search ?? ""}%`,
+      })
       .orderBy("chat.lastSentAt", "DESC")
-      .skip(pagination.skip)
-      .take(pagination.limit)
+      .skip(dto.skip)
+      .take(dto.limit)
       .getManyAndCount();
 
     const data = WhatsappContactMapper.toDtoList(chats);
-    return PaginationMapper.toDto([data, total], pagination);
+    return PaginationMapper.toDto([data, total], dto);
   }
 }

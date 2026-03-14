@@ -208,10 +208,13 @@ export class WhatsappClientService implements OnModuleInit {
       puppeteer: {
         headless: true,
         args: ["--no-sandbox", "--disable-setuid-sandbox"],
-        userAgent:
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
       },
     });
+
+    // this.logger.debug(`[${clientId}] Client created.`, {
+    //   client,
+    //   webVersion: await client.getWWebVersion().catch(() => null),
+    // });
 
     this.clients.set(clientId, client);
 
