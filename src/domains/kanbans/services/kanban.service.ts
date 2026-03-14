@@ -1,14 +1,19 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { KanbanRepository } from "../repositories/kanban.repository";
 import { KanbanCreateDto } from "../dtos/kanban-create.dto";
 import { KanbanMapper } from "../mappers/kanban.mapper";
 import { User } from "../../users/entities/user.entity";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Kanban } from "../entities/kanban.entity";
+import { Repository } from "typeorm";
 
 @Injectable()
 export class KanbanService {
-  constructor(private readonly kanbanRepository: KanbanRepository) {}
+  constructor(
+    @InjectRepository(Kanban)
+    private readonly kanbanRepository: Repository<Kanban>,
+  ) {}
 
   async findAll(user: User, pagination: PaginationRequestDto) {
     const data = await this.kanbanRepository.findAndCount({
@@ -20,7 +25,7 @@ export class KanbanService {
         customers: true,
       },
       order: {
-        position: "ASC",
+        order: "ASC",
       },
       skip: pagination.skip,
       take: pagination.limit,
@@ -44,17 +49,14 @@ export class KanbanService {
 
   async save(user: User, dto: KanbanCreateDto, id?: string) {
     const entity = KanbanMapper.toEntity(dto, id);
+
     entity.user = user;
 
-    if (!id) {
-      const maxPosition = await this.kanbanRepository
-        .createQueryBuilder("kanban")
-        .select("MAX(kanban.position)", "maxPosition")
-        .where("kanban.userId = :userId", { userId: user.id })
-        .andWhere("kanban.active = true")
-        .getRawOne();
-
-      entity.position = (maxPosition?.maxPosition ?? -1) + 1;
+    if (!entity?.id) {
+      entity.order =
+        (await this.kanbanRepository.count({
+          where: { user: { id: user.id } },
+        })) + 1;
     }
 
     return this.kanbanRepository.save(entity);
@@ -64,7 +66,7 @@ export class KanbanService {
     const updates = kanbanIds.map((kanbanId, index) =>
       this.kanbanRepository.update(
         { id: kanbanId, user: { id: user.id } },
-        { position: index },
+        { order: index },
       ),
     );
 

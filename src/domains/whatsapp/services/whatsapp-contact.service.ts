@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { User } from "../../users/entities/user.entity";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { Brackets, Repository } from "typeorm";
 import { WhatsappContactMapper } from "../mappers/whatsapp-contact.mapper";
 import { WhatsappChat } from "../entities/whatsapp-chat.entity";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
@@ -22,6 +22,8 @@ export class WhatsappContactService {
   ) {}
 
   async findAllContactsToImport(user: User, dto: WhatsappContactFilterDto) {
+    const sanitizedSearch = `%${dto?.search ?? ""}%`;
+
     const [chats, total] = await this.whatsappChatRepository
       .createQueryBuilder("chat")
       .leftJoin(
@@ -34,9 +36,13 @@ export class WhatsappContactService {
       .andWhere("LENGTH(chat.phone) >= :minimumLength", { minimumLength: 10 })
       .andWhere("customer.id IS NULL")
       .andWhere("chat.ignored = false")
-      .andWhere("chat.name LIKE :name", {
-        name: `%${dto?.search ?? ""}%`,
-      })
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where("chat.name LIKE :search", {
+            search: sanitizedSearch,
+          }).orWhere("chat.phone LIKE :search", { search: sanitizedSearch });
+        }),
+      )
       .orderBy("chat.lastSentAt", "DESC")
       .skip(dto.skip)
       .take(dto.limit)

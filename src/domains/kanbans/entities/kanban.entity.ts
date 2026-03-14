@@ -25,5 +25,5 @@ export class Kanban extends BaseEntity {
   description: string | null;
 
   @Column({ type: "int", default: 0 })
-  position: number;
+  order: number;
 }
