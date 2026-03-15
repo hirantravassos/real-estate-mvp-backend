@@ -45,21 +45,6 @@ export class VisitService {
       );
     }
 
-    const conflictingVisits = await this.visitRepository.find({
-      where: {
-        user: { id: user.id },
-        startsAt: LessThan(endsAt),
-        endsAt: MoreThan(startsAt),
-      },
-      relations: ["customer"],
-    });
-
-    if (conflictingVisits.length > 0) {
-      throw new ConflictException(
-        `Já existe uma visita agendada neste horário para o cliente ${conflictingVisits[0].customer?.name || "desconhecido"}.`,
-      );
-    }
-
     const visit = this.visitRepository.create({
       user,
       customer,
