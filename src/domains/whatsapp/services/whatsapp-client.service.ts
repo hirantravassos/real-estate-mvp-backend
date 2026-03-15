@@ -176,6 +176,8 @@ export class WhatsappClientService implements OnModuleInit {
 
     for (const user of users) {
       void this.restoreSession(user.id);
+      this.logger.log(`Waiting 3s for ${user.id} to stabilize...`);
+      await new Promise((resolve) => setTimeout(resolve, 3000));
     }
   }
 
@@ -236,6 +238,7 @@ export class WhatsappClientService implements OnModuleInit {
           "--disable-setuid-sandbox",
           "--disable-dev-shm-usage",
           "--disable-gpu",
+          "--single-process",
           "--no-zygote",
           "--disable-extensions",
           "--disable-component-update",
