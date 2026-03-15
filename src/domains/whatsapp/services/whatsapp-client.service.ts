@@ -207,7 +207,7 @@ export class WhatsappClientService implements OnModuleInit {
     const client = new Client({
       authStrategy: new LocalAuth({
         clientId: clientId,
-        dataPath: join(process.cwd(), ".wwebjs_auth"),
+        dataPath: sessionPath,
       }),
       puppeteer: {
         headless: true,
