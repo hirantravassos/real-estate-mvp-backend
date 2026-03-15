@@ -198,7 +198,7 @@ export class CustomerService {
   async createPendingIfNotExists(
     user: User,
     phone: string,
-    name: string | null,
+    name: string,
   ): Promise<void> {
     const existingCustomer = await this.customerRepository.findOne({
       where: { phone, user: { id: user.id } },

@@ -1,10 +1,24 @@
 import { Visit } from "../entities/visit.entity";
 import { Customer } from "../../customers/entities/customer.entity";
 
-export class VisitMapper {
-  static toDto(entity: Visit) {
-    if (!entity) return null;
+export interface VisitResponseDto {
+  id: string;
+  customer: VisitResponseCustomerDto | null;
+  address: string;
+  reference: string | null;
+  startsAt: Date;
+  endsAt: Date;
+  createdAt: Date;
+}
 
+export interface VisitResponseCustomerDto {
+  id: string;
+  name: string;
+  phone: string;
+}
+
+export class VisitMapper {
+  static toDto(entity: Visit): VisitResponseDto {
     return {
       id: entity.id,
       customer: this.toCustomer(entity.customer),
@@ -30,7 +44,7 @@ export class VisitMapper {
     });
   }
 
-  static toCustomer(entity?: Customer) {
+  static toCustomer(entity?: Customer): VisitResponseCustomerDto | null {
     if (!entity) return null;
 
     return {

@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -9,9 +10,12 @@ import { LessThan, MoreThan, Repository } from "typeorm";
 import { CreateVisitDto } from "../dtos/visit.dto";
 import { User } from "../../users/entities/user.entity";
 import { Customer } from "../../customers/entities/customer.entity";
+import { VisitMapper, VisitResponseDto } from "../mappers/visit.mapper";
 
 @Injectable()
 export class VisitService {
+  private logger = new Logger(VisitService.name, { timestamp: true });
+
   constructor(
     @InjectRepository(Visit)
     private readonly visitRepository: Repository<Visit>,
@@ -19,7 +23,11 @@ export class VisitService {
     private readonly customerRepository: Repository<Customer>,
   ) {}
 
-  async create(user: User, dto: CreateVisitDto): Promise<Visit> {
+  async save(
+    user: User,
+    dto: CreateVisitDto,
+    visitId?: string,
+  ): Promise<Visit> {
     const customer = await this.customerRepository.findOne({
       where: { id: dto.customerId, user: { id: user.id } },
     });
@@ -61,6 +69,10 @@ export class VisitService {
       endsAt,
     });
 
+    if (visitId) {
+      visit.id = visitId;
+    }
+
     return await this.visitRepository.save(visit);
   }
 
@@ -85,5 +97,21 @@ export class VisitService {
       },
       order: { startsAt: "DESC" },
     });
+  }
+
+  async findOne(user: User, id: string): Promise<VisitResponseDto> {
+    return VisitMapper.toDto(
+      await this.visitRepository
+        .findOneOrFail({
+          where: { id, user: { id: user.id } },
+          relations: {
+            customer: true,
+          },
+        })
+        .catch(() => {
+          this.logger.warn("[findOne]: Not found", { user, visitId: id });
+          throw new NotFoundException("Visit not found for this user");
+        }),
+    );
   }
 }

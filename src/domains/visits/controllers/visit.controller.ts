@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from "@nestjs/common";
 import { JwtGuard } from "../../auth/guards/jwt.guard";
 import { VisitService } from "../services/visit.service";
 import { CreateVisitDto } from "../dtos/visit.dto";
@@ -13,7 +21,18 @@ export class VisitController {
 
   @Post()
   async create(@GetUser() user: User, @Body() dto: CreateVisitDto) {
-    return VisitMapper.toDto(await this.visitService.create(user, dto));
+    return VisitMapper.toDto(await this.visitService.save(user, dto));
+  }
+
+  @Patch(":visitId")
+  async update(
+    @GetUser() user: User,
+    @Param("visitId") visitId: string,
+    @Body() dto: CreateVisitDto,
+  ) {
+    return VisitMapper.toDto(
+      await this.visitService.save(user, dto, visitId),
+    );
   }
 
   @Get()
@@ -29,5 +48,10 @@ export class VisitController {
   ) {
     const visits = await this.visitService.findByCustomer(user, customerId);
     return VisitMapper.toListDto(visits);
+  }
+
+  @Get(":visitId")
+  async findOne(@GetUser() user: User, @Param("visitId") visitId: string) {
+    return await this.visitService.findOne(user, visitId);
   }
 }

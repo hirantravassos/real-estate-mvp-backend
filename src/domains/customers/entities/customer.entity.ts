@@ -51,8 +51,8 @@ export class Customer extends BaseEntity {
   @OneToMany(() => Visit, (visit) => visit.customer)
   visits: Visit[];
 
-  @ColumnName({ nullable: true })
-  name: string | null;
+  @ColumnName()
+  name: string;
 
   @ColumnPhone()
   phone: string;
