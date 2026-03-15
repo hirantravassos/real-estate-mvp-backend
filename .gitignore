@@ -5,3 +5,5 @@ sessions
 .env
 storage
 .wwebjs_cache
+.wwebjs_auth
+/.wwebjs_cache/
