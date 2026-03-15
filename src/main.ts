@@ -8,8 +8,6 @@ async function bootstrap(): Promise<void> {
 
   const cors = process.env.APP_CORS_ORIGIN || "http://localhost:3000"
 
-  app.setGlobalPrefix("api");
-
   app.enableCors({
     origin: cors,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
