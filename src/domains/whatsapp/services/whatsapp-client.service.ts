@@ -176,6 +176,8 @@ export class WhatsappClientService implements OnModuleInit {
 
     for (const user of users) {
       void this.restoreSession(user.id);
+      this.logger.log(`Waiting 3s for ${user.id} to stabilize...`);
+      await new Promise((resolve) => setTimeout(resolve, 3000));
     }
   }
 
@@ -229,13 +231,14 @@ export class WhatsappClientService implements OnModuleInit {
       }),
       puppeteer: {
         headless: true,
-        protocolTimeout: 60000,
+        protocolTimeout: 0,
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH ?? undefined,
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
           "--disable-dev-shm-usage",
           "--disable-gpu",
+          "--single-process",
           "--no-zygote",
           "--disable-extensions",
           "--disable-component-update",
