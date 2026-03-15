@@ -20,10 +20,11 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Install & Build
-        run: |
-          npm ci
-          npm run build
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Application
+        run: npm run build
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -31,11 +32,18 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Generate Deployment Package
+        # We only zip what is necessary to run the app: dist, package files, and the Procfile
+        run: zip -r deploy.zip dist package.json package-lock.json Procfile
+
       - name: Deploy to Elastic Beanstalk
-        uses: aws-actions/aws-elasticbeanstalk-deploy@v1
+        uses: einaregilsson/beanstalk-deploy@v22
         with:
+          aws_access_key: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws_secret_key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          session_token: ${{ env.AWS_SESSION_TOKEN }}
           application_name: "brokerin"
           environment_name: "Brokerin-env"
           version_label: "deploy-${{ github.sha }}"
           region: "sa-east-1"
-          deployment_package: "."
+          deployment_package: "deploy.zip"
