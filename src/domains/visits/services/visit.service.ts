@@ -68,7 +68,9 @@ export class VisitService {
     return this.visitRepository.find({
       where: { user: { id: user.id } },
       order: { startsAt: "DESC" },
-      relations: ["customer"],
+      relations: {
+        customer: true,
+      },
     });
   }
 
@@ -77,6 +79,9 @@ export class VisitService {
       where: {
         user: { id: user.id },
         customer: { id: customerId },
+      },
+      relations: {
+        customer: true,
       },
       order: { startsAt: "DESC" },
     });

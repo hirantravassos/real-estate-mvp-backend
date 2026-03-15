@@ -17,10 +17,22 @@ export class VisitMapper {
   }
 
   static toListDto(entities: Visit[]) {
-    return entities.map((e) => this.toDto(e));
+    return entities.map((visit) => {
+      return {
+        id: visit.id,
+        customer: this.toCustomer(visit.customer),
+        address: visit.address,
+        reference: visit.reference,
+        startsAt: visit.startsAt,
+        endsAt: visit.endsAt,
+        createdAt: visit.createdAt,
+      };
+    });
   }
 
-  static toCustomer(entity: Customer) {
+  static toCustomer(entity?: Customer) {
+    if (!entity) return null;
+
     return {
       id: entity.id,
       name: entity.name,
