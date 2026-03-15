@@ -229,6 +229,7 @@ export class WhatsappClientService implements OnModuleInit {
       }),
       puppeteer: {
         headless: true,
+        protocolTimeout: 60000,
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH ?? undefined,
         args: [
           "--no-sandbox",
@@ -236,6 +237,9 @@ export class WhatsappClientService implements OnModuleInit {
           "--disable-dev-shm-usage",
           "--disable-gpu",
           "--no-zygote",
+          "--disable-extensions",
+          "--disable-component-update",
+          "--no-first-run",
         ],
       },
     });
