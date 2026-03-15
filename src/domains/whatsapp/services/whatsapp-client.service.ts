@@ -36,14 +36,14 @@ export class WhatsappClientService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    await this.restoreSessions();
+    await this.restoreAllSessions();
   }
 
   requestConnection(user: User) {
     const clientId: string = user.id;
 
     if (this.clients.has(clientId)) {
-      void this.initializeClient(clientId);
+      void this.restoreSession(clientId);
 
       return {
         success: true,
@@ -168,15 +168,19 @@ export class WhatsappClientService implements OnModuleInit {
     void this.syncChat(chat, user);
   }
 
-  private async restoreSessions(): Promise<void> {
+  private async restoreAllSessions(): Promise<void> {
     this.logger.log("Restoring previous WhatsApp sessions...");
 
     const users = await this.userRepository.find();
 
     for (const user of users) {
-      this.logger.log(`Restoring session for: ${user.id}`);
-      this.initializeClient(user.id);
+      void this.restoreSession(user.id);
     }
+  }
+
+  private restoreSession(clientId: string): void {
+    this.logger.log(`Restoring session for: ${clientId}`);
+    void this.initializeClient(clientId);
   }
 
   private async updateConnectionStatus(
