@@ -35,6 +35,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         ? exception.message
         : "Erro interno do servidor";
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
     if (statusCode === HttpStatus.INTERNAL_SERVER_ERROR) {
       this.logger.error(
         "Unhandled exception",
