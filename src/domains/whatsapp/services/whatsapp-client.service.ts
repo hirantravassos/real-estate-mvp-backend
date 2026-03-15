@@ -43,6 +43,8 @@ export class WhatsappClientService implements OnModuleInit {
     const clientId: string = user.id;
 
     if (this.clients.has(clientId)) {
+      void this.initializeClient(clientId);
+
       return {
         success: true,
         message: "Client already initializing or ready.",
