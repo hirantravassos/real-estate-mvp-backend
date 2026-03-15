@@ -1,7 +1,7 @@
 import {
-  ExceptionFilter,
-  Catch,
   ArgumentsHost,
+  Catch,
+  ExceptionFilter,
   HttpException,
   HttpStatus,
   Logger,
@@ -23,6 +23,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const context = host.switchToHttp();
     const response = context.getResponse<Response>();
 
+    console.error(exception);
+
     const statusCode =
       exception instanceof HttpException
         ? exception.getStatus()
@@ -33,6 +35,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         ? exception.message
         : "Erro interno do servidor";
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
     if (statusCode === HttpStatus.INTERNAL_SERVER_ERROR) {
       this.logger.error(
         "Unhandled exception",

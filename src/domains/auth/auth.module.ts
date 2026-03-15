@@ -9,10 +9,14 @@ import { UserModule } from "../users/user.module";
 import { User } from "../users/entities/user.entity";
 import { GoogleStrategy } from "./strategies/google.strategy";
 import { JwtStrategy } from "./strategies/jwt.strategy";
+import { Kanban } from "../kanbans/entities/kanban.entity";
+import { WhatsappStatus } from "../whatsapp/entities/whatsapp-status.entity";
+import { WhatsappModule } from "../whatsapp/whatsapp.module";
 
 @Module({
   imports: [
     ConfigModule,
+    WhatsappModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -33,11 +37,11 @@ import { JwtStrategy } from "./strategies/jwt.strategy";
       },
     }),
     PassportModule.register({ session: false }),
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([User, Kanban, WhatsappStatus]),
     forwardRef(() => UserModule),
   ],
   controllers: [AuthController],
   providers: [AuthService, GoogleStrategy, JwtStrategy],
-  exports: [AuthService, JwtModule],
+  exports: [AuthService, JwtModule, UserModule],
 })
 export class AuthModule {}

@@ -26,7 +26,8 @@ export class KanbanMapper {
         id: entity.id,
         name: entity.name,
         description: entity.description,
-        customers: this.toCustomerDto(entity.customers),
+        order: entity.order,
+        customers: this.toCustomerDto(entity.customers), // TODO: cannot keep, too much data
       };
     });
   }

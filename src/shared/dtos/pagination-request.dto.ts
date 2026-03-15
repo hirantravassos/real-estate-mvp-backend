@@ -24,10 +24,6 @@ export class PaginationRequestDto {
   readonly limit: number = DEFAULT_LIMIT;
 
   @IsOptional()
-  @IsString({ message: "Busca deve ser um texto" })
-  readonly search?: string;
-
-  @IsOptional()
   @IsString({ message: "Campo de ordenação deve ser um texto" })
   readonly sortBy?: string;
 

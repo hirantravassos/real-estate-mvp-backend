@@ -1,7 +1,10 @@
-import { CustomerCreateDto } from "../dtos/customer-create.dto";
 import { Customer } from "../entities/customer.entity";
 import { Kanban } from "../../kanbans/entities/kanban.entity";
 import { CustomerComment } from "../entities/customer-comments.entity";
+import { CustomerCreateDto } from "../services/customer.service";
+import { Visit } from "../../visits/entities/visit.entity";
+import { WhatsappChatMapper } from "../../whatsapp/mappers/whatsapp-chat.mapper";
+import { WhatsappChat } from "../../whatsapp/entities/whatsapp-chat.entity";
 
 export class CustomerMapper {
   static toEntity(dto: CustomerCreateDto, id?: string) {
@@ -9,7 +12,7 @@ export class CustomerMapper {
     const commentEntity = new CustomerComment();
     const kanbanEntity = new Kanban();
     entity.name = dto.name;
-    entity.phone = dto.phone;
+    entity.phone = dto.phone.replaceAll(/\D/g, "");
     if (dto?.kanbanId) {
       kanbanEntity.id = dto.kanbanId;
       entity.kanban = kanbanEntity;
@@ -17,6 +20,9 @@ export class CustomerMapper {
     if (dto?.comment) {
       commentEntity.comment = dto.comment;
       entity.comments = [commentEntity];
+    }
+    if (dto?.budget) {
+      entity.budget = dto.budget;
     }
     if (id) entity.id = id;
     return entity;
@@ -29,6 +35,11 @@ export class CustomerMapper {
       phone: entity.phone,
       kanban: entity.kanban,
       comments: this.toComments(entity.comments),
+      visits: this.toVisit(entity.visits),
+      chat: this.toChat(entity?.chat),
+      createdAt: entity.createdAt,
+      updatedAt: entity.updatedAt,
+      active: entity.active,
     };
   }
 
@@ -40,6 +51,7 @@ export class CustomerMapper {
         phone: entity.phone,
         kanban: this.toKanban(entity.kanban),
         comments: this.toComments(entity.comments),
+        visits: this.toVisit(entity.visits),
       };
     });
   }
@@ -51,6 +63,7 @@ export class CustomerMapper {
       id: kanban.id,
       name: kanban.name,
       description: kanban.description,
+      order: kanban.order,
     };
   }
 
@@ -59,7 +72,28 @@ export class CustomerMapper {
       return {
         id: comment.id,
         comment: comment.comment,
+        createdAt: comment.createdAt,
+        updatedAt: comment.updatedAt,
       };
     });
+  }
+
+  private static toVisit(visits: Visit[]) {
+    return visits?.map((visit) => {
+      return {
+        id: visit.id,
+        address: visit.address,
+        reference: visit.reference,
+        startsAt: visit.startsAt,
+        endsAt: visit.endsAt,
+        createdAt: visit.createdAt,
+        updatedAt: visit.updatedAt,
+      };
+    });
+  }
+
+  private static toChat(chat: WhatsappChat | null) {
+    if (!chat) return null;
+    return WhatsappChatMapper.toDtoList([chat])?.[0];
   }
 }

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { UserRepository } from "../repositories/user.repository.js";
-import type { User } from "../entities/user.entity.js";
+import { User } from "../entities/user.entity.js";
 import { UserMapper } from "../mappers/user.mapper";
 import { UserCreateDto } from "../dtos/user-create.dto";
 
@@ -13,7 +13,7 @@ export class UserService {
   }
 
   async findById(id: string): Promise<User> {
-    const user = await this.userRepository.findById(id);
+    const user = await this.userRepository.findOneBy({ id });
     if (!user) {
       throw new NotFoundException("Usuário não encontrado");
     }

@@ -1,79 +1,54 @@
 import { Injectable } from "@nestjs/common";
-import { WhatsappContactRepository } from "../repositories/whatsapp-contact.repository";
-import { CustomerRepository } from "../../customers/repositories/customer.repository";
 import { User } from "../../users/entities/user.entity";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Brackets, Repository } from "typeorm";
+import { WhatsappContactMapper } from "../mappers/whatsapp-contact.mapper";
+import { WhatsappChat } from "../entities/whatsapp-chat.entity";
+import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
+import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
+import { IsOptional, IsString } from "class-validator";
 
-interface UpsertContactData {
-  readonly whatsappId: string;
-  readonly phoneNumber?: string | null;
-  readonly name?: string | null;
+export class WhatsappContactFilterDto extends PaginationRequestDto {
+  @IsOptional()
+  @IsString()
+  search?: string;
 }
 
 @Injectable()
 export class WhatsappContactService {
   constructor(
-    private readonly contactRepository: WhatsappContactRepository,
-    private readonly customerRepository: CustomerRepository,
-  ) { }
+    @InjectRepository(WhatsappChat)
+    private readonly whatsappChatRepository: Repository<WhatsappChat>,
+  ) {}
 
-  async upsertContact(user: User, data: UpsertContactData): Promise<void> {
-    if (!data.whatsappId) return;
+  async findAllContactsToImport(user: User, dto: WhatsappContactFilterDto) {
+    const sanitizedSearch = `%${dto?.search ?? ""}%`;
 
-    const payload: Record<string, unknown> = {
-      user,
-      whatsappId: data.whatsappId,
-    };
+    const [chats, total] = await this.whatsappChatRepository
+      .createQueryBuilder("chat")
+      .leftJoin(
+        "customers",
+        "customer",
+        "customer.phone = chat.phone AND customer.userId = :userId",
+        { userId: user.id },
+      )
+      .where("chat.userId = :userId", { userId: user.id })
+      .andWhere("LENGTH(chat.phone) >= :minimumLength", { minimumLength: 10 })
+      .andWhere("customer.id IS NULL")
+      .andWhere("chat.ignored = false")
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where("chat.name LIKE :search", {
+            search: sanitizedSearch,
+          }).orWhere("chat.phone LIKE :search", { search: sanitizedSearch });
+        }),
+      )
+      .orderBy("chat.lastSentAt", "DESC")
+      .skip(dto.skip)
+      .take(dto.limit)
+      .getManyAndCount();
 
-    const hasRealName = data.name !== null && data.name !== undefined;
-    const hasRealPhone =
-      data.phoneNumber !== null && data.phoneNumber !== undefined;
-
-    if (hasRealName) payload.name = data.name;
-    if (hasRealPhone) payload.phoneNumber = data.phoneNumber;
-
-    const existingContact = await this.contactRepository.findOneBy({
-      whatsappId: data.whatsappId,
-      userId: user.id,
-    });
-
-    if (existingContact) {
-      if (hasRealName) existingContact.name = data.name;
-      if (hasRealPhone) existingContact.phoneNumber = data.phoneNumber;
-      await this.contactRepository.save(existingContact);
-    } else {
-      await this.contactRepository.upsert(payload, ["whatsappId", "userId"]);
-    }
-
-    if (hasRealPhone) {
-      void this.ensurePendingCustomerExists(user, data.phoneNumber, data.name);
-    }
-  }
-
-  private async ensurePendingCustomerExists(
-    user: User,
-    phone: string,
-    name?: string | null,
-  ): Promise<void> {
-    const existingCustomer = await this.customerRepository.findOneBy({
-      userId: user.id,
-      phone,
-    });
-
-    if (existingCustomer) return;
-
-    await this.customerRepository
-      .save({
-        user,
-        name: name ?? null,
-        phone,
-        pending: true,
-        ignored: false,
-      })
-      .catch((error) => {
-        console.warn(
-          "Customer auto-create skipped (likely duplicate):",
-          error?.message,
-        );
-      });
+    const data = WhatsappContactMapper.toDtoList(chats);
+    return PaginationMapper.toDto([data, total], dto);
   }
 }

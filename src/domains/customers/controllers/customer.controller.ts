@@ -1,4 +1,8 @@
-import { CustomerService } from "../services/customer.service";
+import {
+  CustomerCreateDto,
+  CustomerFilterDto,
+  CustomerService,
+} from "../services/customer.service";
 import {
   Body,
   Controller,
@@ -11,7 +15,6 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { JwtGuard } from "../../auth/guards/jwt.guard";
-import { CustomerCreateDto } from "../dtos/customer-create.dto";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { User } from "../../users/entities/user.entity";
 import { CustomerMapper } from "../mappers/customer.mapper";
@@ -23,34 +26,22 @@ export class CustomerController {
   constructor(private readonly customerService: CustomerService) {}
 
   @Get()
-  async findAll(
-    @GetUser() user: User,
-    @Query() pagination: PaginationRequestDto,
-  ) {
-    const result = await this.customerService.findAll(user, pagination);
-
-    return {
-      ...result,
-      data: CustomerMapper.toListDto(result.data),
-    };
+  async findAll(@GetUser() user: User, @Query() filter: CustomerFilterDto) {
+    return await this.customerService.findAll(user, filter);
   }
 
   @Get("pending")
   async findAllPending(
     @GetUser() user: User,
     @Query() pagination: PaginationRequestDto,
+    @Query() filter: CustomerFilterDto,
   ) {
-    const result = await this.customerService.findAllPending(user, pagination);
-
-    return {
-      ...result,
-      data: CustomerMapper.toListDto(result.data),
-    };
+    return await this.customerService.findAllPending(user, filter, pagination);
   }
 
   @Get(":id")
   async findOne(@GetUser() user: User, @Param("id") id: string) {
-    return CustomerMapper.toDto(await this.customerService.findOne(user, id));
+    return await this.customerService.findOne(user, id);
   }
 
   @Post()
@@ -75,6 +66,15 @@ export class CustomerController {
   @Post(":id/accept")
   async accept(@GetUser() user: User, @Param("id") customerId: string) {
     return await this.customerService.accept(user, customerId);
+  }
+
+  @Patch(":id/move")
+  async moveToKanban(
+    @GetUser() user: User,
+    @Param("id") customerId: string,
+    @Body() body: { kanbanId: string | null },
+  ) {
+    return this.customerService.moveToKanban(user, customerId, body.kanbanId);
   }
 
   @Delete(":id")

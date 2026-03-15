@@ -7,15 +7,18 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from "@nestjs/common";
 import { JwtGuard } from "../../auth/guards/jwt.guard";
 import { KanbanCreateDto } from "../dtos/kanban-create.dto";
+import { KanbanReorderDto } from "../dtos/kanban-reorder.dto";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { User } from "../../users/entities/user.entity";
 import { KanbanMapper } from "../mappers/kanban.mapper";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
+import { CustomerMapper } from "../../customers/mappers/customer.mapper";
 
 @Controller("kanbans")
 @UseGuards(JwtGuard)
@@ -28,11 +31,15 @@ export class KanbanController {
     @Query() pagination: PaginationRequestDto,
   ) {
     const result = await this.kanbanService.findAll(user, pagination);
-
     return {
       ...result,
       data: KanbanMapper.toListDto(result.data),
     };
+  }
+
+  @Put("reorder")
+  async reorder(@GetUser() user: User, @Body() dto: KanbanReorderDto) {
+    await this.kanbanService.reorder(user, dto.kanbanIds);
   }
 
   @Get(":id")

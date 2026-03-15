@@ -1,22 +1,239 @@
-import { Injectable } from "@nestjs/common";
-import { WhatsappChatRepository } from "../repositories/whatsapp-chat.repository";
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { WhatsappClientService } from "./whatsapp-client.service";
 import { User } from "../../users/entities/user.entity";
+import { WhatsappChatMapper } from "../mappers/whatsapp-chat.mapper";
+import { InjectRepository } from "@nestjs/typeorm";
+import { FindOptionsWhere, ILike, Repository } from "typeorm";
+import { WhatsappChat } from "../entities/whatsapp-chat.entity";
+import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
+import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
+import { WhatsappStatusService } from "./whatsapp-status.service";
+import { IsOptional, IsString, IsUUID } from "class-validator";
+import { ValidateBoolean } from "../../../shared/decorators/validation/boolean.decorator";
+
+export class WhatsappChatSendMessageDto {
+  @IsString()
+  message: string;
+}
+
+export class WhatsappChatFilterDto extends PaginationRequestDto {
+  @IsOptional()
+  @IsString()
+  search: string | null;
+
+  @IsOptional()
+  @IsUUID()
+  kanban: string | null;
+
+  @IsOptional()
+  @ValidateBoolean({})
+  unread: boolean | null;
+
+  @IsOptional()
+  @ValidateBoolean({})
+  ignored: boolean | null;
+}
 
 @Injectable()
 export class WhatsappChatService {
-  constructor(private readonly chatRepository: WhatsappChatRepository) {}
+  constructor(
+    private readonly whatsappStatusService: WhatsappStatusService,
+    private readonly whatsappClientService: WhatsappClientService,
+    @InjectRepository(WhatsappChat)
+    private readonly whatsappChatRepository: Repository<WhatsappChat>,
+  ) {}
 
-  async upsertChat(
+  async findAll(user: User, dto: WhatsappChatFilterDto) {
+    void this.whatsappStatusService.clearUpdateStatus(user);
+
+    const [data, total] = await this.whatsappChatRepository.findAndCount({
+      where: this.getWhereClause(user, dto),
+      relations: {
+        customer: {
+          kanban: true,
+        },
+      },
+      order: {
+        lastSentAt: dto.sortOrder || "DESC",
+      },
+      skip: dto.skip,
+      take: dto.limit,
+    });
+
+    const chats = WhatsappChatMapper.toDtoList(data);
+
+    return PaginationMapper.toDto([chats, total], dto);
+  }
+
+  async findOne(user: User, chatId: string, limit = 20) {
+    void this.whatsappStatusService.clearUpdateStatus(user);
+
+    const client = await this.whatsappClientService.getClientOrThrow(user);
+    const chatClient = await client.getChatById(chatId).catch(() => {
+      throw new ForbiddenException(
+        "[findOne.findOne] Chat not found for this user",
+      );
+    });
+
+    await this.whatsappClientService.syncChat(chatClient, user);
+
+    const [contact, messages, chat] = await Promise.all([
+      chatClient.getContact().catch(() => null),
+      chatClient.fetchMessages({ limit }).catch(() => []),
+      this.whatsappChatRepository.findOne({
+        where: {
+          user: { id: user.id },
+          id: chatId,
+        },
+        relations: {
+          customer: {
+            kanban: true,
+          },
+        },
+      }),
+    ]);
+
+    // if (!contact) {
+    //   console.warn("[WhatsappChat.findOne] Contact not found for this chat");
+    //   throw new NotFoundException("Contact not found for this chat");
+    // }
+
+    const profile = await contact?.getProfilePicUrl().catch(() => null);
+
+    void this.markAsRead(user, chatId);
+
+    return WhatsappChatMapper.toDto(
+      { ...chatClient, contact, profile },
+      messages,
+      chat?.customer,
+    );
+  }
+
+  async findMessageMedia(user: User, messageId: string) {
+    const client = await this.whatsappClientService
+      .getClientOrThrow(user)
+      .catch(() => {
+        return null;
+      });
+
+    if (!client) return null;
+
+    const message = await client.getMessageById(messageId);
+
+    if (!message || !message.hasMedia) {
+      return null;
+    }
+
+    const media = await message.downloadMedia();
+
+    return {
+      data: media.data,
+      mimetype: media.mimetype,
+      filename: media.filename,
+      filesize: media.filesize,
+    };
+  }
+
+  async sendMessage(
     user: User,
-    whatsappId: string,
-    unread: boolean,
-    lastSentAt?: string | null,
-  ): Promise<void> {
-    if (!whatsappId) return;
+    chatId: string,
+    dto: WhatsappChatSendMessageDto,
+  ) {
+    const client = await this.whatsappClientService.getClientOrThrow(user);
 
-    const payload: Record<string, unknown> = { user, whatsappId, unread };
-    if (lastSentAt) payload.lastSentAt = lastSentAt;
+    const [chat, isAuthorized] = await Promise.all([
+      client.getChatById(chatId).catch(() => null),
+      this.whatsappChatRepository.exists({
+        where: { id: chatId, user: { id: user.id } },
+      }),
+    ]);
 
-    await this.chatRepository.upsert(payload, ["whatsappId", "userId"]);
+    if (!chat) {
+      console.warn("[WhatsappChat.sendMessage]: ChatId not found", {
+        chatId,
+        dto,
+        user,
+      });
+      throw new NotFoundException("Chat not found");
+    }
+
+    if (!isAuthorized) {
+      console.warn(
+        "[WhatsappChat.sendMessage]: ChatId not found for this user",
+        { chatId, dto, user },
+      );
+      throw new ForbiddenException("Chat doesn't belong to this user");
+    }
+
+    await chat.sendMessage(dto.message);
+  }
+
+  async ignore(user: User, chatId: string) {
+    await this.whatsappChatRepository.update(
+      {
+        user: { id: user.id },
+        id: chatId,
+      },
+      {
+        ignored: true,
+      },
+    );
+  }
+
+  async markAsRead(user: User, chatId: string) {
+    await this.whatsappChatRepository.update(
+      {
+        user: { id: user.id },
+        id: chatId,
+      },
+      {
+        unread: false,
+      },
+    );
+
+    const client = await this.whatsappClientService
+      .getClientOrThrow(user)
+      .catch(() => {
+        return null;
+      });
+
+    if (!client) return;
+
+    await client.sendSeen(chatId);
+  }
+
+  private getWhereClause(
+    user: User,
+    dto: WhatsappChatFilterDto,
+  ): FindOptionsWhere<WhatsappChat> | FindOptionsWhere<WhatsappChat>[] {
+    const baseWhere: FindOptionsWhere<WhatsappChat> = {
+      user: { id: user.id },
+      ignored: dto.ignored ?? false,
+    };
+
+    let where:
+      | FindOptionsWhere<WhatsappChat>
+      | FindOptionsWhere<WhatsappChat>[] = baseWhere;
+
+    if (dto.kanban) {
+      baseWhere.customer = { kanban: { id: dto.kanban } };
+    }
+
+    if (dto.unread !== null && dto.unread !== undefined) {
+      baseWhere.unread = dto.unread;
+    }
+
+    if (dto.search) {
+      where = [
+        { ...baseWhere, name: ILike(`%${dto.search}%`) },
+        { ...baseWhere, phone: ILike(`%${dto.search}%`) },
+      ];
+    }
+
+    return where;
   }
 }

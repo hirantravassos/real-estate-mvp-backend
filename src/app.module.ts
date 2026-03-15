@@ -14,6 +14,7 @@ import { jwtConfig } from "./config/jwt.config";
 import { CustomerModule } from "./domains/customers/customer.module";
 import { KanbanModule } from "./domains/kanbans/kanban.module";
 import { WhatsappModule } from "./domains/whatsapp/whatsapp.module";
+import { VisitModule } from "./domains/visits/visit.module";
 
 const THROTTLE_TTL_MS = 60_000;
 const THROTTLE_LIMIT = 30;
@@ -40,24 +41,25 @@ const THROTTLE_LIMIT = 30;
         logging: false,
       }),
     }),
-    ThrottlerModule.forRoot([
-      {
-        ttl: THROTTLE_TTL_MS,
-        limit: THROTTLE_LIMIT,
-      },
-    ]),
+    // ThrottlerModule.forRoot([
+    //   {
+    //     ttl: THROTTLE_TTL_MS,
+    //     limit: THROTTLE_LIMIT,
+    //   },
+    // ]),
     MailModule,
     UserModule,
     AuthModule,
     CustomerModule,
     KanbanModule,
     WhatsappModule,
+    VisitModule,
   ],
-  providers: [
-    {
-      provide: APP_GUARD,
-      useClass: ThrottlerGuard,
-    },
-  ],
+  // providers: [
+  //   {
+  //     provide: APP_GUARD,
+  //     useClass: ThrottlerGuard,
+  //   },
+  // ],
 })
 export class AppModule {}

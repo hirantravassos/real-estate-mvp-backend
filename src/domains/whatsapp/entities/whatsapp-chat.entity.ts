@@ -1,21 +1,50 @@
-import { Column, Entity, ManyToOne, Unique } from "typeorm";
-import { BaseEntity } from "../../../shared/entities/base.entity";
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToOne,
+  PrimaryColumn,
+  Unique,
+} from "typeorm";
 import { User } from "../../users/entities/user.entity";
+import { ColumnPhone } from "../../../shared/decorators/columns/column-phone.decorator";
+import { ColumnName } from "../../../shared/decorators/columns/column-name.decorator";
+import { Customer } from "../../customers/entities/customer.entity";
+import { ColumnBoolean } from "../../../shared/decorators/columns/column-boolean.decorator";
 
-@Entity("whatsapp_chats")
-@Unique(["whatsappId", "userId"])
-export class WhatsappChat extends BaseEntity {
+@Entity("whatsapp_chats", {
+  orderBy: {
+    lastSentAt: "DESC",
+  },
+})
+@Unique(["id", "userId"])
+export class WhatsappChat {
   @ManyToOne(() => User, {
     nullable: false,
     createForeignKeyConstraints: false,
   })
+  @JoinColumn({ name: "userId" })
   user: User;
 
-  @Column({ type: "varchar", length: 255 })
+  @Column({ type: "varchar", nullable: false })
   userId: string;
 
-  @Column({ type: "varchar", length: 255 })
-  whatsappId: string;
+  @OneToOne(() => Customer, { createForeignKeyConstraints: false })
+  @JoinColumn([
+    { name: "phone", referencedColumnName: "phone" },
+    { name: "userId", referencedColumnName: "userId" },
+  ])
+  customer?: Customer;
+
+  @PrimaryColumn({ type: "varchar", length: 255 })
+  id: string;
+
+  @ColumnPhone()
+  phone: string;
+
+  @ColumnName()
+  name: string;
 
   @Column({
     type: "boolean",
@@ -25,4 +54,13 @@ export class WhatsappChat extends BaseEntity {
 
   @Column({ type: "datetime", nullable: true })
   lastSentAt: string | null;
+
+  @Column({ type: "varchar", nullable: true })
+  lastMessage: string | null;
+
+  @Column({ type: "varchar", nullable: true })
+  profileUrl: string | null;
+
+  @ColumnBoolean({ default: false })
+  ignored: boolean;
 }

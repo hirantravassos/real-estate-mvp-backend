@@ -1,5 +1,22 @@
 import { CustomerComment } from "../entities/customer-comments.entity";
-import { CustomerCommentCreateDto } from "../dtos/customer-comment-create.dto";
+import { ValidateLongText } from "../../../shared/decorators/validation/long-text.decorator";
+
+export interface CustomerCommentDto {
+  id: string;
+  comment: string;
+  createdAt: Date;
+}
+
+export interface CustomerCommentListDto {
+  id: string;
+  comment: string;
+  createdAt: Date;
+}
+
+export class CustomerCommentCreateDto {
+  @ValidateLongText()
+  comment: string;
+}
 
 export class CustomerCommentMapper {
   static toEntity(dto: CustomerCommentCreateDto, id?: string) {
@@ -9,17 +26,19 @@ export class CustomerCommentMapper {
     return entity;
   }
 
-  static toDto(entity: CustomerComment) {
+  static toDto(entity: CustomerComment): CustomerCommentDto {
     return {
       id: entity.id,
-      comments: entity.comment,
+      comment: entity.comment,
+      createdAt: entity.createdAt,
     };
   }
 
-  static toListDto(entities: CustomerComment[]) {
-    return entities?.map((entity) => ({
+  static toListDto(entities: CustomerComment[]): CustomerCommentListDto[] {
+    return entities.map((entity) => ({
       id: entity.id,
       comment: entity.comment,
+      createdAt: entity.createdAt,
     }));
   }
 }

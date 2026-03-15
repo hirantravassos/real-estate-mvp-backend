@@ -1,4 +1,13 @@
-import { Column, Entity, ManyToOne, OneToMany, Unique } from "typeorm";
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  OneToOne,
+  Unique,
+  VirtualColumn,
+} from "typeorm";
 import { BaseEntity } from "../../../shared/entities/base.entity";
 import { ColumnName } from "../../../shared/decorators/columns/column-name.decorator";
 import { ColumnPhone } from "../../../shared/decorators/columns/column-phone.decorator";
@@ -6,17 +15,27 @@ import { User } from "../../users/entities/user.entity";
 import { Kanban } from "../../kanbans/entities/kanban.entity";
 import { CustomerComment } from "./customer-comments.entity";
 import { ColumnBoolean } from "../../../shared/decorators/columns/column-boolean.decorator";
+import { Visit } from "../../visits/entities/visit.entity";
+import { ColumnCurrency } from "../../../shared/decorators/columns/column-currency.decorator";
+import { WhatsappChat } from "../../whatsapp/entities/whatsapp-chat.entity";
 
 @Entity("customers")
 @Unique(["userId", "phone"])
 export class Customer extends BaseEntity {
   @ManyToOne(() => User, (user) => user.customers, {
     nullable: false,
+    onDelete: "CASCADE",
   })
+  @JoinColumn({ name: "userId" })
   user: User;
 
-  @Column({ type: "varchar", length: 255 })
+  @Column({ type: "varchar", nullable: false })
   userId: string;
+
+  @OneToOne(() => WhatsappChat, (whatsappChat) => whatsappChat.customer, {
+    nullable: true,
+  })
+  chat: WhatsappChat | null;
 
   @ManyToOne(() => Kanban, (kanban) => kanban.customers, {
     nullable: true,
@@ -29,11 +48,17 @@ export class Customer extends BaseEntity {
   )
   comments: CustomerComment[];
 
-  @ColumnName({ nullable: true })
-  name: string | null;
+  @OneToMany(() => Visit, (visit) => visit.customer)
+  visits: Visit[];
+
+  @ColumnName()
+  name: string;
 
   @ColumnPhone()
   phone: string;
+
+  @ColumnCurrency({ nullable: true })
+  budget: string | null;
 
   @ColumnBoolean({ default: false })
   ignored: boolean;

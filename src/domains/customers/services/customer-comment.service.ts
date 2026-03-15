@@ -1,17 +1,22 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { CustomerCommentCreateDto } from "../dtos/customer-comment-create.dto";
 import { User } from "../../users/entities/user.entity";
-import { CustomerCommentMapper } from "../mappers/customer-comment.mapper";
+import {
+  CustomerCommentCreateDto,
+  CustomerCommentMapper,
+} from "../mappers/customer-comment.mapper";
 import { CustomerCommentRepository } from "../repositories/customer-comment.repository";
-import { CustomerService } from "./customer.service";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
+import { Repository } from "typeorm";
+import { Customer } from "../entities/customer.entity";
+import { InjectRepository } from "@nestjs/typeorm";
 
 @Injectable()
 export class CustomerCommentService {
   constructor(
     private readonly customerCommentRepository: CustomerCommentRepository,
-    private readonly customerService: CustomerService,
+    @InjectRepository(Customer)
+    private readonly customerRepository: Repository<Customer>,
   ) {}
 
   async findAll(
@@ -51,8 +56,18 @@ export class CustomerCommentService {
     dto: CustomerCommentCreateDto,
     id?: string,
   ) {
+    const customer = await this.customerRepository
+      .findOneOrFail({
+        where: { user: { id: user.id }, id: customerId },
+      })
+      .catch(() => {
+        console.warn(
+          "[CustomerCommentService.save]: Customer not found to relate new comment",
+        );
+        throw new NotFoundException("Customer not found");
+      });
     const entity = CustomerCommentMapper.toEntity(dto, id);
-    entity.customer = await this.customerService.findOne(user, customerId);
+    entity.customer = customer;
     return this.customerCommentRepository.save(entity);
   }
 
