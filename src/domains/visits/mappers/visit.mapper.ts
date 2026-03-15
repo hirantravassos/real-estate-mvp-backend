@@ -1,4 +1,5 @@
 import { Visit } from "../entities/visit.entity";
+import { Customer } from "../../customers/entities/customer.entity";
 
 export class VisitMapper {
   static toDto(entity: Visit) {
@@ -6,9 +7,7 @@ export class VisitMapper {
 
     return {
       id: entity.id,
-      customerId: entity.customer?.id,
-      customerName: entity.customer?.name,
-      customerPhone: entity.customer?.phone,
+      customer: this.toCustomer(entity.customer),
       address: entity.address,
       reference: entity.reference,
       startsAt: entity.startsAt,
@@ -19,5 +18,13 @@ export class VisitMapper {
 
   static toListDto(entities: Visit[]) {
     return entities.map((e) => this.toDto(e));
+  }
+
+  static toCustomer(entity: Customer) {
+    return {
+      id: entity.id,
+      name: entity.name,
+      phone: entity.phone,
+    };
   }
 }
