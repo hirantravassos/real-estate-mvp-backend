@@ -229,7 +229,7 @@ export class WhatsappClientService implements OnModuleInit {
       }),
       puppeteer: {
         headless: true,
-        protocolTimeout: 60000,
+        protocolTimeout: 0,
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH ?? undefined,
         args: [
           "--no-sandbox",
