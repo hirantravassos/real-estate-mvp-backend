@@ -207,7 +207,7 @@ export class WhatsappClientService implements OnModuleInit {
     const client = new Client({
       authStrategy: new LocalAuth({
         clientId: clientId,
-        dataPath: sessionPath,
+        dataPath: join(process.cwd(), ".wwebjs_auth"),
       }),
       puppeteer: {
         headless: true,
@@ -215,10 +215,8 @@ export class WhatsappClientService implements OnModuleInit {
           "--no-sandbox",
           "--disable-setuid-sandbox",
           "--disable-dev-shm-usage",
-          "--disable-accelerated-2d-canvas",
-          "--no-first-run",
-          "--no-zygote",
           "--disable-gpu",
+          "--no-zygote",
         ],
       },
     });
