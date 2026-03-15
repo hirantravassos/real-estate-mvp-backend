@@ -13,6 +13,7 @@ import { WhatsappChatMapper } from "../mappers/whatsapp-chat.mapper";
 import { WhatsappStatus } from "../entities/whatsapp-status.entity";
 import { WhatsappClientStatusEnum } from "../enums/whatsapp-client-status.enum";
 import { join } from "node:path";
+import { existsSync, rmSync } from "fs";
 
 interface WhatsappStatusDto {
   status: WhatsappClientStatusEnum;
@@ -36,14 +37,14 @@ export class WhatsappClientService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    await this.restoreSessions();
+    await this.restoreAllSessions();
   }
 
   requestConnection(user: User) {
     const clientId: string = user.id;
 
     if (this.clients.has(clientId)) {
-      void this.initializeClient(clientId);
+      void this.restoreSession(clientId);
 
       return {
         success: true,
@@ -168,15 +169,19 @@ export class WhatsappClientService implements OnModuleInit {
     void this.syncChat(chat, user);
   }
 
-  private async restoreSessions(): Promise<void> {
+  private async restoreAllSessions(): Promise<void> {
     this.logger.log("Restoring previous WhatsApp sessions...");
 
     const users = await this.userRepository.find();
 
     for (const user of users) {
-      this.logger.log(`Restoring session for: ${user.id}`);
-      this.initializeClient(user.id);
+      void this.restoreSession(user.id);
     }
+  }
+
+  private restoreSession(clientId: string): void {
+    this.logger.log(`Restoring session for: ${clientId}`);
+    void this.initializeClient(clientId);
   }
 
   private async updateConnectionStatus(
@@ -204,12 +209,23 @@ export class WhatsappClientService implements OnModuleInit {
       return;
     }
 
-    const sessionPath = join(process.cwd(), ".wwebjs_auth");
+    const sessionRoot = join(process.cwd(), ".wwebjs_auth");
+    const clientSessionPath = join(sessionRoot, `session-${clientId}`);
+    const lockPath = join(clientSessionPath, "SingletonLock");
+
+    if (existsSync(lockPath)) {
+      try {
+        this.logger.log(`[${clientId}] Removing stale browser lock...`);
+        rmSync(lockPath, { force: true });
+      } catch (err) {
+        this.logger.warn(`[${clientId}] Could not remove lock: ${err}`);
+      }
+    }
 
     const client = new Client({
       authStrategy: new LocalAuth({
         clientId: clientId,
-        dataPath: sessionPath,
+        dataPath: sessionRoot,
       }),
       puppeteer: {
         headless: true,
