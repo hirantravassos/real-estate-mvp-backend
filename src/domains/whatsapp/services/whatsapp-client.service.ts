@@ -12,6 +12,7 @@ import { WhatsappChat } from "../entities/whatsapp-chat.entity";
 import { WhatsappChatMapper } from "../mappers/whatsapp-chat.mapper";
 import { WhatsappStatus } from "../entities/whatsapp-status.entity";
 import { WhatsappClientStatusEnum } from "../enums/whatsapp-client-status.enum";
+import { join } from "node:path";
 
 interface WhatsappStatusDto {
   status: WhatsappClientStatusEnum;
@@ -201,14 +202,24 @@ export class WhatsappClientService implements OnModuleInit {
       return;
     }
 
+    const sessionPath = join(process.cwd(), ".wwebjs_auth");
+
     const client = new Client({
       authStrategy: new LocalAuth({
         clientId: clientId,
-        dataPath: "./sessions",
+        dataPath: sessionPath,
       }),
       puppeteer: {
         headless: true,
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-accelerated-2d-canvas",
+          "--no-first-run",
+          "--no-zygote",
+          "--disable-gpu",
+        ],
       },
     });
 
