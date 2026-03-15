@@ -12,14 +12,14 @@ import {
 import { JwtGuard } from "../../auth/guards/jwt.guard";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { User } from "../../users/entities/user.entity";
-import { CustomerCommentMapper } from "../mappers/customer-comment.mapper";
-import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 import {
   CustomerCommentCreateDto,
-  CustomerCommentService,
-} from "../services/customer-comment.service";
+  CustomerCommentMapper,
+} from "../mappers/customer-comment.mapper";
+import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
+import { CustomerCommentService } from "../services/customer-comment.service";
 
-@Controller("customer-comments/:customerId")
+@Controller("customers/:customerId/comments")
 @UseGuards(JwtGuard)
 export class CustomerCommentController {
   constructor(
@@ -44,7 +44,7 @@ export class CustomerCommentController {
     };
   }
 
-  @Get("comments/:id")
+  @Get(":id")
   async findOne(
     @GetUser() user: User,
     @Param("customerId") customerId: string,
@@ -66,7 +66,7 @@ export class CustomerCommentController {
     );
   }
 
-  @Patch("comments/:id")
+  @Patch(":id")
   async update(
     @GetUser() user: User,
     @Param("customerId") customerId: string,
@@ -78,7 +78,7 @@ export class CustomerCommentController {
     );
   }
 
-  @Delete("comments/:id")
+  @Delete(":id")
   remove(
     @GetUser() user: User,
     @Param("customerId") customerId: string,

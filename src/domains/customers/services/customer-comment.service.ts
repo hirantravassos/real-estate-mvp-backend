@@ -1,18 +1,15 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { User } from "../../users/entities/user.entity";
-import { CustomerCommentMapper } from "../mappers/customer-comment.mapper";
+import {
+  CustomerCommentCreateDto,
+  CustomerCommentMapper,
+} from "../mappers/customer-comment.mapper";
 import { CustomerCommentRepository } from "../repositories/customer-comment.repository";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
-import { ValidateLongText } from "../../../shared/decorators/validation/long-text.decorator";
 import { Repository } from "typeorm";
 import { Customer } from "../entities/customer.entity";
 import { InjectRepository } from "@nestjs/typeorm";
-
-export class CustomerCommentCreateDto {
-  @ValidateLongText()
-  comment: string;
-}
 
 @Injectable()
 export class CustomerCommentService {
