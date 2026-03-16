@@ -182,7 +182,13 @@ class WhatsappClientService implements OnModuleInit {
 
     await new Promise((resolve) => setTimeout(resolve, 10000));
 
-    const chats = await client.getChats().catch(() => []);
+    const chats = await client.getChats().catch(() => {
+      this.logger.error(
+        `[${userId}]`,
+        "Syncing chats failed: getChats failure",
+      );
+      return [];
+    });
     const syncChats: WAWebJS.Chat[] = [];
 
     this.logger.log(`[${userId}] Found ${chats.length} chats to sync.`);

@@ -21,6 +21,11 @@ import {
 export class WhatsappChatController {
   constructor(private readonly whatsappChatsService: WhatsappChatService) {}
 
+  @Post("refresh-all")
+  async refreshAll(@GetUser() user: User) {
+    return this.whatsappChatsService.refreshAll(user);
+  }
+
   @Get("messages/:messageId/media")
   async findMedia(
     @GetUser() user: User,
