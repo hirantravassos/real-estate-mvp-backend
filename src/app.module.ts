@@ -1,8 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
-import { APP_GUARD } from "@nestjs/core";
 import { databaseConfig } from "./config/database.config.js";
 import { authConfig } from "./config/auth.config.js";
 import { mailConfig } from "./config/mail.config.js";
@@ -15,6 +13,7 @@ import { CustomerModule } from "./domains/customers/customer.module";
 import { KanbanModule } from "./domains/kanbans/kanban.module";
 import { WhatsappModule } from "./domains/whatsapp/whatsapp.module";
 import { VisitModule } from "./domains/visits/visit.module";
+import { mongoConfig } from "./config/mongo.config";
 
 const THROTTLE_TTL_MS = 60_000;
 const THROTTLE_LIMIT = 30;
@@ -23,7 +22,14 @@ const THROTTLE_LIMIT = 30;
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, authConfig, mailConfig, jwtConfig],
+      load: [
+        appConfig,
+        databaseConfig,
+        authConfig,
+        mailConfig,
+        jwtConfig,
+        mongoConfig,
+      ],
       envFilePath: ".env",
     }),
     TypeOrmModule.forRootAsync({

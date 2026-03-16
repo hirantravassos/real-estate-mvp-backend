@@ -12,7 +12,7 @@ import { Repository } from "typeorm";
 import { Kanban } from "../../kanbans/entities/kanban.entity";
 import { WhatsappStatus } from "../../whatsapp/entities/whatsapp-status.entity";
 import { WhatsappClientStatusEnum } from "../../whatsapp/enums/whatsapp-client-status.enum";
-import { WhatsappClientService } from "../../whatsapp/services/whatsapp-client.service";
+import WhatsappClientService from "../../whatsapp/services/whatsapp-client.service";
 
 @Injectable()
 export class AuthService {

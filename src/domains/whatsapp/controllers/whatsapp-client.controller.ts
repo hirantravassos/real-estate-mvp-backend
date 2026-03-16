@@ -1,6 +1,6 @@
 import { Controller, Delete, Post, UseGuards } from "@nestjs/common";
 import { JwtGuard } from "../../auth/guards/jwt.guard";
-import { WhatsappClientService } from "../services/whatsapp-client.service";
+import WhatsappClientService from "../services/whatsapp-client.service";
 import { User } from "../../users/entities/user.entity";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 

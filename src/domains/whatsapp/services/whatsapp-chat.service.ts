@@ -4,7 +4,7 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
-import { WhatsappClientService } from "./whatsapp-client.service";
+import WhatsappClientService from "./whatsapp-client.service";
 import { User } from "../../users/entities/user.entity";
 import { WhatsappChatMapper } from "../mappers/whatsapp-chat.mapper";
 import { InjectRepository } from "@nestjs/typeorm";
