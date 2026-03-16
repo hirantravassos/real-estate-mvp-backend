@@ -219,6 +219,11 @@ export class WhatsappChatService {
     await client.sendSeen(chatId);
   }
 
+  async refreshAll(user: User) {
+    const client = await this.whatsappClientService.getClientOrThrow(user);
+    void this.whatsappClientService.syncAllChats(user.id, client);
+  }
+
   private getWhereClause(
     user: User,
     dto: WhatsappChatFilterDto,
