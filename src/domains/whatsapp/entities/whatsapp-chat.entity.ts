@@ -23,6 +23,7 @@ export class WhatsappChat {
   @ManyToOne(() => User, {
     nullable: false,
     createForeignKeyConstraints: false,
+    onDelete: "CASCADE",
   })
   @JoinColumn({ name: "userId" })
   user: User;

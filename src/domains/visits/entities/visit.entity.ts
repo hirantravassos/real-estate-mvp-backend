@@ -15,7 +15,10 @@ export class Visit extends BaseEntity {
   @Column({ type: "varchar", nullable: false })
   userId: string;
 
-  @ManyToOne(() => Customer, (customer) => customer.visits, { nullable: false })
+  @ManyToOne(() => Customer, (customer) => customer.visits, {
+    nullable: false,
+    onDelete: "CASCADE",
+  })
   customer: Customer;
 
   @Column({ type: "varchar", length: 1000 })

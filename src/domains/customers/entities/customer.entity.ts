@@ -39,6 +39,7 @@ export class Customer extends BaseEntity {
 
   @ManyToOne(() => Kanban, (kanban) => kanban.customers, {
     nullable: true,
+    onDelete: "CASCADE",
   })
   kanban: Kanban | null;
 
