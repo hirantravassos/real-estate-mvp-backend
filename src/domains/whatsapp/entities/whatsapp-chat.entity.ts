@@ -56,7 +56,7 @@ export class WhatsappChat {
   @Column({ type: "datetime", nullable: true })
   lastSentAt: string | null;
 
-  @Column({ type: "varchar", nullable: true })
+  @Column({ type: "text", nullable: true })
   lastMessage: string | null;
 
   @Column({ type: "varchar", nullable: true })
