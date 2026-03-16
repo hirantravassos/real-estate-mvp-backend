@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { WhatsappClientService } from "./whatsapp-client.service";
@@ -40,6 +41,8 @@ export class WhatsappChatFilterDto extends PaginationRequestDto {
 
 @Injectable()
 export class WhatsappChatService {
+  private logger = new Logger(WhatsappChatService.name, { timestamp: true });
+
   constructor(
     private readonly whatsappStatusService: WhatsappStatusService,
     private readonly whatsappClientService: WhatsappClientService,
@@ -74,9 +77,12 @@ export class WhatsappChatService {
 
     const client = await this.whatsappClientService.getClientOrThrow(user);
     const chatClient = await client.getChatById(chatId).catch(() => {
-      throw new ForbiddenException(
-        "[findOne.findOne] Chat not found for this user",
-      );
+      this.logger.warn("[findOne.findOne] Chat not found for this user", {
+        user,
+        chatId,
+        limit,
+      });
+      throw new ForbiddenException("Chat not found for this user");
     });
 
     await this.whatsappClientService.syncChat(chatClient, user);
