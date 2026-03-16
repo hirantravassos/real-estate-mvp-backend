@@ -103,7 +103,15 @@ export class WhatsappClientService implements OnModuleInit {
       throw new NotFoundException(`Client not found for user: ${user.id}`);
     }
 
-    const state = await client.getState();
+    let state: WAState | null = null;
+    try {
+      state = await client.getState();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      this.logger.warn(
+        `[${user.id}] Failed to get client state (likely not initialized): ${errorMessage}`,
+      );
+    }
 
     if (state !== WAState.CONNECTED) {
       return new Promise((resolve) => {

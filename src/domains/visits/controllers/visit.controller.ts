@@ -30,9 +30,7 @@ export class VisitController {
     @Param("visitId") visitId: string,
     @Body() dto: CreateVisitDto,
   ) {
-    return VisitMapper.toDto(
-      await this.visitService.save(user, dto, visitId),
-    );
+    return VisitMapper.toDto(await this.visitService.save(user, dto, visitId));
   }
 
   @Get()
