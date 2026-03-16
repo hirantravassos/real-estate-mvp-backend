@@ -42,18 +42,6 @@ export class WhatsappClientService implements OnModuleInit {
     await this.restoreAllSessions();
   }
 
-  private async clearAllStatuses() {
-    this.logger.log("Cleaning up stale WhatsApp statuses...");
-    await this.whatsappStatusRepository.update(
-      {},
-      {
-        qr: null,
-        isSyncing: false,
-        status: WhatsappClientStatusEnum.ERROR,
-      },
-    );
-  }
-
   requestConnection(user: User) {
     const clientId: string = user.id;
 
@@ -132,35 +120,6 @@ export class WhatsappClientService implements OnModuleInit {
     return client;
   }
 
-  private async waitForConnected(
-    client: Client,
-    userId: string,
-    maxRetries = 5,
-  ): Promise<WAState | null> {
-    for (let i = 0; i < maxRetries; i++) {
-      try {
-        const state = await client.getState();
-        if (state === WAState.CONNECTED) return state;
-
-        this.logger.log(
-          `[${userId}] Waiting for connection... attempt ${i + 1}/${maxRetries} (state: ${state})`,
-        );
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        this.logger.warn(
-          `[${userId}] Client state check failed: ${errorMessage}`,
-        );
-      }
-
-      await new Promise((resolve) =>
-        setTimeout(resolve, i === 0 ? 2000 : 5000),
-      );
-    }
-
-    // Final attempt
-    return client.getState().catch(() => null);
-  }
-
   async syncChat(chat: WAWebJS.Chat, user: User) {
     if (chat.isGroup) {
       this.logger.log(
@@ -191,6 +150,52 @@ export class WhatsappClientService implements OnModuleInit {
     );
     // this.logger.log(`[${user.id}]`, `Syncing chat: ${entity.id}`);
     await this.whatsappChatRepository.upsert(entity, ["user", "id"]);
+  }
+
+  private async clearAllStatuses() {
+    this.logger.log("Cleaning up stale WhatsApp statuses...");
+
+    const users = await this.userRepository.find();
+
+    for (const user of users) {
+      await this.whatsappStatusRepository.update(
+        { user: { id: user.id } },
+        {
+          qr: null,
+          isSyncing: false,
+          status: WhatsappClientStatusEnum.ERROR,
+        },
+      );
+    }
+  }
+
+  private async waitForConnected(
+    client: Client,
+    userId: string,
+    maxRetries = 5,
+  ): Promise<WAState | null> {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const state = await client.getState();
+        if (state === WAState.CONNECTED) return state;
+
+        this.logger.log(
+          `[${userId}] Waiting for connection... attempt ${i + 1}/${maxRetries} (state: ${state})`,
+        );
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `[${userId}] Client state check failed: ${errorMessage}`,
+        );
+      }
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, i === 0 ? 2000 : 5000),
+      );
+    }
+
+    // Final attempt
+    return client.getState().catch(() => null);
   }
 
   private async syncChats(userId: string, client: WAWebJS.Client) {
