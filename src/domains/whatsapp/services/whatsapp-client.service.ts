@@ -42,37 +42,16 @@ class WhatsappClientService implements OnModuleInit {
 
     const users = await this.userRepository.find();
     for (const user of users) {
-      void this.initializeClient(user);
+      void this.initializeClient(user).catch(() => {
+        void this.whatsappStatusRepository.update(
+          { userId: user.id },
+          {
+            status: WhatsappClientStatusEnum.ERROR,
+          },
+        );
+      });
       await new Promise((resolve) => setTimeout(resolve, 3000));
     }
-  }
-
-  async wipeUserSession(userId: string): Promise<void> {
-    this.logger.warn(`[${userId}] Wiping all session data...`);
-
-    const existingClient = this.clients.get(userId);
-
-    if (existingClient) {
-      try {
-        await existingClient.destroy();
-      } catch (error) {
-        this.logger.error(
-          `[${userId}] Error destroying client during wipe: ${error}`,
-        );
-      }
-      this.clients.delete(userId);
-    }
-
-    const userAuthPath = join(process.cwd(), ".wwebjs_auth", userId);
-    await fs
-      .rm(userAuthPath, { recursive: true, force: true })
-      .catch(() => null);
-
-    await this.updateConnectionStatus(userId, {
-      status: WhatsappClientStatusEnum.ERROR,
-      qr: null,
-      isSyncing: false,
-    });
   }
 
   requestConnection(user: User) {
@@ -101,10 +80,14 @@ class WhatsappClientService implements OnModuleInit {
     });
 
     const client = this.clients.get(userId);
+
     if (client) {
       try {
         await client.logout();
         await client.destroy();
+        await this.whatsappChatRepository.delete({
+          userId,
+        });
       } catch (err) {
         this.logger.warn(`[${userId}] Error during logout: ${err}`);
       } finally {
@@ -133,15 +116,31 @@ class WhatsappClientService implements OnModuleInit {
   }
 
   async syncChat(chat: WAWebJS.Chat, user: User) {
-    if (chat.isGroup) {
-      this.logger.log(
-        `[${user.id}]`,
-        `Skipped chat (group): ${chat.id._serialized}`,
-      );
-      return;
+    if (chat.isGroup) return;
+
+    if (!chat.lastMessage) {
+      const messages: WAWebJS.Message[] = await chat
+        .fetchMessages({ limit: 1 })
+        .catch(() => []);
+      if (messages?.length > 0) {
+        chat.lastMessage = messages[0];
+      }
     }
 
     const contact = await chat.getContact().catch(() => null);
+
+    if (!contact) {
+      this.logger.warn(`[${user.id}] Syncing chat failed: getContact failure`, {
+        chat,
+      });
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const profile: string | null = await contact
+      .getProfilePicUrl()
+      .catch(() => null);
 
     if (!contact) {
       this.logger.warn(
@@ -151,7 +150,6 @@ class WhatsappClientService implements OnModuleInit {
       return;
     }
 
-    const profile = await contact.getProfilePicUrl().catch(() => null);
     const entity = WhatsappChatMapper.toEntity(
       {
         ...chat,
@@ -160,11 +158,19 @@ class WhatsappClientService implements OnModuleInit {
       },
       user,
     );
-    // this.logger.log(`[${user.id}]`, `Syncing chat: ${entity.id}`);
-    await this.whatsappChatRepository.upsert(entity, ["user", "id"]);
+
+    if (!entity?.lastMessage) {
+      this.logger.warn(
+        `[${user.id}]`,
+        "Syncing chat failed: lastMessage is null",
+      );
+      return;
+    }
+
+    await this.whatsappChatRepository.upsert(entity, ["userId", "id"]);
   }
 
-  async syncChats(userId: string, client: WAWebJS.Client) {
+  async syncAllChats(userId: string, client: WAWebJS.Client) {
     const user = await this.userRepository.findOneBy({ id: userId });
 
     if (!user) {
@@ -172,20 +178,36 @@ class WhatsappClientService implements OnModuleInit {
       return;
     }
 
-    void this.updateConnectionStatus(user.id, {
-      isSyncing: true,
+    void this.updateConnectionStatus(user.id, { isSyncing: true });
+
+    await new Promise((resolve) => setTimeout(resolve, 10000));
+
+    const chats = await client.getChats().catch(() => []);
+    const syncChats: WAWebJS.Chat[] = [];
+
+    this.logger.log(`[${userId}] Found ${chats.length} chats to sync.`);
+
+    const syncPromises: Promise<void>[] = chats.map(async (chat) => {
+      try {
+        void this.updateConnectionStatus(userId, { hasUpdates: true });
+
+        await this.syncChat(chat, user);
+
+        syncChats.push(chat);
+      } catch (error) {
+        this.logger.warn(
+          `[${userId}] Syncing chat failed ${chat?.id?._serialized}: ${error}`,
+        );
+      } finally {
+        void this.updateConnectionStatus(userId, { hasUpdates: true });
+      }
     });
 
-    const chats = await client.getChats();
-
-    const syncPromises: Promise<void>[] = chats.map((chat) => {
-      void this.updateConnectionStatus(userId, {
-        hasUpdates: true,
-      });
-      return this.syncChat(chat, user);
-    });
-
-    void Promise.all(syncPromises).finally(() => {
+    await Promise.all(syncPromises).finally(() => {
+      this.logger.log(
+        `[${userId}] ${syncChats.length} of ${chats.length} chats synced.`,
+      );
+      this.printSyncReport(userId, syncChats, chats);
       void this.updateConnectionStatus(userId, {
         isSyncing: false,
         hasUpdates: true,
@@ -209,8 +231,7 @@ class WhatsappClientService implements OnModuleInit {
     }
 
     this.logger.log(
-      `[${user.id}]`,
-      `Syncing chat from message: ${chat.id._serialized}`,
+      `[${user.id}] Syncing chat from message: ${chat.id._serialized}`,
     );
     void this.syncChat(chat, user);
   }
@@ -226,9 +247,33 @@ class WhatsappClientService implements OnModuleInit {
         {
           qr: null,
           isSyncing: false,
-          status: WhatsappClientStatusEnum.ERROR,
+          status: WhatsappClientStatusEnum.RELOADING,
         },
       );
+    }
+  }
+
+  private printSyncReport(
+    userId: string,
+    syncChats: WAWebJS.Chat[],
+    chats: WAWebJS.Chat[],
+  ) {
+    if (syncChats.length < chats.length) {
+      const failedCount = chats.length - syncChats.length;
+      this.logger.error(`[${userId}] ${failedCount} chats failed to sync.`);
+
+      const syncChatIds = new Set(
+        syncChats.map((syncChat) => syncChat?.id?._serialized),
+      );
+
+      for (const chat of chats) {
+        const chatId = chat?.id?._serialized;
+        if (!syncChatIds.has(chatId)) {
+          this.logger.warn(`[${userId}]`, "Chats failed to sync report:", {
+            chat,
+          });
+        }
+      }
     }
   }
 
@@ -371,7 +416,7 @@ class WhatsappClientService implements OnModuleInit {
       void this.updateConnectionStatus(clientId, {
         status: WhatsappClientStatusEnum.CONNECTED,
       });
-      void this.syncChats(clientId, client);
+      void this.syncAllChats(clientId, client);
     });
 
     client.on("message", (message) => {
