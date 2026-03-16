@@ -63,11 +63,9 @@ export class WhatsappClientService implements OnModuleInit {
       qr: null,
     });
 
-    const sessionPath = join(
-      process.cwd(),
-      ".wwebjs_auth",
-      `session-${userId}`,
-    );
+    const sessionRoot: string =
+      process.env.WHATSAPP_SESSION_PATH || join(process.cwd(), ".wwebjs_auth");
+    const sessionPath: string = join(sessionRoot, `session-${userId}`);
 
     if (existsSync(sessionPath)) {
       try {
@@ -244,9 +242,10 @@ export class WhatsappClientService implements OnModuleInit {
       return;
     }
 
-    const sessionRoot = join(process.cwd(), ".wwebjs_auth");
-    const clientSessionPath = join(sessionRoot, `session-${clientId}`);
-    const lockPath = join(clientSessionPath, "SingletonLock");
+    const sessionRoot: string =
+      process.env.WHATSAPP_SESSION_PATH || join(process.cwd(), ".wwebjs_auth");
+    const clientSessionPath: string = join(sessionRoot, `session-${clientId}`);
+    const lockPath: string = join(clientSessionPath, "SingletonLock");
 
     if (existsSync(lockPath)) {
       try {
