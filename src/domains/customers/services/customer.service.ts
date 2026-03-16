@@ -3,7 +3,7 @@ import { CustomerRepository } from "../repositories/customer.repository";
 import { CustomerMapper } from "../mappers/customer.mapper";
 import { User } from "../../users/entities/user.entity";
 import { Customer } from "../entities/customer.entity";
-import { FindOptionsWhere, ILike } from "typeorm";
+import { FindOptionsWhere, ILike, Repository } from "typeorm";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
 import { ValidateName } from "../../../shared/decorators/validation/name.decorator";
 import { ValidateBrazilianPhoneNumber } from "../../../shared/decorators/validation/brazilian-phone-number.decorator";
@@ -14,6 +14,8 @@ import dayjs from "dayjs";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 import { WhatsappChat } from "../../whatsapp/entities/whatsapp-chat.entity";
+import { InjectRepository } from "@nestjs/typeorm";
+import { CustomerComment } from "../entities/customer-comments.entity";
 
 dayjs.extend(isSameOrAfter);
 
@@ -49,7 +51,11 @@ export class CustomerFilterDto extends PaginationRequestDto {
 
 @Injectable()
 export class CustomerService {
-  constructor(private readonly customerRepository: CustomerRepository) {}
+  constructor(
+    private readonly customerRepository: CustomerRepository,
+    @InjectRepository(CustomerComment)
+    private readonly customerCommentRepository: Repository<CustomerComment>,
+  ) {}
 
   async findAll(user: User, dto: CustomerFilterDto) {
     const baseWhere: FindOptionsWhere<Customer> = {
@@ -155,11 +161,10 @@ export class CustomerService {
 
   async save(user: User, dto: CustomerCreateDto, id?: string) {
     const entity = CustomerMapper.toEntity(dto, id);
-    console.log("Saving entity with ID:", entity.id);
     entity.user = user;
     entity.pending = false;
     entity.ignored = false;
-    return this.customerRepository.save(entity);
+    return await this.customerRepository.save(entity);
   }
 
   async remove(user: User, id: string) {
