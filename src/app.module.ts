@@ -13,7 +13,6 @@ import { CustomerModule } from "./domains/customers/customer.module";
 import { KanbanModule } from "./domains/kanbans/kanban.module";
 import { WhatsappModule } from "./domains/whatsapp/whatsapp.module";
 import { VisitModule } from "./domains/visits/visit.module";
-import { mongoConfig } from "./config/mongo.config";
 
 const THROTTLE_TTL_MS = 60_000;
 const THROTTLE_LIMIT = 30;
@@ -22,14 +21,7 @@ const THROTTLE_LIMIT = 30;
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [
-        appConfig,
-        databaseConfig,
-        authConfig,
-        mailConfig,
-        jwtConfig,
-        mongoConfig,
-      ],
+      load: [appConfig, databaseConfig, authConfig, mailConfig, jwtConfig],
       envFilePath: ".env",
     }),
     TypeOrmModule.forRootAsync({
