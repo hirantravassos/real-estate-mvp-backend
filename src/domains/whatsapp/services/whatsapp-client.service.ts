@@ -287,27 +287,31 @@ class WhatsappClientService implements OnModuleInit {
     const sessionDataPath: string =
       process.env.WHATSAPP_SESSION_PATH || join(process.cwd(), ".wwebjs_auth");
 
-    const lockFilePath: string = join(
+    const userSessionDirectory: string = join(
       sessionDataPath,
       `session-${clientId}`,
-      "Default",
-      "SingletonLock",
     );
 
     try {
       this.logger.log(
-        `[${clientId}] Checking for stale Chromium lock files...`,
+        `[${clientId}] Searching for and removing all stale Chromium lock files...`,
       );
-      await fs.rm(lockFilePath, { force: true });
-    } catch (lockRemovalError) {
-      this.logger.warn(
-        `[${clientId}] Could not remove lock file, it might not exist: ${lockRemovalError}`,
-      );
+
+      const lockFiles: string[] = [
+        join(userSessionDirectory, "SingletonLock"),
+        join(userSessionDirectory, "Default", "SingletonLock"),
+        join(userSessionDirectory, "SingletonCookie"),
+        join(userSessionDirectory, "SingletonSocket"),
+      ];
+
+      for (const lockFilePath of lockFiles) {
+        await fs.rm(lockFilePath, { force: true }).catch(() => null);
+      }
+    } catch (cleanupError) {
+      this.logger.warn(`[${clientId}] Cleanup warning: ${cleanupError}`);
     }
 
-    this.logger.log(
-      `[${clientId}] Starting cold boot: Checking session directory and spawning puppeteer...`,
-    );
+    this.logger.log(`[${clientId}] Starting cold boot: Spawning puppeteer...`);
 
     const client = new Client({
       authStrategy: new LocalAuth({
