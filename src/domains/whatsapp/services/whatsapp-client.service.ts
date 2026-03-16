@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   OnModuleInit,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import WAWebJS, { Client, LocalAuth, WAState } from "whatsapp-web.js";
 import { Repository } from "typeorm";
@@ -12,8 +13,8 @@ import { WhatsappChat } from "../entities/whatsapp-chat.entity";
 import { WhatsappChatMapper } from "../mappers/whatsapp-chat.mapper";
 import { WhatsappStatus } from "../entities/whatsapp-status.entity";
 import { WhatsappClientStatusEnum } from "../enums/whatsapp-client-status.enum";
-import { join } from "node:path";
-import { existsSync, rmSync } from "fs";
+import { join } from "path";
+import * as fs from "fs/promises";
 
 interface WhatsappStatusDto {
   status: WhatsappClientStatusEnum;
@@ -23,7 +24,7 @@ interface WhatsappStatusDto {
 }
 
 @Injectable()
-export class WhatsappClientService implements OnModuleInit {
+class WhatsappClientService implements OnModuleInit {
   private readonly logger = new Logger(WhatsappClientService.name);
   private clients: Map<string, Client> = new Map();
 
@@ -37,14 +38,48 @@ export class WhatsappClientService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    await this.restoreAllSessions();
+    await this.clearAllStatuses();
+
+    const users = await this.userRepository.find();
+    for (const user of users) {
+      void this.initializeClient(user);
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+  }
+
+  async wipeUserSession(userId: string): Promise<void> {
+    this.logger.warn(`[${userId}] Wiping all session data...`);
+
+    const existingClient = this.clients.get(userId);
+
+    if (existingClient) {
+      try {
+        await existingClient.destroy();
+      } catch (error) {
+        this.logger.error(
+          `[${userId}] Error destroying client during wipe: ${error}`,
+        );
+      }
+      this.clients.delete(userId);
+    }
+
+    const userAuthPath = join(process.cwd(), ".wwebjs_auth", userId);
+    await fs
+      .rm(userAuthPath, { recursive: true, force: true })
+      .catch(() => null);
+
+    await this.updateConnectionStatus(userId, {
+      status: WhatsappClientStatusEnum.ERROR,
+      qr: null,
+      isSyncing: false,
+    });
   }
 
   requestConnection(user: User) {
     const clientId: string = user.id;
 
     if (this.clients.has(clientId)) {
-      void this.restoreSession(clientId);
+      // void this.restoreSession(clientId);
 
       return {
         success: true,
@@ -52,7 +87,7 @@ export class WhatsappClientService implements OnModuleInit {
       };
     }
 
-    void this.initializeClient(clientId);
+    void this.initializeClient(user);
   }
 
   async requestLogout(userId: string) {
@@ -60,38 +95,18 @@ export class WhatsappClientService implements OnModuleInit {
 
     void this.updateConnectionStatus(userId, {
       status: WhatsappClientStatusEnum.ERROR,
+      hasUpdates: false,
+      isSyncing: false,
       qr: null,
     });
 
-    const sessionPath = join(
-      process.cwd(),
-      ".wwebjs_auth",
-      `session-${userId}`,
-    );
-
-    if (existsSync(sessionPath)) {
-      try {
-        this.logger.log(
-          `[${userId}] Destroying session files at ${sessionPath}`,
-        );
-        rmSync(sessionPath, { recursive: true, force: true });
-      } catch (err) {
-        this.logger.error(
-          `[${userId}] Failed to delete session folder: ${err}`,
-        );
-      }
-    }
-
     const client = this.clients.get(userId);
-
     if (client) {
       try {
         await client.logout();
-        await client.destroy(); // Properly close the browser process
+        await client.destroy();
       } catch (err) {
-        this.logger.warn(
-          `[${userId}] Error during client logout/destroy: ${err}`,
-        );
+        this.logger.warn(`[${userId}] Error during logout: ${err}`);
       } finally {
         this.clients.delete(userId);
       }
@@ -101,18 +116,13 @@ export class WhatsappClientService implements OnModuleInit {
   async getClientOrThrow(user: User): Promise<Client> {
     const client = this.clients.get(user.id);
 
-    if (!client) {
+    if (!client)
       throw new NotFoundException(`Client not found for user: ${user.id}`);
-    }
 
-    const state = await client.getState();
+    const state = await this.waitForConnected(client, user.id);
 
     if (state !== WAState.CONNECTED) {
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          resolve(client);
-        }, 5000);
-      });
+      throw new ServiceUnavailableException("WhatsApp client is not ready.");
     }
 
     void this.updateConnectionStatus(user.id, {
@@ -154,7 +164,7 @@ export class WhatsappClientService implements OnModuleInit {
     await this.whatsappChatRepository.upsert(entity, ["user", "id"]);
   }
 
-  private async syncChats(userId: string, client: WAWebJS.Client) {
+  async syncChats(userId: string, client: WAWebJS.Client) {
     const user = await this.userRepository.findOneBy({ id: userId });
 
     if (!user) {
@@ -168,9 +178,12 @@ export class WhatsappClientService implements OnModuleInit {
 
     const chats = await client.getChats();
 
-    const syncPromises: Promise<void>[] = chats.map((chat) =>
-      this.syncChat(chat, user),
-    );
+    const syncPromises: Promise<void>[] = chats.map((chat) => {
+      void this.updateConnectionStatus(userId, {
+        hasUpdates: true,
+      });
+      return this.syncChat(chat, user);
+    });
 
     void Promise.all(syncPromises).finally(() => {
       void this.updateConnectionStatus(userId, {
@@ -180,7 +193,7 @@ export class WhatsappClientService implements OnModuleInit {
     });
   }
 
-  private async syncMessage(userId: string, message: WAWebJS.Message) {
+  async syncMessage(userId: string, message: WAWebJS.Message) {
     const user = await this.userRepository.findOneBy({ id: userId });
 
     if (!user) return;
@@ -202,21 +215,50 @@ export class WhatsappClientService implements OnModuleInit {
     void this.syncChat(chat, user);
   }
 
-  private async restoreAllSessions(): Promise<void> {
-    this.logger.log("Restoring previous WhatsApp sessions...");
+  private async clearAllStatuses() {
+    this.logger.log("Cleaning up stale WhatsApp statuses...");
 
     const users = await this.userRepository.find();
 
     for (const user of users) {
-      void this.restoreSession(user.id);
-      this.logger.log(`Waiting 5s for ${user.id} to stabilize...`);
-      await new Promise((resolve) => setTimeout(resolve, 5000));
+      await this.whatsappStatusRepository.update(
+        { user: { id: user.id } },
+        {
+          qr: null,
+          isSyncing: false,
+          status: WhatsappClientStatusEnum.ERROR,
+        },
+      );
     }
   }
 
-  private restoreSession(clientId: string): void {
-    this.logger.log(`Restoring session for: ${clientId}`);
-    void this.initializeClient(clientId);
+  private async waitForConnected(
+    client: Client,
+    userId: string,
+    maxRetries = 5,
+  ): Promise<WAState | null> {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const state = await client.getState();
+        if (state === WAState.CONNECTED) return state;
+
+        this.logger.log(
+          `[${userId}] Waiting for connection... attempt ${i + 1}/${maxRetries} (state: ${state})`,
+        );
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `[${userId}] Client state check failed: ${errorMessage}`,
+        );
+      }
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, i === 0 ? 2000 : 5000),
+      );
+    }
+
+    // Final attempt
+    return client.getState().catch(() => null);
   }
 
   private async updateConnectionStatus(
@@ -232,60 +274,90 @@ export class WhatsappClientService implements OnModuleInit {
     );
   }
 
-  private async initializeClient(clientId: string): Promise<void> {
-    this.logger.log(`[${clientId}] Initializing client...`);
+  private async initializeClient(user: User): Promise<void> {
+    const clientId: string = user.id;
 
-    const user = await this.userRepository.findOneBy({ id: clientId });
-
-    if (!user) {
+    if (this.clients.has(clientId)) {
       this.logger.warn(
-        `[${clientId}] While initializing client, user not found. Skipping...`,
+        `[${clientId}] Initialization aborted: Client already exists in memory.`,
       );
       return;
     }
 
-    const sessionRoot = join(process.cwd(), ".wwebjs_auth");
-    const clientSessionPath = join(sessionRoot, `session-${clientId}`);
-    const lockPath = join(clientSessionPath, "SingletonLock");
+    const sessionDataPath: string =
+      process.env.WHATSAPP_SESSION_PATH || join(process.cwd(), ".wwebjs_auth");
 
-    if (existsSync(lockPath)) {
-      try {
-        this.logger.log(`[${clientId}] Removing stale browser lock...`);
-        rmSync(lockPath, { force: true });
-      } catch (err) {
-        this.logger.warn(`[${clientId}] Could not remove lock: ${err}`);
+    const userSessionDirectory: string = join(
+      sessionDataPath,
+      `session-${clientId}`,
+    );
+
+    try {
+      this.logger.log(
+        `[${clientId}] Searching for and removing all stale Chromium lock files...`,
+      );
+
+      const lockFiles: string[] = [
+        join(userSessionDirectory, "SingletonLock"),
+        join(userSessionDirectory, "Default", "SingletonLock"),
+        join(userSessionDirectory, "SingletonCookie"),
+        join(userSessionDirectory, "SingletonSocket"),
+      ];
+
+      for (const lockFilePath of lockFiles) {
+        await fs.rm(lockFilePath, { force: true }).catch(() => null);
       }
+    } catch (cleanupError) {
+      this.logger.warn(`[${clientId}] Cleanup warning: ${cleanupError}`);
     }
+
+    this.logger.log(`[${clientId}] Starting cold boot: Spawning puppeteer...`);
 
     const client = new Client({
       authStrategy: new LocalAuth({
         clientId: clientId,
-        dataPath: sessionRoot,
+        dataPath: sessionDataPath,
       }),
       puppeteer: {
         headless: true,
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH ?? undefined,
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
           "--disable-dev-shm-usage",
           "--disable-gpu",
-          "--no-zygote",
-          "--disable-extensions",
-          "--disable-component-update",
-          "--no-first-run",
+          "--disable-software-rasterizer",
         ],
       },
     });
 
-    // this.logger.debug(`[${clientId}] Client created.`, {
-    //   client,
-    //   webVersion: await client.getWWebVersion().catch(() => null),
-    // });
+    this.initializeListener(clientId, client, user);
+    try {
+      this.logger.log(`[${clientId}] Invoking whatsapp-web.js initialize()...`);
+      await client.initialize();
+      this.clients.set(clientId, client);
+      this.logger.log(
+        `[${clientId}] Client instance successfully registered in memory map.`,
+      );
+    } catch (initializationError) {
+      this.logger.error(
+        `[${clientId}] Critical failure during cold boot: ${initializationError}`,
+      );
+      this.clients.delete(clientId);
+    }
+  }
 
-    this.clients.set(clientId, client);
+  private initializeListener(
+    clientId: string,
+    client: Client,
+    user: User,
+  ): void {
+    this.logger.log(
+      `[${clientId}] Attaching event listeners for lifecycle observability...`,
+    );
 
     client.on("qr", (qr: string) => {
+      this.logger.log(`[${clientId}] QR Code generated. Awaiting user scan...`);
       void this.updateConnectionStatus(clientId, {
         status: WhatsappClientStatusEnum.PENDING,
         qr,
@@ -293,6 +365,9 @@ export class WhatsappClientService implements OnModuleInit {
     });
 
     client.on("ready", () => {
+      this.logger.log(
+        `[${clientId}] Client is READY. Starting initial chat synchronization...`,
+      );
       void this.updateConnectionStatus(clientId, {
         status: WhatsappClientStatusEnum.CONNECTED,
       });
@@ -315,14 +390,16 @@ export class WhatsappClientService implements OnModuleInit {
     });
 
     client.on("authenticated", () => {
+      this.logger.log(
+        `[${clientId}] Authentication successful. Session files are being utilized.`,
+      );
       void this.updateConnectionStatus(clientId, {
         status: WhatsappClientStatusEnum.AUTHENTICATED,
       });
-      this.logger.log(`[${clientId}] Session authenticated.`);
     });
 
     client.on("auth_failure", (message: string) => {
-      this.logger.warn(`[${clientId}] Authentication failure: ${message}`);
+      this.logger.warn(`[${clientId}] Client disconnected. Reason: ${message}`);
       void this.updateConnectionStatus(clientId, {
         status: WhatsappClientStatusEnum.ERROR,
       });
@@ -338,8 +415,16 @@ export class WhatsappClientService implements OnModuleInit {
       this.clients.delete(clientId);
     });
 
-    void client.initialize().catch((error) => {
-      this.logger.error(`[${clientId}] Initialization error:`, error);
+    client.on("remote_session_saved", () => {
+      this.logger.log(
+        `[${clientId}] Session successfully persisted to MongoDB!`,
+      );
+    });
+
+    client.on("change_state", (state) => {
+      this.logger.log(`[${clientId}] Connection state changed to: ${state}`);
     });
   }
 }
+
+export default WhatsappClientService;

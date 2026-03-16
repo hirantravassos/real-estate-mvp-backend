@@ -1,8 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
-import { APP_GUARD } from "@nestjs/core";
 import { databaseConfig } from "./config/database.config.js";
 import { authConfig } from "./config/auth.config.js";
 import { mailConfig } from "./config/mail.config.js";

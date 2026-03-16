@@ -2,7 +2,7 @@ import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { WhatsappChat } from "./entities/whatsapp-chat.entity";
 import { WhatsappClientController } from "./controllers/whatsapp-client.controller";
-import { WhatsappClientService } from "./services/whatsapp-client.service";
+import WhatsappClientService from "./services/whatsapp-client.service";
 import { User } from "../users/entities/user.entity";
 import { WhatsappChatService } from "./services/whatsapp-chat.service";
 import { WhatsappChatController } from "./controllers/whatsapp-chat.controller";
