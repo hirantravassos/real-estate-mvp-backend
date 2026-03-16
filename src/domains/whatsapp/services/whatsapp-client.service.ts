@@ -57,12 +57,45 @@ export class WhatsappClientService implements OnModuleInit {
 
   async requestLogout(userId: string) {
     this.logger.log(`[${userId}] Client was logged out by user request`);
+
     void this.updateConnectionStatus(userId, {
       status: WhatsappClientStatusEnum.ERROR,
       qr: null,
     });
+
+    const sessionPath = join(
+      process.cwd(),
+      ".wwebjs_auth",
+      `session-${userId}`,
+    );
+
+    if (existsSync(sessionPath)) {
+      try {
+        this.logger.log(
+          `[${userId}] Destroying session files at ${sessionPath}`,
+        );
+        rmSync(sessionPath, { recursive: true, force: true });
+      } catch (err) {
+        this.logger.error(
+          `[${userId}] Failed to delete session folder: ${err}`,
+        );
+      }
+    }
+
     const client = this.clients.get(userId);
-    await client?.logout();
+
+    if (client) {
+      try {
+        await client.logout();
+        await client.destroy(); // Properly close the browser process
+      } catch (err) {
+        this.logger.warn(
+          `[${userId}] Error during client logout/destroy: ${err}`,
+        );
+      } finally {
+        this.clients.delete(userId);
+      }
+    }
   }
 
   async getClientOrThrow(user: User): Promise<Client> {
@@ -176,8 +209,8 @@ export class WhatsappClientService implements OnModuleInit {
 
     for (const user of users) {
       void this.restoreSession(user.id);
-      this.logger.log(`Waiting 3s for ${user.id} to stabilize...`);
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+      this.logger.log(`Waiting 5s for ${user.id} to stabilize...`);
+      await new Promise((resolve) => setTimeout(resolve, 5000));
     }
   }
 
@@ -231,14 +264,12 @@ export class WhatsappClientService implements OnModuleInit {
       }),
       puppeteer: {
         headless: true,
-        protocolTimeout: 0,
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH ?? undefined,
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
           "--disable-dev-shm-usage",
           "--disable-gpu",
-          "--single-process",
           "--no-zygote",
           "--disable-extensions",
           "--disable-component-update",
