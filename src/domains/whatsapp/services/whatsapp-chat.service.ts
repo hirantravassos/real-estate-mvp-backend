@@ -76,14 +76,21 @@ export class WhatsappChatService {
     void this.whatsappStatusService.clearUpdateStatus(user);
 
     const client = await this.whatsappClientService.getClientOrThrow(user);
-    const chatClient = await client.getChatById(chatId).catch(() => {
-      this.logger.warn("[findOne.findOne] Chat not found for this user", {
-        user,
-        chatId,
-        limit,
+    const chatClient = await client
+      .getChatById(chatId)
+      .catch((err: unknown) => {
+        const errorDetails = err instanceof Error ? err.stack : String(err);
+        this.logger.error(
+          `[findOne.getChatById] Failed to get chat: ${chatId}`,
+          {
+            error: errorDetails,
+            userId: user.id,
+          },
+        );
+        throw new ForbiddenException(
+          `Chat ${chatId} not found or inaccessible for this user`,
+        );
       });
-      throw new ForbiddenException("Chat not found for this user");
-    });
 
     await this.whatsappClientService.syncChat(chatClient, user);
 
