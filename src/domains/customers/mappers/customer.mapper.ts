@@ -34,6 +34,7 @@ export class CustomerMapper {
       name: entity.name,
       phone: entity.phone,
       kanban: entity.kanban,
+      budget: entity.budget,
       comments: this.toComments(entity.comments),
       visits: this.toVisit(entity.visits),
       chat: this.toChat(entity?.chat),

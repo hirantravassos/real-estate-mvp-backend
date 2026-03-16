@@ -21,7 +21,7 @@ export function ValidateCurrency(
   decorators.push(
     Transform(({ value }) => {
       if (typeof value === "string") {
-        const parsed = Math.round(parseFloat(value) * 100);
+        const parsed = Math.round(parseFloat(value) * 1);
         return isNaN(parsed) ? value : parsed;
       }
       return value as number;
