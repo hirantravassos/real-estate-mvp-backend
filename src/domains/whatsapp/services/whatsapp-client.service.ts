@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   OnModuleInit,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import WAWebJS, { Client, LocalAuth, WAState } from "whatsapp-web.js";
 import { Repository } from "typeorm";
@@ -37,7 +38,20 @@ export class WhatsappClientService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    await this.clearAllStatuses();
     await this.restoreAllSessions();
+  }
+
+  private async clearAllStatuses() {
+    this.logger.log("Cleaning up stale WhatsApp statuses...");
+    await this.whatsappStatusRepository.update(
+      {},
+      {
+        qr: null,
+        isSyncing: false,
+        status: WhatsappClientStatusEnum.ERROR,
+      },
+    );
   }
 
   requestConnection(user: User) {
@@ -103,22 +117,12 @@ export class WhatsappClientService implements OnModuleInit {
       throw new NotFoundException(`Client not found for user: ${user.id}`);
     }
 
-    let state: WAState | null = null;
-    try {
-      state = await client.getState();
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      this.logger.warn(
-        `[${user.id}] Failed to get client state (likely not initialized): ${errorMessage}`,
-      );
-    }
+    const state = await this.waitForConnected(client, user.id);
 
     if (state !== WAState.CONNECTED) {
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          resolve(client);
-        }, 5000);
-      });
+      throw new ServiceUnavailableException(
+        `WhatsApp client is not ready (current state: ${state}). Please try again in a few seconds.`,
+      );
     }
 
     void this.updateConnectionStatus(user.id, {
@@ -126,6 +130,35 @@ export class WhatsappClientService implements OnModuleInit {
     });
 
     return client;
+  }
+
+  private async waitForConnected(
+    client: Client,
+    userId: string,
+    maxRetries = 5,
+  ): Promise<WAState | null> {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const state = await client.getState();
+        if (state === WAState.CONNECTED) return state;
+
+        this.logger.log(
+          `[${userId}] Waiting for connection... attempt ${i + 1}/${maxRetries} (state: ${state})`,
+        );
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `[${userId}] Client state check failed: ${errorMessage}`,
+        );
+      }
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, i === 0 ? 2000 : 5000),
+      );
+    }
+
+    // Final attempt
+    return client.getState().catch(() => null);
   }
 
   async syncChat(chat: WAWebJS.Chat, user: User) {
@@ -214,9 +247,21 @@ export class WhatsappClientService implements OnModuleInit {
     const users = await this.userRepository.find();
 
     for (const user of users) {
-      void this.restoreSession(user.id);
-      this.logger.log(`Waiting 5s for ${user.id} to stabilize...`);
-      await new Promise((resolve) => setTimeout(resolve, 5000));
+      const sessionRoot: string =
+        process.env.WHATSAPP_SESSION_PATH ||
+        join(process.cwd(), ".wwebjs_auth");
+      const sessionPath: string = join(sessionRoot, `session-${user.id}`);
+
+      if (existsSync(sessionPath)) {
+        void this.restoreSession(user.id);
+        this.logger.log(`Restoring session for ${user.id}...`);
+        // Wait a bit between restorations to avoid heavy CPU load
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      } else {
+        this.logger.log(
+          `No session found for ${user.id}, skipping restoration.`,
+        );
+      }
     }
   }
 
