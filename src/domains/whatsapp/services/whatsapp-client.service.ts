@@ -284,17 +284,35 @@ class WhatsappClientService implements OnModuleInit {
       return;
     }
 
+    const sessionDataPath: string =
+      process.env.WHATSAPP_SESSION_PATH || join(process.cwd(), ".wwebjs_auth");
+
+    const lockFilePath: string = join(
+      sessionDataPath,
+      `session-${clientId}`,
+      "Default",
+      "SingletonLock",
+    );
+
+    try {
+      this.logger.log(
+        `[${clientId}] Checking for stale Chromium lock files...`,
+      );
+      await fs.rm(lockFilePath, { force: true });
+    } catch (lockRemovalError) {
+      this.logger.warn(
+        `[${clientId}] Could not remove lock file, it might not exist: ${lockRemovalError}`,
+      );
+    }
+
     this.logger.log(
       `[${clientId}] Starting cold boot: Checking session directory and spawning puppeteer...`,
     );
 
-    const dataPath =
-      process.env.WHATSAPP_SESSION_PATH || join(process.cwd(), ".wwebjs_auth");
-
     const client = new Client({
       authStrategy: new LocalAuth({
         clientId: clientId,
-        dataPath,
+        dataPath: sessionDataPath,
       }),
       puppeteer: {
         headless: true,
