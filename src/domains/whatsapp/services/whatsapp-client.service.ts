@@ -303,14 +303,20 @@ export class WhatsappClientService implements OnModuleInit {
     const sessionRoot: string =
       process.env.WHATSAPP_SESSION_PATH || join(process.cwd(), ".wwebjs_auth");
     const clientSessionPath: string = join(sessionRoot, `session-${clientId}`);
-    const lockPath: string = join(clientSessionPath, "SingletonLock");
+    const lockPaths: string[] = [
+      join(clientSessionPath, "SingletonLock"),
+      join(clientSessionPath, "Default", "SingletonLock"),
+      join(clientSessionPath, "SingletonCookie"),
+      join(clientSessionPath, "SingletonSocket"),
+    ];
 
-    if (existsSync(lockPath)) {
-      try {
-        this.logger.log(`[${clientId}] Removing stale browser lock...`);
-        rmSync(lockPath, { force: true });
-      } catch (err) {
-        this.logger.warn(`[${clientId}] Could not remove lock: ${err}`);
+    for (const path of lockPaths) {
+      if (existsSync(path)) {
+        try {
+          rmSync(path, { force: true });
+        } catch (error) {
+          this.logger.warn(`[${clientId}] Failed to remove lock at ${path}: ${error.message}`);
+        }
       }
     }
 
@@ -321,16 +327,14 @@ export class WhatsappClientService implements OnModuleInit {
       }),
       puppeteer: {
         headless: true,
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH ?? undefined,
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
           "--disable-dev-shm-usage",
           "--disable-gpu",
           "--no-zygote",
-          "--disable-extensions",
-          "--disable-component-update",
-          "--no-first-run",
+          "--single-process",
         ],
       },
     });
@@ -397,6 +401,7 @@ export class WhatsappClientService implements OnModuleInit {
 
     void client.initialize().catch((error) => {
       this.logger.error(`[${clientId}] Initialization error:`, error);
+      this.clients.delete(clientId);
     });
   }
 }
