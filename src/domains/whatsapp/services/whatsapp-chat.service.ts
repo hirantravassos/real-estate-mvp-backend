@@ -8,7 +8,7 @@ import WhatsappClientService from "./whatsapp-client.service";
 import { User } from "../../users/entities/user.entity";
 import { WhatsappChatMapper } from "../mappers/whatsapp-chat.mapper";
 import { InjectRepository } from "@nestjs/typeorm";
-import { FindOptionsWhere, ILike, Repository } from "typeorm";
+import { FindOptionsWhere, ILike, IsNull, Repository } from "typeorm";
 import { WhatsappChat } from "../entities/whatsapp-chat.entity";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
@@ -37,6 +37,10 @@ export class WhatsappChatFilterDto extends PaginationRequestDto {
   @IsOptional()
   @ValidateBoolean({})
   ignored: boolean | null;
+
+  @IsOptional()
+  @ValidateBoolean({})
+  new: boolean | null;
 }
 
 @Injectable()
@@ -58,6 +62,9 @@ export class WhatsappChatService {
       relations: {
         customer: {
           kanban: true,
+        },
+        propertiesContact: {
+          property: true,
         },
       },
       order: {
@@ -103,6 +110,9 @@ export class WhatsappChatService {
           id: chatId,
         },
         relations: {
+          propertiesContact: {
+            property: true,
+          },
           customer: {
             kanban: true,
           },
@@ -250,6 +260,10 @@ export class WhatsappChatService {
 
     if (dto.kanban) {
       baseWhere.customer = { kanban: { id: dto.kanban } };
+    }
+
+    if (dto.new) {
+      baseWhere.customer = { id: IsNull() };
     }
 
     if (dto.unread !== null && dto.unread !== undefined) {

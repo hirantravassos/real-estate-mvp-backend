@@ -3,6 +3,7 @@ import { BaseEntity } from "../../../shared/entities/base.entity";
 import { ColumnPhone } from "../../../shared/decorators/columns/column-phone.decorator";
 import { User } from "../../users/entities/user.entity";
 import { Property } from "./property.entity";
+import { WhatsappChat } from "../../whatsapp/entities/whatsapp-chat.entity";
 
 @Entity("property_contacts")
 export class PropertyContact extends BaseEntity {
@@ -15,6 +16,19 @@ export class PropertyContact extends BaseEntity {
 
   @Column({ type: "varchar", nullable: false })
   userId: string;
+
+  @ManyToOne(
+    () => WhatsappChat,
+    (whatsappChat) => whatsappChat.propertiesContact,
+    {
+      createForeignKeyConstraints: false,
+    },
+  )
+  @JoinColumn([
+    { name: "userId", referencedColumnName: "userId" },
+    { name: "phone", referencedColumnName: "phone" },
+  ])
+  whatsappChat?: WhatsappChat;
 
   @ManyToOne(() => Property, (property) => property.contacts, {
     nullable: false,

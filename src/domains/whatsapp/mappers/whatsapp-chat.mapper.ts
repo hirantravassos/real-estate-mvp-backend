@@ -4,6 +4,7 @@ import { WhatsappHelper } from "../helpers/whatsapp.helper";
 import { User } from "../../users/entities/user.entity";
 import { WhatsappChat } from "../entities/whatsapp-chat.entity";
 import dayjs from "dayjs";
+import { PropertyContact } from "../../properties/entities/property-contact.entity";
 
 export interface WAWebCustomChatWithContactDto extends WAWebJS.Chat {
   contact?: WAWebJS.Contact | null;
@@ -37,19 +38,21 @@ export class WhatsappChatMapper {
   }
 
   static toDtoList(entities: WhatsappChat[]) {
-    return entities.map((chat) => {
+    return entities.map((entity) => {
       return {
-        id: chat.id,
-        name: chat.name,
-        phone: chat.phone,
-        profile: chat.profileUrl ?? null,
+        id: entity.id,
+        name: entity.name,
+        phone: entity.phone,
+        profile: entity.profileUrl ?? null,
         lastMessage: {
-          message: chat.lastMessage,
-          sentAt: chat.lastSentAt,
+          message: entity.lastMessage,
+          sentAt: entity.lastSentAt,
         },
-        ignored: chat.ignored ?? false,
-        customer: chat.customer ?? null,
-        unread: chat.unread,
+        ignored: entity.ignored ?? false,
+        customer: entity.customer ?? null,
+        properties: this.toProperty(entity?.propertiesContact ?? []),
+        isOwner: this.toProperty(entity?.propertiesContact ?? [])?.length > 0,
+        unread: entity.unread,
       };
     });
   }
@@ -66,6 +69,8 @@ export class WhatsappChatMapper {
       phone: WhatsappHelper.getPhoneFromChat(chat, customer),
       profile: chat.profile ?? null,
       customer: customer ?? null,
+      properties: this.toProperty(entity?.propertiesContact ?? []),
+      isOwner: this.toProperty(entity?.propertiesContact ?? [])?.length > 0,
       ignored: entity.ignored ?? false,
       messages: messages?.map((message) => this.toMessage(message)),
     };
@@ -81,5 +86,11 @@ export class WhatsappChatMapper {
       location: message?.location ?? null,
       sentAt: DateHelper.formatDateTime(message.timestamp * 1000),
     };
+  }
+
+  private static toProperty(propertyContact: PropertyContact[]) {
+    return propertyContact
+      .map((contact) => contact.property)
+      .filter((property) => !!property);
   }
 }
