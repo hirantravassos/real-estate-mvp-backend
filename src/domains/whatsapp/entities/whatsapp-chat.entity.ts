@@ -3,6 +3,7 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   OneToOne,
   PrimaryColumn,
   Unique,
@@ -12,6 +13,7 @@ import { ColumnPhone } from "../../../shared/decorators/columns/column-phone.dec
 import { ColumnName } from "../../../shared/decorators/columns/column-name.decorator";
 import { Customer } from "../../customers/entities/customer.entity";
 import { ColumnBoolean } from "../../../shared/decorators/columns/column-boolean.decorator";
+import { PropertyContact } from "../../properties/entities/property-contact.entity";
 
 @Entity("whatsapp_chats", {
   orderBy: {
@@ -37,6 +39,15 @@ export class WhatsappChat {
     { name: "userId", referencedColumnName: "userId" },
   ])
   customer?: Customer;
+
+  @OneToMany(
+    () => PropertyContact,
+    (propertyContact) => propertyContact.whatsappChat,
+    {
+      createForeignKeyConstraints: false,
+    },
+  )
+  propertiesContact?: PropertyContact[];
 
   @PrimaryColumn({ type: "varchar", length: 255 })
   id: string;

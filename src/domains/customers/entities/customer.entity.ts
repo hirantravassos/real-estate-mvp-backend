@@ -13,7 +13,6 @@ import { ColumnPhone } from "../../../shared/decorators/columns/column-phone.dec
 import { User } from "../../users/entities/user.entity";
 import { Kanban } from "../../kanbans/entities/kanban.entity";
 import { CustomerComment } from "./customer-comments.entity";
-import { ColumnBoolean } from "../../../shared/decorators/columns/column-boolean.decorator";
 import { Visit } from "../../visits/entities/visit.entity";
 import { ColumnCurrency } from "../../../shared/decorators/columns/column-currency.decorator";
 import { WhatsappChat } from "../../whatsapp/entities/whatsapp-chat.entity";
