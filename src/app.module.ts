@@ -13,6 +13,7 @@ import { CustomerModule } from "./domains/customers/customer.module";
 import { KanbanModule } from "./domains/kanbans/kanban.module";
 import { WhatsappModule } from "./domains/whatsapp/whatsapp.module";
 import { VisitModule } from "./domains/visits/visit.module";
+import { PropertyModule } from "./domains/properties/property.module";
 
 const THROTTLE_TTL_MS = 60_000;
 const THROTTLE_LIMIT = 30;
@@ -52,6 +53,7 @@ const THROTTLE_LIMIT = 30;
     KanbanModule,
     WhatsappModule,
     VisitModule,
+    PropertyModule,
   ],
   // providers: [
   //   {
