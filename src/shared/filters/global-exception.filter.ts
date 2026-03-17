@@ -20,10 +20,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GlobalExceptionFilter.name);
 
   catch(exception: unknown, host: ArgumentsHost): void {
-    const context = host.switchToHttp();
-    const response = context.getResponse<Response>();
-
-    console.error(exception);
+    const httpContext = host.switchToHttp();
+    const response = httpContext.getResponse<Response>();
 
     const statusCode =
       exception instanceof HttpException
@@ -35,21 +33,26 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         ? exception.message
         : "Erro interno do servidor";
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
-    if (statusCode === HttpStatus.INTERNAL_SERVER_ERROR) {
-      this.logger.error(
-        "Unhandled exception",
-        exception instanceof Error ? exception.stack : String(exception),
-      );
-    }
+    const stackTrace =
+      exception instanceof Error ? exception.stack : String(exception);
 
-    const body: ExceptionResponseBody = {
+    const loggingStrategies: Record<number, () => void> = {
+      [HttpStatus.UNAUTHORIZED]: () => this.logger.warn("Expired token"),
+      [HttpStatus.BAD_REQUEST]: () =>
+        this.logger.error(`Bad Request: ${message}`, stackTrace),
+      [HttpStatus.INTERNAL_SERVER_ERROR]: () =>
+        this.logger.error("Unhandled exception", stackTrace),
+    };
+
+    loggingStrategies[statusCode]?.();
+
+    const responseBody: ExceptionResponseBody = {
       statusCode,
       message,
       error: HttpStatus[statusCode] ?? "Unknown Error",
       timestamp: new Date().toISOString(),
     };
 
-    response.status(statusCode).json(body);
+    response.status(statusCode).json(responseBody);
   }
 }

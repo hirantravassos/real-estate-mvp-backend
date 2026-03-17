@@ -4,11 +4,12 @@ import { UserCreateDto } from "../dtos/user-create.dto";
 import { TokenPayload } from "google-auth-library";
 
 export class UserMapper {
-  static toResponseDto(user: User) {
+  static toDto(user: User) {
     return {
       id: user.id,
       email: user.email,
       name: user.name,
+      profileImage: user.profileImage,
       createdAt: DateHelper.formatUtcToIso(user.createdAt),
       updatedAt: DateHelper.formatUtcToIso(user.updatedAt),
     };

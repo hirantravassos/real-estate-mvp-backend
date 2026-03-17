@@ -58,16 +58,6 @@ export class CustomerController {
     return CustomerMapper.toDto(await this.customerService.save(user, dto, id));
   }
 
-  @Post(":id/ignore")
-  async ignore(@GetUser() user: User, @Param("id") customerId: string) {
-    return await this.customerService.ignore(user, customerId);
-  }
-
-  @Post(":id/accept")
-  async accept(@GetUser() user: User, @Param("id") customerId: string) {
-    return await this.customerService.accept(user, customerId);
-  }
-
   @Patch(":id/move")
   async moveToKanban(
     @GetUser() user: User,

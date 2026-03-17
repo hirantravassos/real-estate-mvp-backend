@@ -25,4 +25,7 @@ export class User extends BaseEntity {
 
   @Column({ type: "varchar", length: 1000 })
   googleId: string;
+
+  @Column({ type: "text", nullable: true })
+  profileImage: string | null;
 }

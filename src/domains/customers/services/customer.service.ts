@@ -61,8 +61,6 @@ export class CustomerService {
     const baseWhere: FindOptionsWhere<Customer> = {
       user: { id: user.id },
       active: true,
-      ignored: false,
-      pending: false,
     };
 
     let where:
@@ -109,8 +107,6 @@ export class CustomerService {
     const where: FindOptionsWhere<Customer> = {
       user: { id: user.id },
       active: true,
-      ignored: false,
-      pending: true,
     };
 
     const [data, total] = await this.customerRepository.findAndCount({
@@ -162,8 +158,6 @@ export class CustomerService {
   async save(user: User, dto: CustomerCreateDto, id?: string) {
     const entity = CustomerMapper.toEntity(dto, id);
     entity.user = user;
-    entity.pending = false;
-    entity.ignored = false;
     return await this.customerRepository.save(entity);
   }
 
@@ -171,32 +165,6 @@ export class CustomerService {
     await this.customerRepository.update(
       { id, user: { id: user.id } },
       { active: false },
-    );
-  }
-
-  async ignore(user: User, id: string) {
-    return this.customerRepository.update(
-      {
-        user: { id: user.id },
-        id,
-      },
-      {
-        ignored: true,
-        pending: false,
-      },
-    );
-  }
-
-  async accept(user: User, id: string) {
-    return this.customerRepository.update(
-      {
-        user: { id: user.id },
-        id,
-      },
-      {
-        ignored: false,
-        pending: false,
-      },
     );
   }
 
@@ -215,8 +183,6 @@ export class CustomerService {
     entity.phone = phone;
     entity.name = name;
     entity.user = user;
-    entity.pending = true;
-    entity.ignored = false;
 
     await this.customerRepository.save(entity);
   }
