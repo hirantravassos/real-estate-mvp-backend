@@ -55,6 +55,8 @@ export class CustomerService {
     private readonly customerRepository: CustomerRepository,
     @InjectRepository(CustomerComment)
     private readonly customerCommentRepository: Repository<CustomerComment>,
+    @InjectRepository(WhatsappChat)
+    private readonly whatsappChatRepository: Repository<WhatsappChat>,
   ) {}
 
   async findAll(user: User, dto: CustomerFilterDto) {
@@ -158,6 +160,22 @@ export class CustomerService {
   async save(user: User, dto: CustomerCreateDto, id?: string) {
     const entity = CustomerMapper.toEntity(dto, id);
     entity.user = user;
+
+    const hasMatchingChat = await this.whatsappChatRepository.findOne({
+      where: { user: { id: user.id }, phone: entity.phone },
+    });
+
+    if (hasMatchingChat) {
+      await this.whatsappChatRepository.update(
+        {
+          id: hasMatchingChat.id,
+        },
+        {
+          ignored: false,
+        },
+      );
+    }
+
     return await this.customerRepository.save(entity);
   }
 

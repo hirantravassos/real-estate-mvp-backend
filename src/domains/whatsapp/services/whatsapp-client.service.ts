@@ -182,12 +182,12 @@ class WhatsappClientService implements OnModuleInit {
     const canProceed = can();
 
     if (!canProceed) {
-      this.logger.warn(`[${user.id}] Syncing chat failed: can() is false`, {
-        lastMessage: !!entity?.lastMessage,
-        chatLastMessage: chat?.lastMessage?.timestamp,
-        name: !!entity?.name,
-        phone: !!entity?.phone,
-      });
+      // this.logger.warn(`[${user.id}] Syncing chat failed: can() is false`, {
+      //   lastMessage: !!entity?.lastMessage,
+      //   chatLastMessage: chat?.lastMessage?.timestamp,
+      //   name: !!entity?.name,
+      //   phone: !!entity?.phone,
+      // });
       return;
     }
 
