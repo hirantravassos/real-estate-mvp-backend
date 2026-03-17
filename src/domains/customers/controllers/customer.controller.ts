@@ -58,15 +58,6 @@ export class CustomerController {
     return CustomerMapper.toDto(await this.customerService.save(user, dto, id));
   }
 
-  @Patch(":id/move")
-  async moveToKanban(
-    @GetUser() user: User,
-    @Param("id") customerId: string,
-    @Body() body: { kanbanId: string | null },
-  ) {
-    return this.customerService.moveToKanban(user, customerId, body.kanbanId);
-  }
-
   @Delete(":id")
   remove(@GetUser() user: User, @Param("id") id: string) {
     return this.customerService.remove(user, id);

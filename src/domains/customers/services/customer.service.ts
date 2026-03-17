@@ -185,36 +185,4 @@ export class CustomerService {
       { active: false },
     );
   }
-
-  async createPendingIfNotExists(
-    user: User,
-    phone: string,
-    name: string,
-  ): Promise<void> {
-    const existingCustomer = await this.customerRepository.findOne({
-      where: { phone, user: { id: user.id } },
-    });
-
-    if (existingCustomer) return;
-
-    const entity = new Customer();
-    entity.phone = phone;
-    entity.name = name;
-    entity.user = user;
-
-    await this.customerRepository.save(entity);
-  }
-
-  async moveToKanban(user: User, customerId: string, kanbanId: string | null) {
-    const customer = await this.customerRepository
-      .findOneOrFail({
-        where: { id: customerId, user: { id: user.id } },
-      })
-      .catch(() => {
-        throw new NotFoundException("Customer not found");
-      });
-
-    customer.kanban = kanbanId ? ({ id: kanbanId } as never) : null;
-    return this.customerRepository.save(customer);
-  }
 }

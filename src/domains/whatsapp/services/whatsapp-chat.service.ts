@@ -115,14 +115,18 @@ export class WhatsappChatService {
     //   throw new NotFoundException("Contact not found for this chat");
     // }
 
+    if (!chat) {
+      throw new NotFoundException("Chat not found for user");
+    }
+
     const profile = await contact?.getProfilePicUrl().catch(() => null);
 
     void this.markAsRead(user, chatId);
 
     return WhatsappChatMapper.toDto(
       { ...chatClient, contact, profile },
+      chat,
       messages,
-      chat?.customer,
     );
   }
 
@@ -222,6 +226,13 @@ export class WhatsappChatService {
   async refreshAll(user: User) {
     const client = await this.whatsappClientService.getClientOrThrow(user);
     void this.whatsappClientService.syncAllChats(user.id, client);
+  }
+
+  async reactivate(user: User, id: string) {
+    await this.whatsappChatRepository.update(
+      { id, user: { id: user.id } },
+      { ignored: false },
+    );
   }
 
   private getWhereClause(
