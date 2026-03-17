@@ -14,6 +14,6 @@ export class UserController {
   @Get("me")
   async me(@GetUser() user: User): Promise<UserResponseDto> {
     const entity = await this.userService.findById(user.id);
-    return UserMapper.toResponseDto(entity);
+    return UserMapper.toDto(entity);
   }
 }

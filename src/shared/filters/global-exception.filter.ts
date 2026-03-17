@@ -10,7 +10,7 @@ import type { Response } from "express";
 
 interface ExceptionResponseBody {
   readonly statusCode: number;
-  readonly message: string;
+  readonly message: string | string[] | object;
   readonly error: string;
   readonly timestamp: string;
 }
@@ -20,36 +20,47 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GlobalExceptionFilter.name);
 
   catch(exception: unknown, host: ArgumentsHost): void {
-    const context = host.switchToHttp();
-    const response = context.getResponse<Response>();
+    const httpContext = host.switchToHttp();
+    const response = httpContext.getResponse<Response>();
 
-    console.error(exception);
+    let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
+    let message: string | string[] | object = "Erro interno do servidor";
 
-    const statusCode =
-      exception instanceof HttpException
-        ? exception.getStatus()
-        : HttpStatus.INTERNAL_SERVER_ERROR;
+    if (exception instanceof HttpException) {
+      statusCode = exception.getStatus();
+      const exceptionResponse = exception.getResponse();
 
-    const message =
-      exception instanceof HttpException
-        ? exception.message
-        : "Erro interno do servidor";
-
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
-    if (statusCode === HttpStatus.INTERNAL_SERVER_ERROR) {
-      this.logger.error(
-        "Unhandled exception",
-        exception instanceof Error ? exception.stack : String(exception),
-      );
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      message =
+        typeof exceptionResponse === "object" && exceptionResponse !== null
+          ? // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+            (exceptionResponse as any).message || exception.message
+          : exception.message;
     }
 
-    const body: ExceptionResponseBody = {
+    const stackTrace =
+      exception instanceof Error ? exception.stack : String(exception);
+
+    const loggingStrategies: Record<number, () => void> = {
+      [HttpStatus.UNAUTHORIZED]: () => this.logger.warn("Expired token"),
+      [HttpStatus.BAD_REQUEST]: () =>
+        this.logger.error(
+          `Bad Request: ${JSON.stringify(message)}`,
+          stackTrace,
+        ),
+      [HttpStatus.INTERNAL_SERVER_ERROR]: () =>
+        this.logger.error("Unhandled exception", stackTrace),
+    };
+
+    loggingStrategies[statusCode]?.();
+
+    const responseBody: ExceptionResponseBody = {
       statusCode,
       message,
       error: HttpStatus[statusCode] ?? "Unknown Error",
       timestamp: new Date().toISOString(),
     };
 
-    response.status(statusCode).json(body);
+    response.status(statusCode).json(responseBody);
   }
 }

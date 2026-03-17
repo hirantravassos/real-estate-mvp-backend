@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -60,5 +61,10 @@ export class WhatsappChatController {
   @Post(":id/ignore")
   async ignore(@GetUser() user: User, @Param("id") id: string) {
     return this.whatsappChatsService.ignore(user, id);
+  }
+
+  @Patch(":id/reactivate")
+  async reactivate(@GetUser() user: User, @Param("id") id: string) {
+    return this.whatsappChatsService.reactivate(user, id);
   }
 }

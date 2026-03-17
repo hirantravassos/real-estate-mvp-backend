@@ -55,14 +55,14 @@ export class CustomerService {
     private readonly customerRepository: CustomerRepository,
     @InjectRepository(CustomerComment)
     private readonly customerCommentRepository: Repository<CustomerComment>,
+    @InjectRepository(WhatsappChat)
+    private readonly whatsappChatRepository: Repository<WhatsappChat>,
   ) {}
 
   async findAll(user: User, dto: CustomerFilterDto) {
     const baseWhere: FindOptionsWhere<Customer> = {
       user: { id: user.id },
       active: true,
-      ignored: false,
-      pending: false,
     };
 
     let where:
@@ -109,8 +109,6 @@ export class CustomerService {
     const where: FindOptionsWhere<Customer> = {
       user: { id: user.id },
       active: true,
-      ignored: false,
-      pending: true,
     };
 
     const [data, total] = await this.customerRepository.findAndCount({
@@ -162,8 +160,22 @@ export class CustomerService {
   async save(user: User, dto: CustomerCreateDto, id?: string) {
     const entity = CustomerMapper.toEntity(dto, id);
     entity.user = user;
-    entity.pending = false;
-    entity.ignored = false;
+
+    const hasMatchingChat = await this.whatsappChatRepository.findOne({
+      where: { user: { id: user.id }, phone: entity.phone },
+    });
+
+    if (hasMatchingChat) {
+      await this.whatsappChatRepository.update(
+        {
+          id: hasMatchingChat.id,
+        },
+        {
+          ignored: false,
+        },
+      );
+    }
+
     return await this.customerRepository.save(entity);
   }
 
@@ -172,65 +184,5 @@ export class CustomerService {
       { id, user: { id: user.id } },
       { active: false },
     );
-  }
-
-  async ignore(user: User, id: string) {
-    return this.customerRepository.update(
-      {
-        user: { id: user.id },
-        id,
-      },
-      {
-        ignored: true,
-        pending: false,
-      },
-    );
-  }
-
-  async accept(user: User, id: string) {
-    return this.customerRepository.update(
-      {
-        user: { id: user.id },
-        id,
-      },
-      {
-        ignored: false,
-        pending: false,
-      },
-    );
-  }
-
-  async createPendingIfNotExists(
-    user: User,
-    phone: string,
-    name: string,
-  ): Promise<void> {
-    const existingCustomer = await this.customerRepository.findOne({
-      where: { phone, user: { id: user.id } },
-    });
-
-    if (existingCustomer) return;
-
-    const entity = new Customer();
-    entity.phone = phone;
-    entity.name = name;
-    entity.user = user;
-    entity.pending = true;
-    entity.ignored = false;
-
-    await this.customerRepository.save(entity);
-  }
-
-  async moveToKanban(user: User, customerId: string, kanbanId: string | null) {
-    const customer = await this.customerRepository
-      .findOneOrFail({
-        where: { id: customerId, user: { id: user.id } },
-      })
-      .catch(() => {
-        throw new NotFoundException("Customer not found");
-      });
-
-    customer.kanban = kanbanId ? ({ id: kanbanId } as never) : null;
-    return this.customerRepository.save(customer);
   }
 }

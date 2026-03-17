@@ -1,5 +1,4 @@
 import WAWebJS from "whatsapp-web.js";
-import { Customer } from "../../customers/entities/customer.entity";
 import { DateHelper } from "../../../shared/utils/date.util";
 import { WhatsappHelper } from "../helpers/whatsapp.helper";
 import { User } from "../../users/entities/user.entity";
@@ -48,6 +47,7 @@ export class WhatsappChatMapper {
           message: chat.lastMessage,
           sentAt: chat.lastSentAt,
         },
+        ignored: chat.ignored ?? false,
         customer: chat.customer ?? null,
         unread: chat.unread,
       };
@@ -56,15 +56,17 @@ export class WhatsappChatMapper {
 
   static toDto(
     chat: WAWebCustomChatWithContactDto,
+    entity: WhatsappChat,
     messages: WAWebJS.Message[],
-    customer?: Customer,
   ) {
+    const customer = entity.customer;
     return {
       id: chat.id?._serialized,
       name: WhatsappHelper.getNameFromChat(chat, customer),
       phone: WhatsappHelper.getPhoneFromChat(chat, customer),
       profile: chat.profile ?? null,
       customer: customer ?? null,
+      ignored: entity.ignored ?? false,
       messages: messages?.map((message) => this.toMessage(message)),
     };
   }

@@ -115,14 +115,27 @@ class WhatsappClientService implements OnModuleInit {
     return client;
   }
 
+  async syncSelfProfileImage(user: User, client: WAWebJS.Client) {
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+
+    const selfContactId = client.info.wid._serialized;
+    const profileImage = await client
+      .getProfilePicUrl(selfContactId)
+      ?.catch(() => null);
+
+    if (profileImage) {
+      await this.userRepository.update({ id: user.id }, { profileImage });
+    }
+  }
+
   async syncChat(chat: WAWebJS.Chat, user: User) {
     if (chat.isGroup) return;
 
     if (!chat.lastMessage) {
       const messages: WAWebJS.Message[] = await chat
-        .fetchMessages({ limit: 1 })
+        .fetchMessages({ limit: 5 })
         .catch(() => []);
-      if (messages?.length > 0) {
+      if (messages?.length > 0 && messages?.[0]?.timestamp) {
         chat.lastMessage = messages[0];
       }
     }
@@ -159,11 +172,22 @@ class WhatsappClientService implements OnModuleInit {
       user,
     );
 
-    if (!entity?.lastMessage) {
-      this.logger.warn(
-        `[${user.id}]`,
-        "Syncing chat failed: lastMessage is null",
-      );
+    const can = () => {
+      if (!entity?.lastMessage) return false;
+      if (!entity?.name || entity?.name === "") return false;
+      if (!entity?.phone || entity?.phone === "") return false;
+      return true;
+    };
+
+    const canProceed = can();
+
+    if (!canProceed) {
+      // this.logger.warn(`[${user.id}] Syncing chat failed: can() is false`, {
+      //   lastMessage: !!entity?.lastMessage,
+      //   chatLastMessage: chat?.lastMessage?.timestamp,
+      //   name: !!entity?.name,
+      //   phone: !!entity?.phone,
+      // });
       return;
     }
 
@@ -423,6 +447,7 @@ class WhatsappClientService implements OnModuleInit {
         status: WhatsappClientStatusEnum.CONNECTED,
       });
       void this.syncAllChats(clientId, client);
+      void this.syncSelfProfileImage(user, client);
     });
 
     client.on("message", (message) => {

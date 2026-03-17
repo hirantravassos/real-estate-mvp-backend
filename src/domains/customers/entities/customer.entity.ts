@@ -60,10 +60,4 @@ export class Customer extends BaseEntity {
 
   @ColumnCurrency({ nullable: true })
   budget: string | null;
-
-  @ColumnBoolean({ default: false })
-  ignored: boolean;
-
-  @ColumnBoolean({ default: true })
-  pending: boolean;
 }
