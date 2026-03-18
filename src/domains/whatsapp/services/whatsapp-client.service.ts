@@ -131,12 +131,14 @@ class WhatsappClientService implements OnModuleInit {
   async syncChat(chat: WAWebJS.Chat, user: User) {
     if (chat.isGroup) return;
 
-    if (!chat.lastMessage) {
+    if (!chat.lastMessage || chat.lastMessage?.fromMe) {
       const messages: WAWebJS.Message[] = await chat
-        .fetchMessages({ limit: 5 })
+        .fetchMessages({ limit: 10 })
         .catch(() => []);
       if (messages?.length > 0 && messages?.[0]?.timestamp) {
-        chat.lastMessage = messages[0];
+        chat.lastMessage = messages?.filter((item) => {
+          return !item?.fromMe;
+        })[0];
       }
     }
 
