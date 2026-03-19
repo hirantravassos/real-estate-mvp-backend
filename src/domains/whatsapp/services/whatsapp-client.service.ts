@@ -434,7 +434,6 @@ class WhatsappClientService implements OnModuleInit {
     );
 
     client.on("qr", (qr: string) => {
-      this.logger.log(`[${clientId}] QR Code generated. Awaiting user scan...`);
       void this.updateConnectionStatus(clientId, {
         status: WhatsappClientStatusEnum.PENDING,
         qr,
