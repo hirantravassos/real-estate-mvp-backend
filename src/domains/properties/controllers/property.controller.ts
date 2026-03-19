@@ -7,7 +7,7 @@ import {
   Patch,
   Post,
   Query,
-  UploadedFile,
+  UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from "@nestjs/common";
@@ -20,7 +20,7 @@ import { JwtGuard } from "../../auth/guards/jwt.guard";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { User } from "../../users/entities/user.entity";
 import { PropertyMapper } from "../mappers/property.mapper";
-import { FileInterceptor } from "@nestjs/platform-express";
+import { FilesInterceptor } from "@nestjs/platform-express";
 
 @Controller("properties")
 @UseGuards(JwtGuard)
@@ -40,6 +40,14 @@ export class PropertyController {
   @Get(":id/files")
   async findAllFilesFromOne(@GetUser() user: User, @Param("id") id: string) {
     return await this.propertyService.findAllFilesFromOne(user, id);
+  }
+
+  @Get(":id/presentation-files")
+  async findAllPresentationFilesFromOne(
+    @GetUser() user: User,
+    @Param("id") id: string,
+  ) {
+    return await this.propertyService.findAllPresentationFilesFromOne(user, id);
   }
 
   @Post()
@@ -62,12 +70,22 @@ export class PropertyController {
   }
 
   @Post(":id/upload")
-  @UseInterceptors(FileInterceptor("file"))
-  async upload(
+  @UseInterceptors(FilesInterceptor("files"))
+  async saveFiles(
     @GetUser() user: User,
     @Param("id") id: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFiles() files: Express.Multer.File[],
   ) {
-    await this.propertyService.saveFile(user, id, file);
+    await this.propertyService.saveFiles(user, id, files);
+  }
+
+  @Post(":id/presentation-upload")
+  @UseInterceptors(FilesInterceptor("files"))
+  async savePresentationFiles(
+    @GetUser() user: User,
+    @Param("id") id: string,
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    await this.propertyService.savePresentationFiles(user, id, files);
   }
 }

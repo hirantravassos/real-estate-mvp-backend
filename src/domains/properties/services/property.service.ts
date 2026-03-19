@@ -1,31 +1,11 @@
-import {
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-  NotFoundException,
-} from "@nestjs/common";
+import { Injectable, InternalServerErrorException, Logger, NotFoundException, } from "@nestjs/common";
 import { User } from "../../users/entities/user.entity";
 import { Property } from "../entities/property.entity";
-import {
-  Between,
-  FindOptionsWhere,
-  ILike,
-  LessThanOrEqual,
-  MoreThanOrEqual,
-  Repository,
-} from "typeorm";
+import { Between, FindOptionsWhere, ILike, LessThanOrEqual, MoreThanOrEqual, Repository, } from "typeorm";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
 import { ValidateBrazilianPhoneNumber } from "../../../shared/decorators/validation/brazilian-phone-number.decorator";
 import { ValidateLongText } from "../../../shared/decorators/validation/long-text.decorator";
-import {
-  IsArray,
-  IsBoolean,
-  IsEnum,
-  IsNumber,
-  IsOptional,
-  IsString,
-  ValidateNested,
-} from "class-validator";
+import { IsArray, IsBoolean, IsEnum, IsNumber, IsOptional, IsString, ValidateNested, } from "class-validator";
 import { Transform, Type } from "class-transformer";
 import { ValidateCurrency } from "../../../shared/decorators/validation/currency.decorator";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
@@ -38,6 +18,7 @@ import {
 } from "../mappers/property.mapper";
 import { StorageService } from "../../storage/services/storage.service";
 import { PropertyFile } from "../entities/property-files.entity";
+import { PropertyFilePresentation } from "../entities/property-file-presentation.entity";
 
 export class PropertyContactCreateDto {
   @ValidateBrazilianPhoneNumber()
@@ -214,13 +195,16 @@ export class PropertyFilterDto extends PaginationRequestDto {
 @Injectable()
 export class PropertyService {
   private logger = new Logger(PropertyService.name, { timestamp: true });
-  private readonly storageFolderName = "properties";
+  private readonly storageFolderFiles = "properties/files";
+  private readonly storageFolderPresentation = "properties/presentations";
 
   constructor(
     @InjectRepository(Property)
     private readonly propertyRepository: Repository<Property>,
     @InjectRepository(PropertyFile)
     private readonly propertyFileRepository: Repository<PropertyFile>,
+    @InjectRepository(PropertyFilePresentation)
+    private readonly propertyFilePresentationRepository: Repository<PropertyFilePresentation>,
     private readonly storageService: StorageService,
   ) {}
 
@@ -349,6 +333,38 @@ export class PropertyService {
     return PaginationMapper.toDto([PropertyMapper.toListDto(data), total], dto);
   }
 
+  async findAllFilesFromOne(user: User, id: string) {
+    const files = await this.propertyFileRepository.find({
+      where: { property: { id, user: { id: user.id } } },
+    });
+
+    if (files?.length === 0) {
+      return [];
+    }
+
+    return await Promise.all(
+      files.map(async (file) => {
+        return await this.storageService.getFile(user, file.fileId);
+      }),
+    );
+  }
+
+  async findAllPresentationFilesFromOne(user: User, id: string) {
+    const files = await this.propertyFilePresentationRepository.find({
+      where: { property: { id, user: { id: user.id } } },
+    });
+
+    if (files?.length === 0) {
+      return [];
+    }
+
+    return await Promise.all(
+      files.map(async (file) => {
+        return await this.storageService.getFile(user, file.fileId);
+      }),
+    );
+  }
+
   async findOne(user: User, id: string) {
     return PropertyMapper.toDto(
       await this.propertyRepository
@@ -377,48 +393,68 @@ export class PropertyService {
     return await this.propertyRepository.save(entity);
   }
 
+  async saveFiles(user: User, id: string, files: Express.Multer.File[]) {
+    const property = await this.propertyRepository.findOneOrFail({
+      where: { id, user: { id: user.id } },
+    });
+
+    for (const file of files) {
+      const fileId = await this.storageService
+        .uploadFile(user, this.storageFolderFiles, file)
+        .catch((error: unknown) => {
+          this.logger.error("[saveFile] saveFiles", {
+            user,
+            id,
+            file,
+            error,
+            files,
+          });
+          throw new InternalServerErrorException("Error uploading file");
+        });
+
+      await this.propertyFileRepository.save({
+        user,
+        property,
+        fileId,
+      });
+    }
+  }
+
+  async savePresentationFiles(
+    user: User,
+    id: string,
+    files: Express.Multer.File[],
+  ) {
+    const property = await this.propertyRepository.findOneOrFail({
+      where: { id, user: { id: user.id } },
+    });
+
+    for (const file of files) {
+      const fileId = await this.storageService
+        .uploadFile(user, this.storageFolderPresentation, file)
+        .catch((error: unknown) => {
+          this.logger.error("[saveFile] savePresentationFiles", {
+            user,
+            id,
+            file,
+            error,
+            files,
+          });
+          throw new InternalServerErrorException("Error uploading file");
+        });
+
+      await this.propertyFilePresentationRepository.save({
+        user,
+        property,
+        fileId,
+      });
+    }
+  }
+
   async remove(user: User, id: string) {
     await this.propertyRepository.update(
       { id, user: { id: user.id } },
       { active: false },
     );
-  }
-
-  async findAllFilesFromOne(user: User, id: string) {
-    const files = await this.propertyFileRepository.find({
-      where: { property: { id, user: { id: user.id } } },
-    });
-
-    const processedFiles = [];
-
-    for (const file of files) {
-      const foundFile = await this.storageService.getFile(user, file.fileId);
-      processedFiles.push({
-        id: file.id,
-        url: foundFile.url,
-        mimetype: foundFile.mimetype,
-      });
-    }
-
-    return processedFiles;
-  }
-
-  async saveFile(user: User, id: string, file: Express.Multer.File) {
-    const property = await this.propertyRepository.findOneOrFail({
-      where: { id, user: { id: user.id } },
-    });
-
-    const fileId = await this.storageService
-      .uploadFile(user, this.storageFolderName, file)
-      .catch((error: unknown) => {
-        this.logger.error("[saveFile] uploadFile", { user, id, file, error });
-        throw new InternalServerErrorException("Error uploading file");
-      });
-
-    await this.propertyFileRepository.save({
-      user,
-      property,
-      fileId,
-    });
   }
 }

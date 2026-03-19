@@ -10,6 +10,7 @@ import {
   PropertyLiftEnum,
 } from "../mappers/property.mapper";
 import { PropertyFile } from "./property-files.entity";
+import { PropertyFilePresentation } from "./property-file-presentation.entity";
 
 @Entity("properties")
 export class Property extends BaseEntity {
@@ -30,6 +31,9 @@ export class Property extends BaseEntity {
 
   @OneToMany(() => PropertyFile, (contact) => contact.property)
   files: PropertyFile[];
+
+  @OneToMany(() => PropertyFilePresentation, (contact) => contact.property)
+  presentationFiles: PropertyFilePresentation[];
 
   @Column({ type: "varchar", nullable: true })
   alias: string | null;

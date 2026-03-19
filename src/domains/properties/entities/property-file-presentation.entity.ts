@@ -4,8 +4,8 @@ import { User } from "../../users/entities/user.entity";
 import { Property } from "./property.entity";
 import { StorageFile } from "../../storage/entities/storage-files.entity";
 
-@Entity("property_files")
-export class PropertyFile extends BaseEntity {
+@Entity("property_file_presentations")
+export class PropertyFilePresentation extends BaseEntity {
   @ManyToOne(() => User, {
     nullable: false,
     onDelete: "CASCADE",
@@ -16,7 +16,7 @@ export class PropertyFile extends BaseEntity {
   @Column({ type: "varchar", nullable: false })
   userId: string;
 
-  @ManyToOne(() => Property, (property) => property.files, {
+  @ManyToOne(() => Property, (property) => property.presentationFiles, {
     nullable: false,
     onDelete: "CASCADE",
   })
