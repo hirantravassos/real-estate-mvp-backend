@@ -214,6 +214,7 @@ export class PropertyFilterDto extends PaginationRequestDto {
 @Injectable()
 export class PropertyService {
   private logger = new Logger(PropertyService.name, { timestamp: true });
+  private readonly storageFolderName = "properties";
 
   constructor(
     @InjectRepository(Property)
@@ -391,7 +392,7 @@ export class PropertyService {
     const processedFiles = [];
 
     for (const file of files) {
-      const foundFile = await this.storageService.getFile(file.fileKey);
+      const foundFile = await this.storageService.getFile(user, file.fileId);
       processedFiles.push({
         id: file.id,
         url: foundFile.url,
@@ -407,8 +408,8 @@ export class PropertyService {
       where: { id, user: { id: user.id } },
     });
 
-    const fileKey = await this.storageService
-      .uploadFile(file)
+    const fileId = await this.storageService
+      .uploadFile(user, this.storageFolderName, file)
       .catch((error: unknown) => {
         this.logger.error("[saveFile] uploadFile", { user, id, file, error });
         throw new InternalServerErrorException("Error uploading file");
@@ -417,7 +418,7 @@ export class PropertyService {
     await this.propertyFileRepository.save({
       user,
       property,
-      fileKey,
+      fileId,
     });
   }
 }

@@ -20,6 +20,9 @@ export class Property extends BaseEntity {
   @JoinColumn({ name: "userId" })
   user: User;
 
+  @Column({ type: "varchar", nullable: false })
+  userId: string;
+
   @OneToMany(() => PropertyContact, (contact) => contact.property, {
     cascade: ["insert", "update", "remove", "soft-remove", "recover"],
   })
@@ -27,9 +30,6 @@ export class Property extends BaseEntity {
 
   @OneToMany(() => PropertyFile, (contact) => contact.property)
   files: PropertyFile[];
-
-  @Column({ type: "varchar", nullable: false })
-  userId: string;
 
   @Column({ type: "varchar", nullable: true })
   alias: string | null;
