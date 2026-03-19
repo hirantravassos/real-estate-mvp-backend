@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
 import { User } from "../../users/entities/user.entity";
 import { Property } from "../entities/property.entity";
 import {
@@ -31,6 +36,8 @@ import {
   PropertyLiftEnum,
   PropertyMapper,
 } from "../mappers/property.mapper";
+import { StorageService } from "../../storage/services/storage.service";
+import { PropertyFile } from "../entities/property-files.entity";
 
 export class PropertyContactCreateDto {
   @ValidateBrazilianPhoneNumber()
@@ -206,9 +213,14 @@ export class PropertyFilterDto extends PaginationRequestDto {
 
 @Injectable()
 export class PropertyService {
+  private logger = new Logger(PropertyService.name, { timestamp: true });
+
   constructor(
     @InjectRepository(Property)
     private readonly propertyRepository: Repository<Property>,
+    @InjectRepository(PropertyFile)
+    private readonly propertyFileRepository: Repository<PropertyFile>,
+    private readonly storageService: StorageService,
   ) {}
 
   async findAll(user: User, dto: PropertyFilterDto) {
@@ -369,5 +381,43 @@ export class PropertyService {
       { id, user: { id: user.id } },
       { active: false },
     );
+  }
+
+  async findAllFilesFromOne(user: User, id: string) {
+    const files = await this.propertyFileRepository.find({
+      where: { property: { id, user: { id: user.id } } },
+    });
+
+    const processedFiles = [];
+
+    for (const file of files) {
+      const foundFile = await this.storageService.getFile(file.fileKey);
+      processedFiles.push({
+        id: file.id,
+        url: foundFile.url,
+        mimetype: foundFile.mimetype,
+      });
+    }
+
+    return processedFiles;
+  }
+
+  async saveFile(user: User, id: string, file: Express.Multer.File) {
+    const property = await this.propertyRepository.findOneOrFail({
+      where: { id, user: { id: user.id } },
+    });
+
+    const fileKey = await this.storageService
+      .uploadFile(file)
+      .catch((error: unknown) => {
+        this.logger.error("[saveFile] uploadFile", { user, id, file, error });
+        throw new InternalServerErrorException("Error uploading file");
+      });
+
+    await this.propertyFileRepository.save({
+      user,
+      property,
+      fileKey,
+    });
   }
 }

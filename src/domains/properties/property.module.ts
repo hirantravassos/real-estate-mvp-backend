@@ -4,9 +4,14 @@ import { PropertyController } from "./controllers/property.controller";
 import { PropertyService } from "./services/property.service";
 import { Property } from "./entities/property.entity";
 import { PropertyContact } from "./entities/property-contact.entity";
+import { PropertyFile } from "./entities/property-files.entity";
+import { StorageModule } from "../storage/storage.module";
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Property, PropertyContact])],
+  imports: [
+    TypeOrmModule.forFeature([Property, PropertyContact, PropertyFile]),
+    StorageModule,
+  ],
   controllers: [PropertyController],
   providers: [PropertyService],
   exports: [PropertyService],

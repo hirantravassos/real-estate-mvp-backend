@@ -9,6 +9,7 @@ import {
   PropertyFurnitureEnum,
   PropertyLiftEnum,
 } from "../mappers/property.mapper";
+import { PropertyFile } from "./property-files.entity";
 
 @Entity("properties")
 export class Property extends BaseEntity {
@@ -18,6 +19,14 @@ export class Property extends BaseEntity {
   })
   @JoinColumn({ name: "userId" })
   user: User;
+
+  @OneToMany(() => PropertyContact, (contact) => contact.property, {
+    cascade: ["insert", "update", "remove", "soft-remove", "recover"],
+  })
+  contacts: PropertyContact[];
+
+  @OneToMany(() => PropertyFile, (contact) => contact.property)
+  files: PropertyFile[];
 
   @Column({ type: "varchar", nullable: false })
   userId: string;
@@ -36,11 +45,6 @@ export class Property extends BaseEntity {
 
   @ColumnCurrency({ nullable: false })
   price: string;
-
-  @OneToMany(() => PropertyContact, (contact) => contact.property, {
-    cascade: ["insert", "update", "remove", "soft-remove", "recover"],
-  })
-  contacts: PropertyContact[];
 
   @Column({ type: "int", nullable: true })
   infoBedrooms: number | null;

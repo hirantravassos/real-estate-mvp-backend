@@ -1,19 +1,21 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { databaseConfig } from "./config/database.config.js";
-import { authConfig } from "./config/auth.config.js";
-import { mailConfig } from "./config/mail.config.js";
+import { databaseConfig } from "./shared/config/database.config.js";
+import { authConfig } from "./shared/config/auth.config.js";
+import { mailConfig } from "./shared/config/mail.config.js";
 import { MailModule } from "./infrastructure/mail/mail.module.js";
 import { UserModule } from "./domains/users/user.module";
-import { appConfig } from "./config/app.config";
+import { appConfig } from "./shared/config/app.config";
 import { AuthModule } from "./domains/auth/auth.module";
-import { jwtConfig } from "./config/jwt.config";
+import { jwtConfig } from "./shared/config/jwt.config";
 import { CustomerModule } from "./domains/customers/customer.module";
 import { KanbanModule } from "./domains/kanbans/kanban.module";
 import { WhatsappModule } from "./domains/whatsapp/whatsapp.module";
 import { VisitModule } from "./domains/visits/visit.module";
 import { PropertyModule } from "./domains/properties/property.module";
+import { bucketConfig } from "./shared/config/bucket.config";
+import { StorageModule } from "./domains/storage/storage.module";
 
 const THROTTLE_TTL_MS = 60_000;
 const THROTTLE_LIMIT = 30;
@@ -22,7 +24,14 @@ const THROTTLE_LIMIT = 30;
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, authConfig, mailConfig, jwtConfig],
+      load: [
+        appConfig,
+        databaseConfig,
+        authConfig,
+        mailConfig,
+        jwtConfig,
+        bucketConfig,
+      ],
       envFilePath: ".env",
     }),
     TypeOrmModule.forRootAsync({
@@ -46,6 +55,7 @@ const THROTTLE_LIMIT = 30;
     //     limit: THROTTLE_LIMIT,
     //   },
     // ]),
+    StorageModule,
     MailModule,
     UserModule,
     AuthModule,
