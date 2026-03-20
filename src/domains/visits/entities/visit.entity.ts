@@ -19,7 +19,11 @@ export class Visit extends BaseEntity {
     nullable: false,
     onDelete: "CASCADE",
   })
+  @JoinColumn({ name: "customerId" })
   customer: Customer;
+
+  @Column({ name: "customerId", type: "uuid", nullable: false })
+  customerId: string;
 
   @Column({ type: "varchar", length: 1000 })
   address: string;

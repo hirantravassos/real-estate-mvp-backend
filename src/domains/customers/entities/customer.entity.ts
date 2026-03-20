@@ -16,6 +16,7 @@ import { CustomerComment } from "./customer-comments.entity";
 import { Visit } from "../../visits/entities/visit.entity";
 import { ColumnCurrency } from "../../../shared/decorators/columns/column-currency.decorator";
 import { WhatsappChat } from "../../whatsapp/entities/whatsapp-chat.entity";
+import { ColumnBoolean } from "../../../shared/decorators/columns/column-boolean.decorator";
 
 @Entity("customers")
 @Unique(["userId", "phone"])
@@ -59,4 +60,7 @@ export class Customer extends BaseEntity {
 
   @ColumnCurrency({ nullable: true })
   budget: string | null;
+
+  @ColumnBoolean({ default: false })
+  lost: boolean;
 }

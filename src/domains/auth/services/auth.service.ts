@@ -159,15 +159,13 @@ export class AuthService {
           order: 2,
         },
       ]);
-      await this.whatsappStatusRepository.save([
-        {
-          user,
-          status: WhatsappClientStatusEnum.ERROR,
-          hasUpdates: false,
-          isSyncing: false,
-          qr: null,
-        },
-      ]);
+      await this.whatsappStatusRepository.save({
+        user,
+        status: WhatsappClientStatusEnum.ERROR,
+        hasUpdates: false,
+        isSyncing: false,
+        qr: null,
+      }).catch();
       this.whatsappClientService.requestConnection(user);
     } catch (error) {
       this.logger.error(
