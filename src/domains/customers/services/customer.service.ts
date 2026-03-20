@@ -16,6 +16,8 @@ import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dt
 import { WhatsappChat } from "../../whatsapp/entities/whatsapp-chat.entity";
 import { InjectRepository } from "@nestjs/typeorm";
 import { CustomerComment } from "../entities/customer-comments.entity";
+import { ValidateBoolean } from "../../../shared/decorators/validation/boolean.decorator";
+import { Visit } from "../../visits/entities/visit.entity";
 
 dayjs.extend(isSameOrAfter);
 
@@ -47,6 +49,10 @@ export class CustomerFilterDto extends PaginationRequestDto {
   @IsOptional()
   @IsUUID()
   kanban: string | null;
+
+  @IsOptional()
+  @ValidateBoolean()
+  lost: boolean | null;
 }
 
 @Injectable()
@@ -57,12 +63,15 @@ export class CustomerService {
     private readonly customerCommentRepository: Repository<CustomerComment>,
     @InjectRepository(WhatsappChat)
     private readonly whatsappChatRepository: Repository<WhatsappChat>,
+    @InjectRepository(Visit)
+    private readonly visitRepository: Repository<Visit>,
   ) {}
 
   async findAll(user: User, dto: CustomerFilterDto) {
     const baseWhere: FindOptionsWhere<Customer> = {
       user: { id: user.id },
       active: true,
+      lost: dto.lost ?? false,
     };
 
     let where:
@@ -177,6 +186,52 @@ export class CustomerService {
     }
 
     return await this.customerRepository.save(entity);
+  }
+
+  async markAsLost(user: User, id: string) {
+    const customer = await this.findOne(user, id);
+
+    await this.customerRepository.update(
+      { id: customer.id, user: { id: user.id } },
+      {
+        lost: true,
+        kanban: null,
+      },
+    );
+
+    await this.visitRepository.delete({
+      customerId: customer.id,
+      user: { id: user.id },
+    });
+
+    if (customer.chat) {
+      await this.whatsappChatRepository.update(
+        { id: customer.chat.id, phone: customer.phone, user: { id: user.id } },
+        {
+          ignored: true,
+        },
+      );
+    }
+  }
+
+  async markAsVisible(user: User, id: string) {
+    const customer = await this.findOne(user, id);
+
+    await this.customerRepository.update(
+      { id: customer.id, user: { id: user.id } },
+      {
+        lost: false,
+      },
+    );
+
+    if (customer.chat) {
+      await this.whatsappChatRepository.update(
+        { id: customer.chat.id, phone: customer.phone, user: { id: user.id } },
+        {
+          ignored: false,
+        },
+      );
+    }
   }
 
   async remove(user: User, id: string) {

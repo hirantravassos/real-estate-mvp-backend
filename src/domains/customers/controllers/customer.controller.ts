@@ -58,6 +58,16 @@ export class CustomerController {
     return CustomerMapper.toDto(await this.customerService.save(user, dto, id));
   }
 
+  @Post(":id/mark-lost")
+  markAsLost(@GetUser() user: User, @Param("id") id: string) {
+    return this.customerService.markAsLost(user, id);
+  }
+
+  @Post(":id/mark-visible")
+  markAsVisible(@GetUser() user: User, @Param("id") id: string) {
+    return this.customerService.markAsVisible(user, id);
+  }
+
   @Delete(":id")
   remove(@GetUser() user: User, @Param("id") id: string) {
     return this.customerService.remove(user, id);
