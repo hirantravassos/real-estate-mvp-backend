@@ -5,7 +5,7 @@ import { ColumnEmail } from "../../../shared/decorators/columns/column-email.dec
 import { Customer } from "../../customers/entities/customer.entity";
 import { Visit } from "../../visits/entities/visit.entity";
 import { WhatsappStatus } from "../../whatsapp/entities/whatsapp-status.entity";
-import { StorageFile } from "../../storage/entities/storage-files.entity";
+import { StorageFile } from "../../storage/entities/storage.entity";
 
 @Entity("users")
 export class User extends BaseEntity {

@@ -1,11 +1,31 @@
-import { Injectable, InternalServerErrorException, Logger, NotFoundException, } from "@nestjs/common";
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
 import { User } from "../../users/entities/user.entity";
 import { Property } from "../entities/property.entity";
-import { Between, FindOptionsWhere, ILike, LessThanOrEqual, MoreThanOrEqual, Repository, } from "typeorm";
+import {
+  Between,
+  FindOptionsWhere,
+  ILike,
+  LessThanOrEqual,
+  MoreThanOrEqual,
+  Repository,
+} from "typeorm";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
 import { ValidateBrazilianPhoneNumber } from "../../../shared/decorators/validation/brazilian-phone-number.decorator";
 import { ValidateLongText } from "../../../shared/decorators/validation/long-text.decorator";
-import { IsArray, IsBoolean, IsEnum, IsNumber, IsOptional, IsString, ValidateNested, } from "class-validator";
+import {
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from "class-validator";
 import { Transform, Type } from "class-transformer";
 import { ValidateCurrency } from "../../../shared/decorators/validation/currency.decorator";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
@@ -16,7 +36,10 @@ import {
   PropertyLiftEnum,
   PropertyMapper,
 } from "../mappers/property.mapper";
-import { StorageService } from "../../storage/services/storage.service";
+import {
+  StorageFileResponse,
+  StorageService,
+} from "../../storage/services/storage.service";
 import { PropertyFile } from "../entities/property-files.entity";
 import { PropertyFilePresentation } from "../entities/property-file-presentation.entity";
 
@@ -349,7 +372,10 @@ export class PropertyService {
     );
   }
 
-  async findAllPresentationFilesFromOne(user: User, id: string) {
+  async findAllPresentationFilesFromOne(
+    user: User,
+    id: string,
+  ): Promise<StorageFileResponse[]> {
     const files = await this.propertyFilePresentationRepository.find({
       where: { property: { id, user: { id: user.id } } },
     });

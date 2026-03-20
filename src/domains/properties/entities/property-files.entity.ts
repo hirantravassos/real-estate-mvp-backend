@@ -2,7 +2,7 @@ import { BaseEntity } from "../../../shared/entities/base.entity";
 import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
 import { User } from "../../users/entities/user.entity";
 import { Property } from "./property.entity";
-import { StorageFile } from "../../storage/entities/storage-files.entity";
+import { StorageFile } from "../../storage/entities/storage.entity";
 
 @Entity("property_files")
 export class PropertyFile extends BaseEntity {

@@ -2,7 +2,7 @@ import { BaseEntity } from "../../../shared/entities/base.entity";
 import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
 import { User } from "../../users/entities/user.entity";
 import { Property } from "./property.entity";
-import { StorageFile } from "../../storage/entities/storage-files.entity";
+import { StorageFile } from "../../storage/entities/storage.entity";
 
 @Entity("property_file_presentations")
 export class PropertyFilePresentation extends BaseEntity {
@@ -23,9 +23,13 @@ export class PropertyFilePresentation extends BaseEntity {
   @JoinColumn({ name: "property_id" })
   property: Property;
 
-  @ManyToOne(() => StorageFile, (storage) => storage.propertyFiles, {
-    onDelete: "CASCADE",
-  })
+  @ManyToOne(
+    () => StorageFile,
+    (storage) => storage.propertyFilePresentations,
+    {
+      onDelete: "CASCADE",
+    },
+  )
   @JoinColumn({ name: "file_id" })
   file: StorageFile;
 
