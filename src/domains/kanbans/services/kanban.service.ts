@@ -22,7 +22,10 @@ export class KanbanService {
         active: true,
       },
       relations: {
-        customers: true,
+        customers: {
+          visits: true,
+          comments: true,
+        },
       },
       order: {
         order: "ASC",
