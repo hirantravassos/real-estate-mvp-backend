@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -51,5 +52,10 @@ export class VisitController {
   @Get(":visitId")
   async findOne(@GetUser() user: User, @Param("visitId") visitId: string) {
     return await this.visitService.findOne(user, visitId);
+  }
+
+  @Delete(":visitId")
+  async remove(@GetUser() user: User, @Param("visitId") visitId: string) {
+    return await this.visitService.remove(user, visitId);
   }
 }

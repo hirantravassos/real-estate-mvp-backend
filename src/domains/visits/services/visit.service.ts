@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Visit } from "../entities/visit.entity";
-import { LessThan, MoreThan, Repository } from "typeorm";
+import { Repository } from "typeorm";
 import { CreateVisitDto } from "../dtos/visit.dto";
 import { User } from "../../users/entities/user.entity";
 import { Customer } from "../../customers/entities/customer.entity";
@@ -98,5 +98,14 @@ export class VisitService {
           throw new NotFoundException("Visit not found for this user");
         }),
     );
+  }
+
+  async remove(user: User, id: string): Promise<void> {
+    await this.visitRepository
+      .delete({ id, user: { id: user.id } })
+      .catch(() => {
+        this.logger.warn("[remove]: Not Removed", { user, visitId: id });
+        throw new NotFoundException("Visit was not deleted for this user");
+      });
   }
 }

@@ -1,5 +1,19 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
-import { PropertyService, PropertyCreateDto, PropertyFilterDto } from "../services/property.service";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from "@nestjs/common";
+import {
+  PropertyService,
+  PropertyCreateDto,
+  PropertyFilterDto,
+} from "../services/property.service";
 import { JwtGuard } from "../../auth/guards/jwt.guard";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { User } from "../../users/entities/user.entity";
@@ -26,7 +40,11 @@ export class PropertyController {
   }
 
   @Patch(":id")
-  async update(@GetUser() user: User, @Param("id") id: string, @Body() dto: PropertyCreateDto) {
+  async update(
+    @GetUser() user: User,
+    @Param("id") id: string,
+    @Body() dto: PropertyCreateDto,
+  ) {
     return PropertyMapper.toDto(await this.propertyService.save(user, dto, id));
   }
 
