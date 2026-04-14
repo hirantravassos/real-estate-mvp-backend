@@ -8,12 +8,11 @@ import { CustomerComment } from "./entities/customer-comments.entity";
 import { CustomerCommentController } from "./controllers/customer-comment.controller";
 import { CustomerCommentRepository } from "./repositories/customer-comment.repository";
 import { CustomerCommentService } from "./services/customer-comment.service";
-import { WhatsappChat } from "../whatsapp/entities/whatsapp-chat.entity";
 import { Visit } from "../visits/entities/visit.entity";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Customer, CustomerComment, WhatsappChat, Visit]),
+    TypeOrmModule.forFeature([Customer, CustomerComment, Visit]),
   ],
   controllers: [CustomerController, CustomerCommentController],
   providers: [

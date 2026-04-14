@@ -3,8 +3,6 @@ import { Kanban } from "../../kanbans/entities/kanban.entity";
 import { CustomerComment } from "../entities/customer-comments.entity";
 import { CustomerCreateDto } from "../services/customer.service";
 import { Visit } from "../../visits/entities/visit.entity";
-import { WhatsappChatMapper } from "../../whatsapp/mappers/whatsapp-chat.mapper";
-import { WhatsappChat } from "../../whatsapp/entities/whatsapp-chat.entity";
 
 export class CustomerMapper {
   static toEntity(dto: CustomerCreateDto, id?: string) {
@@ -38,7 +36,6 @@ export class CustomerMapper {
       lost: entity.lost,
       comments: this.toComments(entity.comments),
       visits: this.toVisit(entity.visits),
-      chat: this.toChat(entity?.chat),
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
       active: entity.active,
@@ -94,10 +91,5 @@ export class CustomerMapper {
         updatedAt: visit.updatedAt,
       };
     });
-  }
-
-  private static toChat(chat: WhatsappChat | null) {
-    if (!chat) return null;
-    return WhatsappChatMapper.toDtoList([chat])?.[0];
   }
 }

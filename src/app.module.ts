@@ -11,18 +11,28 @@ import { AuthModule } from "./domains/auth/auth.module";
 import { jwtConfig } from "./config/jwt.config";
 import { CustomerModule } from "./domains/customers/customer.module";
 import { KanbanModule } from "./domains/kanbans/kanban.module";
-import { WhatsappModule } from "./domains/whatsapp/whatsapp.module";
 import { VisitModule } from "./domains/visits/visit.module";
 import { PropertyModule } from "./domains/properties/property.module";
+import { bucketConfig } from "./config/bucket.config";
+import { BucketModule } from "./infrastructure/bucket/bucket.module";
+import { mongoConfig } from "./config/mongo.config";
 
-const THROTTLE_TTL_MS = 60_000;
-const THROTTLE_LIMIT = 30;
+// const THROTTLE_TTL_MS = 60_000;
+// const THROTTLE_LIMIT = 30;
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, authConfig, mailConfig, jwtConfig],
+      load: [
+        appConfig,
+        databaseConfig,
+        authConfig,
+        mailConfig,
+        jwtConfig,
+        bucketConfig,
+        mongoConfig,
+      ],
       envFilePath: ".env",
     }),
     TypeOrmModule.forRootAsync({
@@ -46,12 +56,12 @@ const THROTTLE_LIMIT = 30;
     //     limit: THROTTLE_LIMIT,
     //   },
     // ]),
+    BucketModule,
     MailModule,
     UserModule,
     AuthModule,
     CustomerModule,
     KanbanModule,
-    WhatsappModule,
     VisitModule,
     PropertyModule,
   ],

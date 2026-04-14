@@ -4,7 +4,6 @@ import {
   JoinColumn,
   ManyToOne,
   OneToMany,
-  OneToOne,
   Unique,
 } from "typeorm";
 import { BaseEntity } from "../../../shared/entities/base.entity";
@@ -15,7 +14,6 @@ import { Kanban } from "../../kanbans/entities/kanban.entity";
 import { CustomerComment } from "./customer-comments.entity";
 import { Visit } from "../../visits/entities/visit.entity";
 import { ColumnCurrency } from "../../../shared/decorators/columns/column-currency.decorator";
-import { WhatsappChat } from "../../whatsapp/entities/whatsapp-chat.entity";
 import { ColumnBoolean } from "../../../shared/decorators/columns/column-boolean.decorator";
 
 @Entity("customers")
@@ -30,11 +28,6 @@ export class Customer extends BaseEntity {
 
   @Column({ type: "varchar", nullable: false })
   userId: string;
-
-  @OneToOne(() => WhatsappChat, (whatsappChat) => whatsappChat.customer, {
-    nullable: true,
-  })
-  chat: WhatsappChat | null;
 
   @ManyToOne(() => Kanban, (kanban) => kanban.customers, {
     nullable: true,
