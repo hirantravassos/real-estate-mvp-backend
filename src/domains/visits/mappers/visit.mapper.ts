@@ -8,6 +8,7 @@ export interface VisitResponseDto {
   reference: string | null;
   startsAt: Date;
   endsAt: Date;
+  notes: string | null;
   createdAt: Date;
 }
 
@@ -26,6 +27,7 @@ export class VisitMapper {
       reference: entity.reference,
       startsAt: entity.startsAt,
       endsAt: entity.endsAt,
+      notes: entity.notes ?? null,
       createdAt: entity.createdAt,
     };
   }
@@ -39,6 +41,7 @@ export class VisitMapper {
         reference: visit.reference,
         startsAt: visit.startsAt,
         endsAt: visit.endsAt,
+        notes: visit.notes ?? null,
         createdAt: visit.createdAt,
       };
     });

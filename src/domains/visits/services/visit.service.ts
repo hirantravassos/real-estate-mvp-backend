@@ -52,6 +52,7 @@ export class VisitService {
       reference: dto.reference || null,
       startsAt,
       endsAt,
+      notes: dto.notes || null,
     });
 
     if (visitId) {

@@ -26,4 +26,8 @@ export class CreateVisitDto {
   @IsDateString()
   @IsNotEmpty()
   endsAt: string;
+
+  @IsString()
+  @IsOptional()
+  notes?: string;
 }

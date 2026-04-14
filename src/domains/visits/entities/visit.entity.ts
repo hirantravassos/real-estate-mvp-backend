@@ -36,4 +36,7 @@ export class Visit extends BaseEntity {
 
   @Column({ type: "datetime" })
   endsAt: Date;
+
+  @Column({ type: "text", nullable: true })
+  notes: string | null;
 }

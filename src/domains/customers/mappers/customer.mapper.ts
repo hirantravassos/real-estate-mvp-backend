@@ -89,6 +89,7 @@ export class CustomerMapper {
         reference: visit.reference,
         startsAt: visit.startsAt,
         endsAt: visit.endsAt,
+        notes: visit.notes ?? null,
         createdAt: visit.createdAt,
         updatedAt: visit.updatedAt,
       };
