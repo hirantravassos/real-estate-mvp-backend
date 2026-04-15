@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Visit } from "../entities/visit.entity";
-import { Repository } from "typeorm";
+import { IsNull, Not, Repository } from "typeorm";
 import { CreateVisitDto } from "../dtos/visit.dto";
 import { User } from "../../users/entities/user.entity";
 import { Customer } from "../../customers/entities/customer.entity";
@@ -53,6 +53,7 @@ export class VisitService {
       startsAt,
       endsAt,
       notes: dto.notes || null,
+      propertyId: dto.propertyId || null,
     });
 
     if (visitId) {
@@ -68,6 +69,7 @@ export class VisitService {
       order: { startsAt: "DESC" },
       relations: {
         customer: true,
+        property: true,
       },
     });
   }
@@ -80,6 +82,7 @@ export class VisitService {
       },
       relations: {
         customer: true,
+        property: true,
       },
       order: { startsAt: "DESC" },
     });
@@ -92,6 +95,7 @@ export class VisitService {
           where: { id, user: { id: user.id } },
           relations: {
             customer: true,
+            property: true,
           },
         })
         .catch(() => {
@@ -99,6 +103,21 @@ export class VisitService {
           throw new NotFoundException("Visit not found for this user");
         }),
     );
+  }
+
+  async findByProperty(user: User, propertyId: string): Promise<Visit[]> {
+    return this.visitRepository.find({
+      where: {
+        user: { id: user.id },
+        propertyId,
+        notes: Not(IsNull()),
+      },
+      relations: {
+        customer: true,
+        property: true,
+      },
+      order: { startsAt: "DESC" },
+    });
   }
 
   async remove(user: User, id: string): Promise<void> {

@@ -2,6 +2,7 @@ import { BaseEntity } from "../../../shared/entities/base.entity";
 import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
 import { User } from "../../users/entities/user.entity";
 import { Customer } from "../../customers/entities/customer.entity";
+import { Property } from "../../properties/entities/property.entity";
 
 @Entity("visits")
 export class Visit extends BaseEntity {
@@ -39,4 +40,11 @@ export class Visit extends BaseEntity {
 
   @Column({ type: "text", nullable: true })
   notes: string | null;
+
+  @ManyToOne(() => Property, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "propertyId" })
+  property: Property | null;
+
+  @Column({ name: "propertyId", type: "uuid", nullable: true })
+  propertyId: string | null;
 }

@@ -87,6 +87,7 @@ export class CustomerMapper {
         startsAt: visit.startsAt,
         endsAt: visit.endsAt,
         notes: visit.notes ?? null,
+        propertyId: visit.propertyId ?? null,
         createdAt: visit.createdAt,
         updatedAt: visit.updatedAt,
       };

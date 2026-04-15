@@ -30,4 +30,8 @@ export class CreateVisitDto {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @IsUUID()
+  @IsOptional()
+  propertyId?: string;
 }
