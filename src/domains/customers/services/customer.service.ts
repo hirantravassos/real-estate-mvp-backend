@@ -1,9 +1,13 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { CustomerRepository } from "../repositories/customer.repository";
 import { CustomerMapper } from "../mappers/customer.mapper";
 import { User } from "../../users/entities/user.entity";
 import { Customer } from "../entities/customer.entity";
-import { FindOptionsWhere, ILike, Repository } from "typeorm";
+import { FindOptionsWhere, ILike, QueryFailedError, Repository } from "typeorm";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
 import { ValidateName } from "../../../shared/decorators/validation/name.decorator";
 import { ValidateBrazilianPhoneNumber } from "../../../shared/decorators/validation/brazilian-phone-number.decorator";
@@ -164,7 +168,17 @@ export class CustomerService {
   async save(user: User, dto: CustomerCreateDto, id?: string) {
     const entity = CustomerMapper.toEntity(dto, id);
     entity.user = user;
-    return await this.customerRepository.save(entity);
+    try {
+      return await this.customerRepository.save(entity);
+    } catch (error) {
+      if (
+        error instanceof QueryFailedError &&
+        (error as unknown as { code: string }).code === "23505"
+      ) {
+        throw new ConflictException("Telefone já cadastrado para este usuário");
+      }
+      throw error;
+    }
   }
 
   async markAsLost(user: User, id: string) {
