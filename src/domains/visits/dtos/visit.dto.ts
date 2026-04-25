@@ -26,4 +26,12 @@ export class CreateVisitDto {
   @IsDateString()
   @IsNotEmpty()
   endsAt: string;
+
+  @IsString()
+  @IsOptional()
+  notes?: string;
+
+  @IsUUID()
+  @IsOptional()
+  propertyId?: string;
 }

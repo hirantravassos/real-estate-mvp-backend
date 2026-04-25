@@ -49,6 +49,15 @@ export class VisitController {
     return VisitMapper.toListDto(visits);
   }
 
+  @Get("property/:propertyId")
+  async findByProperty(
+    @GetUser() user: User,
+    @Param("propertyId") propertyId: string,
+  ) {
+    const visits = await this.visitService.findByProperty(user, propertyId);
+    return VisitMapper.toListDto(visits);
+  }
+
   @Get(":visitId")
   async findOne(@GetUser() user: User, @Param("visitId") visitId: string) {
     return await this.visitService.findOne(user, visitId);

@@ -10,9 +10,6 @@ import { AccessTokenDto } from "../dtos/access-token.dto";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Kanban } from "../../kanbans/entities/kanban.entity";
-import { WhatsappStatus } from "../../whatsapp/entities/whatsapp-status.entity";
-import { WhatsappClientStatusEnum } from "../../whatsapp/enums/whatsapp-client-status.enum";
-import WhatsappClientService from "../../whatsapp/services/whatsapp-client.service";
 
 @Injectable()
 export class AuthService {
@@ -28,11 +25,8 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly userRepository: UserRepository,
     private readonly jwtService: JwtService,
-    private readonly whatsappClientService: WhatsappClientService,
     @InjectRepository(Kanban)
     private readonly kanbanRepository: Repository<Kanban>,
-    @InjectRepository(WhatsappStatus)
-    private readonly whatsappStatusRepository: Repository<WhatsappStatus>,
   ) {
     const clientId = this.configService.get<string>("auth.googleClientId");
     const refreshSecret = this.configService.get<string>(
@@ -159,16 +153,6 @@ export class AuthService {
           order: 2,
         },
       ]);
-      await this.whatsappStatusRepository
-        .save({
-          user,
-          status: WhatsappClientStatusEnum.ERROR,
-          hasUpdates: false,
-          isSyncing: false,
-          qr: null,
-        })
-        .catch();
-      this.whatsappClientService.requestConnection(user);
     } catch (error) {
       this.logger.error(
         "[AuthService.onboardNewUser]: Error onboarding new user]",

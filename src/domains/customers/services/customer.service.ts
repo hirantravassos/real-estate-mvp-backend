@@ -1,9 +1,13 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { CustomerRepository } from "../repositories/customer.repository";
 import { CustomerMapper } from "../mappers/customer.mapper";
 import { User } from "../../users/entities/user.entity";
 import { Customer } from "../entities/customer.entity";
-import { FindOptionsWhere, ILike, Repository } from "typeorm";
+import { FindOptionsWhere, ILike, QueryFailedError, Repository } from "typeorm";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
 import { ValidateName } from "../../../shared/decorators/validation/name.decorator";
 import { ValidateBrazilianPhoneNumber } from "../../../shared/decorators/validation/brazilian-phone-number.decorator";
@@ -13,7 +17,6 @@ import { ValidateCurrency } from "../../../shared/decorators/validation/currency
 import dayjs from "dayjs";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
-import { WhatsappChat } from "../../whatsapp/entities/whatsapp-chat.entity";
 import { InjectRepository } from "@nestjs/typeorm";
 import { CustomerComment } from "../entities/customer-comments.entity";
 import { ValidateBoolean } from "../../../shared/decorators/validation/boolean.decorator";
@@ -61,8 +64,6 @@ export class CustomerService {
     private readonly customerRepository: CustomerRepository,
     @InjectRepository(CustomerComment)
     private readonly customerCommentRepository: Repository<CustomerComment>,
-    @InjectRepository(WhatsappChat)
-    private readonly whatsappChatRepository: Repository<WhatsappChat>,
     @InjectRepository(Visit)
     private readonly visitRepository: Repository<Visit>,
   ) {}
@@ -74,9 +75,8 @@ export class CustomerService {
       lost: dto.lost ?? false,
     };
 
-    let where:
-      | FindOptionsWhere<WhatsappChat>
-      | FindOptionsWhere<WhatsappChat>[] = baseWhere;
+    let where: FindOptionsWhere<Customer> | FindOptionsWhere<Customer>[] =
+      baseWhere;
 
     if (dto.kanban) {
       baseWhere.kanban = { id: dto.kanban };
@@ -154,7 +154,6 @@ export class CustomerService {
             comments: true,
             kanban: true,
             visits: true,
-            chat: true,
           },
           order: {
             comments: { createdAt: "ASC" },
@@ -169,23 +168,11 @@ export class CustomerService {
   async save(user: User, dto: CustomerCreateDto, id?: string) {
     const entity = CustomerMapper.toEntity(dto, id);
     entity.user = user;
-
-    const hasMatchingChat = await this.whatsappChatRepository.findOne({
-      where: { user: { id: user.id }, phone: entity.phone },
-    });
-
-    if (hasMatchingChat) {
-      await this.whatsappChatRepository.update(
-        {
-          id: hasMatchingChat.id,
-        },
-        {
-          ignored: false,
-        },
-      );
+    try {
+      return await this.customerRepository.save(entity);
+    } catch {
+      throw new ConflictException("Telefone já cadastrado para este usuário");
     }
-
-    return await this.customerRepository.save(entity);
   }
 
   async markAsLost(user: User, id: string) {
@@ -203,15 +190,6 @@ export class CustomerService {
       customerId: customer.id,
       user: { id: user.id },
     });
-
-    if (customer.chat) {
-      await this.whatsappChatRepository.update(
-        { id: customer.chat.id, phone: customer.phone, user: { id: user.id } },
-        {
-          ignored: true,
-        },
-      );
-    }
   }
 
   async markAsVisible(user: User, id: string) {
@@ -223,15 +201,6 @@ export class CustomerService {
         lost: false,
       },
     );
-
-    if (customer.chat) {
-      await this.whatsappChatRepository.update(
-        { id: customer.chat.id, phone: customer.phone, user: { id: user.id } },
-        {
-          ignored: false,
-        },
-      );
-    }
   }
 
   async remove(user: User, id: string) {
