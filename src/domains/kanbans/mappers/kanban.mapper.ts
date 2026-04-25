@@ -39,6 +39,7 @@ export class KanbanMapper {
         id: entity.id,
         name: entity.name,
         phone: entity.phone,
+        budget: entity.budget,
         comments: this.toCustomerCommentDto(entity.comments),
         visits: this.toCustomerVisit(entity.visits),
       };

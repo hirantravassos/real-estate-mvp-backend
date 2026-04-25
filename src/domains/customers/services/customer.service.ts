@@ -170,14 +170,8 @@ export class CustomerService {
     entity.user = user;
     try {
       return await this.customerRepository.save(entity);
-    } catch (error) {
-      if (
-        error instanceof QueryFailedError &&
-        (error as unknown as { code: string }).code === "23505"
-      ) {
-        throw new ConflictException("Telefone já cadastrado para este usuário");
-      }
-      throw error;
+    } catch {
+      throw new ConflictException("Telefone já cadastrado para este usuário");
     }
   }
 

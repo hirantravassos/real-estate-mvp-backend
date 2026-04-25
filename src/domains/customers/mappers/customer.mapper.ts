@@ -49,6 +49,7 @@ export class CustomerMapper {
         name: entity.name,
         phone: entity.phone,
         lost: entity.lost,
+        budget: entity.budget,
         kanban: this.toKanban(entity.kanban),
         comments: this.toComments(entity.comments),
         visits: this.toVisit(entity.visits),
