@@ -142,6 +142,28 @@ export class PropertyMediaService {
     return this.mediaRepository.save(media);
   }
 
+  async findAllForPresentation(propertyId: string) {
+    const media = await this.mediaRepository
+      .createQueryBuilder("media")
+      .addSelect("media.s3Key")
+      .where("media.propertyId = :propertyId", { propertyId })
+      .andWhere("media.active = :active", { active: true })
+      .orderBy("media.sortOrder", "ASC")
+      .addOrderBy("media.createdAt", "ASC")
+      .getMany();
+
+    return Promise.all(
+      media.map(async (m) => ({
+        id: m.id,
+        type: m.type,
+        displayName: m.displayName,
+        url: await this.storageService.getPresignedUrl(m.s3Key),
+        sortOrder: m.sortOrder,
+        isCover: m.isCover,
+      })),
+    );
+  }
+
   async reorder(
     userId: string,
     propertyId: string,

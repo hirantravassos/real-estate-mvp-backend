@@ -10,6 +10,7 @@ import { PropertyMedia } from "./entities/property-media.entity";
 import { PropertyMediaRepository } from "./repositories/property-media.repository";
 import { PropertyMediaService } from "./services/property-media.service";
 import { PropertyMediaController } from "./controllers/property-media.controller";
+import { PropertyPresentationController } from "./controllers/property-presentation.controller";
 import { StorageModule } from "../../infrastructure/storage/storage.module";
 
 @Module({
@@ -22,6 +23,7 @@ import { StorageModule } from "../../infrastructure/storage/storage.module";
     PropertyController,
     PropertyDocumentController,
     PropertyMediaController,
+    PropertyPresentationController,
   ],
   providers: [
     PropertyService,

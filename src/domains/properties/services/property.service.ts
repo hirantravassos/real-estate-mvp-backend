@@ -370,4 +370,25 @@ export class PropertyService {
       { active: false },
     );
   }
+
+  async findOneForPresentation(id: string) {
+    const entity = await this.propertyRepository
+      .findOneOrFail({
+        where: { id, active: true },
+        relations: { contacts: true, user: true },
+      })
+      .catch(() => {
+        throw new NotFoundException("Property not found");
+      });
+
+    const dto = PropertyMapper.toDto(entity);
+    const { comment: _c, ...presentation } = dto;
+    return {
+      ...presentation,
+      agent: {
+        name: entity.user.name,
+        profileImage: entity.user.profileImage,
+      },
+    };
+  }
 }
