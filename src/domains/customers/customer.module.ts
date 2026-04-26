@@ -9,12 +9,15 @@ import { CustomerCommentController } from "./controllers/customer-comment.contro
 import { CustomerCommentRepository } from "./repositories/customer-comment.repository";
 import { CustomerCommentService } from "./services/customer-comment.service";
 import { Visit } from "../visits/entities/visit.entity";
+import { CustomerDocumentController } from "./controllers/customer-document.controller";
+import { DocumentModule } from "../documents/document.module";
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Customer, CustomerComment, Visit]),
+    DocumentModule,
   ],
-  controllers: [CustomerController, CustomerCommentController],
+  controllers: [CustomerController, CustomerCommentController, CustomerDocumentController],
   providers: [
     CustomerService,
     CustomerCommentService,
