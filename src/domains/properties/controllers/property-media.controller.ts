@@ -38,8 +38,11 @@ export class PropertyMediaController {
     @Param("propertyId") propertyId: string,
   ) {
     await this.propertyService.findOne(user, propertyId);
-    const media = await this.mediaService.findAllByProperty(user.id, propertyId);
-    return media.map(PropertyMediaMapper.toDto);
+    const media = await this.mediaService.findAllByProperty(
+      user.id,
+      propertyId,
+    );
+    return media.map((i) => PropertyMediaMapper.toDto(i));
   }
 
   @Post("presigned-upload")
@@ -59,7 +62,11 @@ export class PropertyMediaController {
     @Body() dto: MediaConfirmUploadDto,
   ) {
     await this.propertyService.findOne(user, propertyId);
-    const media = await this.mediaService.confirmUpload(user.id, propertyId, dto);
+    const media = await this.mediaService.confirmUpload(
+      user.id,
+      propertyId,
+      dto,
+    );
     return PropertyMediaMapper.toDto(media);
   }
 

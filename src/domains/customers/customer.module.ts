@@ -17,7 +17,11 @@ import { DocumentModule } from "../documents/document.module";
     TypeOrmModule.forFeature([Customer, CustomerComment, Visit]),
     DocumentModule,
   ],
-  controllers: [CustomerController, CustomerCommentController, CustomerDocumentController],
+  controllers: [
+    CustomerController,
+    CustomerCommentController,
+    CustomerDocumentController,
+  ],
   providers: [
     CustomerService,
     CustomerCommentService,

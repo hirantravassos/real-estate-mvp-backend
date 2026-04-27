@@ -54,7 +54,7 @@ export class PropertyDocumentController {
       DocumentOwnerType.PROPERTY,
       propertyId,
     );
-    return documents.map(DocumentMapper.toDto);
+    return documents.map((i) => DocumentMapper.toDto(i));
   }
 
   @Post()
@@ -118,10 +118,7 @@ export class PropertyDocumentController {
   }
 
   @Delete(":documentId")
-  async remove(
-    @GetUser() user: User,
-    @Param("documentId") documentId: string,
-  ) {
+  async remove(@GetUser() user: User, @Param("documentId") documentId: string) {
     await this.documentService.remove(user.id, documentId);
   }
 }
