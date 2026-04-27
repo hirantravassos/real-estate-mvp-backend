@@ -18,7 +18,6 @@ import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { User } from "../../users/entities/user.entity";
 import { KanbanMapper } from "../mappers/kanban.mapper";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
-import { CustomerMapper } from "../../customers/mappers/customer.mapper";
 
 @Controller("kanbans")
 @UseGuards(JwtGuard)

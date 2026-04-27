@@ -3,7 +3,10 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { PropertyMedia, PropertyMediaType } from "../entities/property-media.entity";
+import {
+  PropertyMedia,
+  PropertyMediaType,
+} from "../entities/property-media.entity";
 import { PropertyMediaRepository } from "../repositories/property-media.repository";
 import { StorageService } from "../../../infrastructure/storage/services/storage.service";
 import {

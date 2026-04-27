@@ -33,4 +33,4 @@ async function bootstrap(): Promise<void> {
   console.log(`🚀 Cors allowed for: ${cors}`);
 }
 
-bootstrap();
+void bootstrap();

@@ -382,7 +382,8 @@ export class PropertyService {
       });
 
     const dto = PropertyMapper.toDto(entity);
-    const { comment: _c, ...presentation } = dto;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { comment: _, ...presentation } = dto;
     return {
       ...presentation,
       agent: {

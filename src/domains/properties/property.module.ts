@@ -25,11 +25,7 @@ import { StorageModule } from "../../infrastructure/storage/storage.module";
     PropertyMediaController,
     PropertyPresentationController,
   ],
-  providers: [
-    PropertyService,
-    PropertyMediaService,
-    PropertyMediaRepository,
-  ],
+  providers: [PropertyService, PropertyMediaService, PropertyMediaRepository],
   exports: [PropertyService],
 })
 export class PropertyModule {}

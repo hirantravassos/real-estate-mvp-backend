@@ -1,8 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import {
-  Document,
-  DocumentOwnerType,
-} from "../entities/document.entity";
+import { Document, DocumentOwnerType } from "../entities/document.entity";
 import { DocumentRepository } from "../repositories/document.repository";
 import {
   DocumentOwnerDomain,
