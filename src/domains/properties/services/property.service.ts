@@ -375,7 +375,7 @@ export class PropertyService {
     const entity = await this.propertyRepository
       .findOneOrFail({
         where: { id, active: true },
-        relations: { contacts: true, user: true },
+        relations: { user: true },
       })
       .catch(() => {
         throw new NotFoundException("Property not found");

@@ -146,7 +146,7 @@ export class PropertyMapper {
       infoHasGasWaterHeatingSystem: entity.infoHasGasWaterHeatingSystem,
       infoHasGasSystem: entity.infoHasGasSystem,
       infoHasGym: entity.infoHasGym,
-      contacts: this.toContacts(entity.contacts),
+      contacts: [], // Must be ALWAYS empty!!!
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
       active: entity.active,
