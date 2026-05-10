@@ -18,9 +18,9 @@ import dayjs from "dayjs";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 import { InjectRepository } from "@nestjs/typeorm";
-import { CustomerComment } from "../entities/customer-comments.entity";
 import { ValidateBoolean } from "../../../shared/decorators/validation/boolean.decorator";
 import { Visit } from "../../visits/entities/visit.entity";
+import { CustomerCommentService } from "./customer-comment.service";
 
 dayjs.extend(isSameOrAfter);
 
@@ -62,10 +62,9 @@ export class CustomerFilterDto extends PaginationRequestDto {
 export class CustomerService {
   constructor(
     private readonly customerRepository: CustomerRepository,
-    @InjectRepository(CustomerComment)
-    private readonly customerCommentRepository: Repository<CustomerComment>,
     @InjectRepository(Visit)
     private readonly visitRepository: Repository<Visit>,
+    private readonly customerCommentService: CustomerCommentService,
   ) {}
 
   async findAll(user: User, dto: CustomerFilterDto) {
@@ -145,23 +144,26 @@ export class CustomerService {
   }
 
   async findOne(user: User, id: string) {
-    return CustomerMapper.toDto(
-      await this.customerRepository
-        .findOneOrFail({
-          where: { id, user: { id: user.id } },
-          relations: {
-            comments: true,
-            kanban: true,
-            visits: true,
-          },
-          order: {
-            comments: { createdAt: "ASC" },
-          },
-        })
-        .catch(() => {
-          throw new NotFoundException("Customer not found");
-        }),
-    );
+    const customer = await this.customerRepository
+      .createQueryBuilder("customer")
+      .leftJoinAndSelect("customer.kanban", "kanban")
+      .leftJoinAndSelect("customer.visits", "visits")
+      .leftJoinAndSelect(
+        "customer.comments",
+        "comments",
+        "comments.active = :active",
+        { active: true },
+      )
+      .where("customer.id = :id", { id })
+      .andWhere("customer.user = :userId", { userId: user.id })
+      .orderBy("comments.createdAt", "ASC")
+      .getOne();
+
+    if (!customer) {
+      throw new NotFoundException("Customer not found");
+    }
+
+    return CustomerMapper.toDto(customer);
   }
 
   async save(user: User, dto: CustomerCreateDto, id?: string) {
