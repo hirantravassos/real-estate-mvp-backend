@@ -95,8 +95,7 @@ export class CustomerService {
       .leftJoinAndSelect("customer.comments", "comments")
       .leftJoinAndSelect("customer.visits", "visits")
       .where(where)
-      .orderBy("kanban.order", "DESC")
-      .addOrderBy("customer.name", "ASC")
+      .orderBy("customer.createdAt", "DESC")
       .skip(dto.skip)
       .take(dto.limit)
       .getManyAndCount();
