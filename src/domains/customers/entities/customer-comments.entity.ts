@@ -5,7 +5,7 @@ import { Customer } from "./customer.entity";
 
 @Entity("customer_comments", {
   orderBy: {
-    createdAt: "DESC",
+    createdAt: "ASC",
   },
 })
 export class CustomerComment extends BaseEntity {
