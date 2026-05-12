@@ -49,7 +49,7 @@ const MAX_VIDEO_SIZE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
 const PRESIGNED_DOWNLOAD_EXPIRY_SECONDS = 15 * 60; // 15 minutes
 const PRESIGNED_UPLOAD_EXPIRY_SECONDS = 60 * 60; // 60 minutes (for large video uploads)
 
-export type DocumentOwnerDomain = "customers" | "properties";
+export type DocumentOwnerDomain = "customers" | "properties" | "proposals";
 
 export interface UploadResult {
   s3Key: string;

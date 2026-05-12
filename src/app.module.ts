@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
+import { ThrottlerModule } from "@nestjs/throttler";
 import { databaseConfig } from "./config/database.config.js";
 import { authConfig } from "./config/auth.config.js";
 import { mailConfig } from "./config/mail.config.js";
@@ -13,12 +14,10 @@ import { CustomerModule } from "./domains/customers/customer.module";
 import { KanbanModule } from "./domains/kanbans/kanban.module";
 import { VisitModule } from "./domains/visits/visit.module";
 import { PropertyModule } from "./domains/properties/property.module";
+import { ProposalModule } from "./domains/proposals/proposal.module";
 import { bucketConfig } from "./config/bucket.config";
 import { BucketModule } from "./infrastructure/bucket/bucket.module";
 import { mongoConfig } from "./config/mongo.config";
-
-// const THROTTLE_TTL_MS = 60_000;
-// const THROTTLE_LIMIT = 30;
 
 @Module({
   imports: [
@@ -56,6 +55,9 @@ import { mongoConfig } from "./config/mongo.config";
     //     limit: THROTTLE_LIMIT,
     //   },
     // ]),
+    ThrottlerModule.forRoot([
+      { name: "default", ttl: 60_000, limit: 30 },
+    ]),
     BucketModule,
     MailModule,
     UserModule,
@@ -64,6 +66,7 @@ import { mongoConfig } from "./config/mongo.config";
     KanbanModule,
     VisitModule,
     PropertyModule,
+    ProposalModule,
   ],
   // providers: [
   //   {
