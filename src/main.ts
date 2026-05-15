@@ -4,7 +4,7 @@ import { AppModule } from "./app.module.js";
 import { GlobalExceptionFilter } from "./shared/filters/global-exception.filter.js";
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   const cors = process.env.APP_CORS_ORIGIN || "http://localhost:3000";
 

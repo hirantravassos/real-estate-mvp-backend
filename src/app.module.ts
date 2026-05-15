@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
+import { BullModule } from "@nestjs/bullmq";
 import { databaseConfig } from "./config/database.config.js";
 import { authConfig } from "./config/auth.config.js";
 import { mailConfig } from "./config/mail.config.js";
@@ -16,6 +17,9 @@ import { PropertyModule } from "./domains/properties/property.module";
 import { bucketConfig } from "./config/bucket.config";
 import { BucketModule } from "./infrastructure/bucket/bucket.module";
 import { mongoConfig } from "./config/mongo.config";
+import { redisConfig } from "./config/redis.config";
+import { whatsappConfig } from "./config/whatsapp.config";
+import { WhatsappModule } from "./domains/whatsapp/whatsapp.module";
 
 // const THROTTLE_TTL_MS = 60_000;
 // const THROTTLE_LIMIT = 30;
@@ -32,6 +36,8 @@ import { mongoConfig } from "./config/mongo.config";
         jwtConfig,
         bucketConfig,
         mongoConfig,
+        redisConfig,
+        whatsappConfig,
       ],
       envFilePath: ".env",
     }),
@@ -56,6 +62,17 @@ import { mongoConfig } from "./config/mongo.config";
     //     limit: THROTTLE_LIMIT,
     //   },
     // ]),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        connection: {
+          host: configService.get<string>("redis.host", "localhost"),
+          port: configService.get<number>("redis.port", 6379),
+          password: configService.get<string | undefined>("redis.password"),
+        },
+      }),
+    }),
     BucketModule,
     MailModule,
     UserModule,
@@ -64,6 +81,7 @@ import { mongoConfig } from "./config/mongo.config";
     KanbanModule,
     VisitModule,
     PropertyModule,
+    WhatsappModule,
   ],
   // providers: [
   //   {
