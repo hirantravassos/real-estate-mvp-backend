@@ -1,8 +1,4 @@
-import {
-  CustomerCreateDto,
-  CustomerFilterDto,
-  CustomerService,
-} from "../services/customer.service";
+import { CustomerService } from "../services/customer.service";
 import {
   Body,
   Controller,
@@ -19,6 +15,8 @@ import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { User } from "../../users/entities/user.entity";
 import { CustomerMapper } from "../mappers/customer.mapper";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
+import { CustomerFilterDto } from "../dtos/customer-filter.dto";
+import { CustomerCreateDto } from "../dtos/customer-create.dto";
 
 @Controller("customers")
 @UseGuards(JwtGuard)

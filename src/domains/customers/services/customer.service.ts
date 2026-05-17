@@ -7,66 +7,19 @@ import { CustomerRepository } from "../repositories/customer.repository";
 import { CustomerMapper } from "../mappers/customer.mapper";
 import { User } from "../../users/entities/user.entity";
 import { Customer } from "../entities/customer.entity";
-import { FindOptionsWhere, ILike, Repository } from "typeorm";
+import { FindOptionsWhere, ILike } from "typeorm";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
-import { ValidateName } from "../../../shared/decorators/validation/name.decorator";
-import { ValidateBrazilianPhoneNumber } from "../../../shared/decorators/validation/brazilian-phone-number.decorator";
-import { ValidateLongText } from "../../../shared/decorators/validation/long-text.decorator";
-import { IsOptional, IsString, IsUUID } from "class-validator";
-import { ValidateCurrency } from "../../../shared/decorators/validation/currency.decorator";
 import dayjs from "dayjs";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
-import { InjectRepository } from "@nestjs/typeorm";
-import { CustomerComment } from "../entities/customer-comments.entity";
-import { ValidateBoolean } from "../../../shared/decorators/validation/boolean.decorator";
-import { Visit } from "../../visits/entities/visit.entity";
+import { CustomerFilterDto } from "../dtos/customer-filter.dto";
+import { CustomerCreateDto } from "../dtos/customer-create.dto";
 
 dayjs.extend(isSameOrAfter);
 
-export class CustomerCreateDto {
-  @ValidateName()
-  name: string;
-
-  @ValidateBrazilianPhoneNumber()
-  phone: string;
-
-  @IsOptional()
-  @IsUUID()
-  kanbanId: string | null;
-
-  @IsOptional()
-  @ValidateCurrency({ isOptional: true })
-  budget?: string | null;
-
-  @IsOptional()
-  @ValidateLongText({ isOptional: true })
-  comment: string | null;
-}
-
-export class CustomerFilterDto extends PaginationRequestDto {
-  @IsOptional()
-  @IsString()
-  search: string | null;
-
-  @IsOptional()
-  @IsUUID()
-  kanban: string | null;
-
-  @IsOptional()
-  @ValidateBoolean()
-  lost: boolean | null;
-}
-
 @Injectable()
 export class CustomerService {
-  constructor(
-    private readonly customerRepository: CustomerRepository,
-    @InjectRepository(CustomerComment)
-    private readonly customerCommentRepository: Repository<CustomerComment>,
-    @InjectRepository(Visit)
-    private readonly visitRepository: Repository<Visit>,
-  ) {}
+  constructor(private readonly customerRepository: CustomerRepository) {}
 
   async findAll(user: User, dto: CustomerFilterDto) {
     const baseWhere: FindOptionsWhere<Customer> = {
@@ -101,12 +54,6 @@ export class CustomerService {
       .take(dto.limit)
       .getManyAndCount();
 
-    for (const item of data) {
-      item.visits = item.visits.filter((visit) => {
-        return dayjs(visit.startsAt).isSameOrAfter(dayjs());
-      });
-    }
-
     return PaginationMapper.toDto([CustomerMapper.toListDto(data), total], dto);
   }
 
@@ -130,7 +77,6 @@ export class CustomerService {
       relations: {
         comments: true,
         kanban: true,
-        visits: true,
       },
       order: {
         [pagination.sortBy || "createdAt"]: pagination.sortOrder || "DESC",
@@ -153,7 +99,6 @@ export class CustomerService {
           relations: {
             comments: true,
             kanban: true,
-            visits: true,
           },
           order: {
             comments: { createdAt: "ASC" },
@@ -185,11 +130,6 @@ export class CustomerService {
         kanban: null,
       },
     );
-
-    await this.visitRepository.delete({
-      customerId: customer.id,
-      user: { id: user.id },
-    });
   }
 
   async markAsVisible(user: User, id: string) {

@@ -1,8 +1,7 @@
 import { Customer } from "../entities/customer.entity";
 import { Kanban } from "../../kanbans/entities/kanban.entity";
 import { CustomerComment } from "../entities/customer-comments.entity";
-import { CustomerCreateDto } from "../services/customer.service";
-import { Visit } from "../../visits/entities/visit.entity";
+import { CustomerCreateDto } from "../dtos/customer-create.dto";
 
 export class CustomerMapper {
   static toEntity(dto: CustomerCreateDto, id?: string) {
@@ -35,7 +34,6 @@ export class CustomerMapper {
       budget: entity.budget,
       lost: entity.lost,
       comments: this.toComments(entity.comments),
-      visits: this.toVisit(entity.visits),
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
       active: entity.active,
@@ -52,7 +50,6 @@ export class CustomerMapper {
         budget: entity.budget,
         kanban: this.toKanban(entity.kanban),
         comments: this.toComments(entity.comments),
-        visits: this.toVisit(entity.visits),
       };
     });
   }
@@ -75,22 +72,6 @@ export class CustomerMapper {
         comment: comment.comment,
         createdAt: comment.createdAt,
         updatedAt: comment.updatedAt,
-      };
-    });
-  }
-
-  private static toVisit(visits: Visit[]) {
-    return visits?.map((visit) => {
-      return {
-        id: visit.id,
-        address: visit.address,
-        reference: visit.reference,
-        startsAt: visit.startsAt,
-        endsAt: visit.endsAt,
-        notes: visit.notes ?? null,
-        propertyId: visit.propertyId ?? null,
-        createdAt: visit.createdAt,
-        updatedAt: visit.updatedAt,
       };
     });
   }

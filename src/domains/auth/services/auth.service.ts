@@ -28,15 +28,13 @@ export class AuthService {
     @InjectRepository(Kanban)
     private readonly kanbanRepository: Repository<Kanban>,
   ) {
-    const clientId = this.configService.get<string>("auth.googleClientId");
-    const refreshSecret = this.configService.get<string>(
-      "auth.jwtRefreshSecret",
-    );
+    const clientId = this.configService.get<string>("GOOGLE_CLIENT_ID");
+    const refreshSecret = this.configService.get<string>("JWT_REFRESH_SECRET");
     const accessExpiration = this.configService.get<number>(
-      "auth.jwtExpirationTime",
+      "JWT_REFRESH_EXPIRATION_TIME",
     );
     const refreshExpiration = this.configService.get<number>(
-      "auth.jwtRefreshExpirationTime",
+      "MFA_TOKEN_EXPIRATION_MINUTES",
     );
 
     if (!clientId) {

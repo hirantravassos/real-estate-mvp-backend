@@ -1,22 +1,26 @@
-import { Inject, Injectable } from "@nestjs/common";
-import type { ConfigType } from "@nestjs/config";
+import { Injectable } from "@nestjs/common";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { bucketConfig } from "../../../config/bucket.config";
+import { ConfigService } from "@nestjs/config";
 
 @Injectable()
 export class BucketService {
   public readonly s3Client: S3Client;
+  private readonly bucketName: string;
 
-  constructor(
-    @Inject(bucketConfig.KEY)
-    private readonly bucketConfiguration: ConfigType<typeof bucketConfig>,
-  ) {
+  constructor(private readonly configService: ConfigService) {
+    const endpoint = this.configService.getOrThrow<string>("BUCKET_URL");
+    const accessKeyId = this.configService.getOrThrow<string>("BUCKET_KEY");
+    const secretAccessKey =
+      this.configService.getOrThrow<string>("BUCKET_SECRET");
+
+    this.bucketName = this.configService.getOrThrow<string>("BUCKET_NAME");
+
     this.s3Client = new S3Client({
       region: "auto",
-      endpoint: this.bucketConfiguration.url,
+      endpoint: endpoint,
       credentials: {
-        accessKeyId: this.bucketConfiguration.key,
-        secretAccessKey: this.bucketConfiguration.secret,
+        accessKeyId: accessKeyId,
+        secretAccessKey: secretAccessKey,
       },
     });
   }
@@ -27,7 +31,7 @@ export class BucketService {
     mimeType: string,
   ): Promise<string> {
     const uploadCommand = new PutObjectCommand({
-      Bucket: this.bucketConfiguration.name,
+      Bucket: this.bucketName,
       Key: fileName,
       Body: fileBuffer,
       ContentType: mimeType,

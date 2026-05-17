@@ -1,17 +1,15 @@
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from "typeorm";
-import { BaseEntity } from "../../../shared/entities/base.entity";
+import { DatabaseBaseEntity } from "../../../infrastructure/database/entities/database-base.entity";
 import { User } from "../../users/entities/user.entity";
 import { PropertyContact } from "./property-contact.entity";
 import { ColumnBoolean } from "../../../shared/decorators/columns/column-boolean.decorator";
 import { ColumnCurrency } from "../../../shared/decorators/columns/column-currency.decorator";
-import {
-  PropertyConciergeServiceEnum,
-  PropertyFurnitureEnum,
-  PropertyLiftEnum,
-} from "../mappers/property.mapper";
+import { PropertyLiftEnum } from "../enums/property-lift.enum";
+import { PropertyFurnitureEnum } from "../enums/property-furniture.enum";
+import { PropertyConciergeServiceEnum } from "../enums/property-concierge.enum";
 
 @Entity("properties")
-export class Property extends BaseEntity {
+export class Property extends DatabaseBaseEntity {
   @ManyToOne(() => User, {
     nullable: false,
     onDelete: "CASCADE",

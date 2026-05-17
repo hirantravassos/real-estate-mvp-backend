@@ -9,7 +9,7 @@ export class UserMapper {
       id: user.id,
       email: user.email,
       name: user.name,
-      profileImage: user.profileImage,
+      phone: user.phone,
       createdAt: DateHelper.formatUtcToIso(user.createdAt),
       updatedAt: DateHelper.formatUtcToIso(user.updatedAt),
     };
@@ -31,9 +31,7 @@ export class UserMapper {
     const user = new User();
 
     user.name = dto?.name as string;
-
     user.email = dto?.email as string;
-
     user.googleId = dto?.sub;
 
     return user;

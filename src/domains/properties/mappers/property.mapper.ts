@@ -1,76 +1,8 @@
 import { Property } from "../entities/property.entity";
-import { PropertyCreateDto } from "../services/property.service";
 import { PropertyContact } from "../entities/property-contact.entity";
-
-export enum PropertyLiftEnum {
-  PRIVATE = "private",
-  COMMON = "common",
-  NONE = "none",
-}
-
-export enum PropertyFurnitureEnum {
-  FULL = "full",
-  HALF = "half",
-  NONE = "none",
-}
-
-export enum PropertyConciergeServiceEnum {
-  FULL = "full",
-  HALF = "half",
-  NONE = "none",
-}
-
-export interface PropertyContactDto {
-  id: string;
-  name: string | null;
-  phone: string;
-}
-
-export interface PropertyDto {
-  id: string;
-  alias: string | null;
-  address: string;
-  address2: string;
-  comment: string | null;
-  price: string;
-  contacts: PropertyContactDto[];
-  infoBedrooms: number | null;
-  infoSuiteBedrooms: number | null;
-  infoBathrooms: number | null;
-  infoLift: PropertyLiftEnum | null;
-  infoHasPool: boolean | null;
-  infoHasBalcony: boolean | null;
-  infoHasFancyBalcony: boolean | null;
-  infoFurniture: PropertyFurnitureEnum | null;
-  infoParkingSpaceUnits: number | null;
-  infoHasDedicatedParkingSpace: boolean | null;
-  infoSquareMeters: number | null;
-  infoPropertyTax: string | null;
-  infoMaintenanceFee: string | null;
-  infoFloor: number | null;
-  infoBeachProximityInKm: number | null;
-  infoConciergeService: PropertyConciergeServiceEnum | null;
-  infoHasAirConditioningSystem: boolean | null;
-  infoHasGasWaterHeatingSystem: boolean | null;
-  infoHasGasSystem: boolean | null;
-  infoHasGym: boolean | null;
-  createdAt: Date;
-  updatedAt: Date;
-  active: boolean;
-}
-
-export interface PropertyListDto {
-  id: string;
-  alias: string | null;
-  address: string;
-  address2: string;
-  price: string;
-  infoBedrooms: number | null;
-  infoBathrooms: number | null;
-  infoSquareMeters: number | null;
-  createdAt: Date;
-  contacts: PropertyContactDto[];
-}
+import { PropertyDto } from "../dtos/property.dto";
+import { PropertyListDto } from "../dtos/property-list.dto";
+import { PropertyCreateDto } from "../dtos/property-create.dto";
 
 export class PropertyMapper {
   static toEntity(dto: PropertyCreateDto, id?: string) {

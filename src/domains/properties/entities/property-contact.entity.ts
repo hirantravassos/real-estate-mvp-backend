@@ -1,11 +1,11 @@
 import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
-import { BaseEntity } from "../../../shared/entities/base.entity";
+import { DatabaseBaseEntity } from "../../../infrastructure/database/entities/database-base.entity";
 import { ColumnPhone } from "../../../shared/decorators/columns/column-phone.decorator";
 import { User } from "../../users/entities/user.entity";
 import { Property } from "./property.entity";
 
 @Entity("property_contacts")
-export class PropertyContact extends BaseEntity {
+export class PropertyContact extends DatabaseBaseEntity {
   @ManyToOne(() => User, {
     nullable: false,
     onDelete: "CASCADE",

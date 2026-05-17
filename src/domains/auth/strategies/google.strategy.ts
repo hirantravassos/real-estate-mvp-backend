@@ -16,13 +16,11 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
     @Inject(forwardRef(() => UserService))
     private readonly userService: UserService,
   ) {
-    const googleClientId = configService.get<string>("auth.googleClientId");
+    const googleClientId = configService.get<string>("GOOGLE_CLIENT_ID");
     const googleClientSecret = configService.get<string>(
-      "auth.googleClientSecret",
+      "GOOGLE_CLIENT_SECRET",
     );
-    const googleCallbackUrl = configService.get<string>(
-      "auth.googleCallbackUrl",
-    );
+    const googleCallbackUrl = configService.get<string>("GOOGLE_CALLBACK_URL");
 
     if (!googleClientId || !googleClientSecret) {
       throw new Error(

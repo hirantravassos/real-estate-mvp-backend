@@ -10,28 +10,35 @@ import { User } from "../users/entities/user.entity";
 import { GoogleStrategy } from "./strategies/google.strategy";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { Kanban } from "../kanbans/entities/kanban.entity";
+import Joi from "joi";
 
 @Module({
   imports: [
-    ConfigModule,
+    ConfigModule.forRoot({
+      isGlobal: true,
+      validationSchema: Joi.object({
+        JWT_SECRET: Joi.string(),
+        JWT_EXPIRATION_TIME: Joi.number(),
+        JWT_REFRESH_SECRET: Joi.string(),
+        JWT_REFRESH_EXPIRATION_TIME: Joi.number().default(60),
+        MFA_TOKEN_EXPIRATION_MINUTES: Joi.number(),
+        MFA_TOKEN_LENGTH: Joi.number(),
+        GOOGLE_CLIENT_ID: Joi.string(),
+        GOOGLE_CLIENT_SECRET: Joi.string(),
+        GOOGLE_CALLBACK_URL: Joi.string(),
+      }),
+    }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService): JwtModuleOptions => {
-        const secret = configService.get<string>("jwt.secret");
-        const expiresIn = configService.get<string>("jwt.expiration");
-
-        if (!secret) {
-          throw new Error("JWT_SECRET is not defined in the environment");
-        }
-
-        return {
-          secret,
-          signOptions: {
-            expiresIn: (expiresIn ?? "60m") as "60m",
-          },
-        };
-      },
+      useFactory: (configService: ConfigService): JwtModuleOptions => ({
+        secret: configService.getOrThrow<string>("JWT_SECRET"),
+        signOptions: {
+          expiresIn: configService.getOrThrow<number>(
+            "JWT_REFRESH_EXPIRATION_TIME",
+          ),
+        },
+      }),
     }),
     PassportModule.register({ session: false }),
     TypeOrmModule.forFeature([User, Kanban]),

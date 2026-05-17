@@ -1,12 +1,12 @@
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from "typeorm";
-import { BaseEntity } from "../../../shared/entities/base.entity";
+import { DatabaseBaseEntity } from "../../../infrastructure/database/entities/database-base.entity";
 import { ColumnName } from "../../../shared/decorators/columns/column-name.decorator";
 import { User } from "../../users/entities/user.entity";
 import { Customer } from "../../customers/entities/customer.entity";
 import { ColumnLongText } from "../../../shared/decorators/columns/column-long-text.decorator";
 
 @Entity("kanbans")
-export class Kanban extends BaseEntity {
+export class Kanban extends DatabaseBaseEntity {
   @ManyToOne(() => User, {
     nullable: false,
     onDelete: "CASCADE",

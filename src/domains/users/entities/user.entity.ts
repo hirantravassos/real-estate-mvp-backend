@@ -1,27 +1,27 @@
 import { Column, Entity, OneToMany } from "typeorm";
-import { BaseEntity } from "../../../shared/entities/base.entity.js";
+import { DatabaseBaseEntity } from "../../../infrastructure/database/entities/database-base.entity";
 import { ColumnName } from "../../../shared/decorators/columns/column-name.decorator.js";
 import { ColumnEmail } from "../../../shared/decorators/columns/column-email.decorator.js";
 import { Customer } from "../../customers/entities/customer.entity";
-import { Visit } from "../../visits/entities/visit.entity";
+import { ColumnPhone } from "../../../shared/decorators/columns/column-phone.decorator";
 
 @Entity("users")
-export class User extends BaseEntity {
+export class User extends DatabaseBaseEntity {
   @OneToMany(() => Customer, (customer) => customer.user)
   customers: Customer[];
 
-  @OneToMany(() => Visit, (visit) => visit.user)
-  visits: Visit[];
-
   @ColumnEmail({ unique: true })
   email: string;
+
+  @ColumnPhone()
+  phone: string;
 
   @ColumnName()
   name: string;
 
   @Column({ type: "varchar", length: 1000 })
-  googleId: string;
+  googleId: string | null;
 
-  @Column({ type: "text", nullable: true })
-  profileImage: string | null;
+  @Column({ type: "varchar", length: 1000 })
+  facebookId: string | null;
 }

@@ -23,7 +23,6 @@ export class KanbanService {
       },
       relations: {
         customers: {
-          visits: true,
           comments: true,
         },
       },

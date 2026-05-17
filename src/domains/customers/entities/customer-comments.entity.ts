@@ -1,5 +1,5 @@
 import { Entity, ManyToOne } from "typeorm";
-import { BaseEntity } from "../../../shared/entities/base.entity";
+import { DatabaseBaseEntity } from "../../../infrastructure/database/entities/database-base.entity";
 import { ColumnLongText } from "../../../shared/decorators/columns/column-long-text.decorator";
 import { Customer } from "./customer.entity";
 
@@ -8,7 +8,7 @@ import { Customer } from "./customer.entity";
     createdAt: "DESC",
   },
 })
-export class CustomerComment extends BaseEntity {
+export class CustomerComment extends DatabaseBaseEntity {
   @ManyToOne(() => Customer, (customer) => customer.comments, {
     onDelete: "CASCADE",
   })

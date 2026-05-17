@@ -9,15 +9,13 @@ import {
   Query,
   UseGuards,
 } from "@nestjs/common";
-import {
-  PropertyService,
-  PropertyCreateDto,
-  PropertyFilterDto,
-} from "../services/property.service";
 import { JwtGuard } from "../../auth/guards/jwt.guard";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { User } from "../../users/entities/user.entity";
 import { PropertyMapper } from "../mappers/property.mapper";
+import { PropertyService } from "../services/property.service";
+import { PropertyFilterDto } from "../dtos/property-filter.dto";
+import { PropertyCreateDto } from "../dtos/property-create.dto";
 
 @Controller("properties")
 @UseGuards(JwtGuard)

@@ -6,19 +6,18 @@ import {
   OneToMany,
   Unique,
 } from "typeorm";
-import { BaseEntity } from "../../../shared/entities/base.entity";
+import { DatabaseBaseEntity } from "../../../infrastructure/database/entities/database-base.entity";
 import { ColumnName } from "../../../shared/decorators/columns/column-name.decorator";
 import { ColumnPhone } from "../../../shared/decorators/columns/column-phone.decorator";
 import { User } from "../../users/entities/user.entity";
 import { Kanban } from "../../kanbans/entities/kanban.entity";
 import { CustomerComment } from "./customer-comments.entity";
-import { Visit } from "../../visits/entities/visit.entity";
 import { ColumnCurrency } from "../../../shared/decorators/columns/column-currency.decorator";
 import { ColumnBoolean } from "../../../shared/decorators/columns/column-boolean.decorator";
 
 @Entity("customers")
 @Unique(["userId", "phone"])
-export class Customer extends BaseEntity {
+export class Customer extends DatabaseBaseEntity {
   @ManyToOne(() => User, (user) => user.customers, {
     nullable: false,
     onDelete: "CASCADE",
@@ -41,9 +40,6 @@ export class Customer extends BaseEntity {
     { cascade: true },
   )
   comments: CustomerComment[];
-
-  @OneToMany(() => Visit, (visit) => visit.customer)
-  visits: Visit[];
 
   @ColumnName()
   name: string;
