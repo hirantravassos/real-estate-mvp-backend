@@ -3,6 +3,7 @@ dist
 .idea
 sessions
 .env
+.env.development
 .wwebjs_cache
 .wwebjs_auth
 /.wwebjs_cache/
