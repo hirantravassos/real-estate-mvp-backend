@@ -11,6 +11,7 @@ import { JwtStrategy } from "./strategies/jwt.strategy";
 import { Kanban } from "../kanbans/entities/kanban.entity";
 import Joi from "joi";
 import { AuthGoogleService } from "./services/auth-google.service";
+import { MailModule } from "../../infrastructure/mail/mail.module";
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { AuthGoogleService } from "./services/auth-google.service";
     }),
     PassportModule.register({ session: false }),
     TypeOrmModule.forFeature([User, Kanban]),
+    MailModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, AuthGoogleService, GoogleStrategy, JwtStrategy],

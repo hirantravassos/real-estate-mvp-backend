@@ -17,6 +17,7 @@ import { PasswordLoginDto } from "../dtos/password-login.dto";
 import { CryptoUtils } from "../../../shared/utils/crypto.util";
 import { CreateAuthDto } from "../dtos/create-auth.dto";
 import { AuthGoogleService } from "./auth-google.service";
+import { MailService } from "../../../infrastructure/mail/services/mail.service";
 
 @Injectable()
 export class AuthService {
@@ -28,6 +29,7 @@ export class AuthService {
   constructor(
     private readonly configService: ConfigService,
     private readonly jwtService: JwtService,
+    private readonly mailService: MailService,
     private readonly authGoogleService: AuthGoogleService,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -86,6 +88,13 @@ export class AuthService {
       });
 
     void this.authGoogleService.validateGoogleLink(newUser.googleId);
+    void this.mailService.sendEmail({
+      sendTo: newUser.email,
+      template: "welcome",
+      context: {
+        name: dto.name,
+      },
+    });
   }
 
   async authenticateWithPassword(dto: PasswordLoginDto): Promise<TokenDto> {

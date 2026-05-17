@@ -1,7 +1,10 @@
 import { Module } from "@nestjs/common";
 import { MailerModule } from "@nestjs-modules/mailer";
 import { ConfigModule, ConfigService } from "@nestjs/config";
+import { join } from "path";
 import Joi from "joi";
+import { MailService } from "./services/mail.service";
+import { EjsAdapter } from "@nestjs-modules/mailer/adapters/ejs.adapter";
 
 @Module({
   imports: [
@@ -31,9 +34,17 @@ import Joi from "joi";
         defaults: {
           from: configService.getOrThrow<string>("MAIL_FROM"),
         },
+        template: {
+          dir: join(__dirname, "templates"),
+          adapter: new EjsAdapter(),
+          options: {
+            strict: true,
+          },
+        },
       }),
     }),
   ],
-  exports: [MailerModule],
+  providers: [MailService],
+  exports: [MailerModule, MailService],
 })
 export class MailModule {}
