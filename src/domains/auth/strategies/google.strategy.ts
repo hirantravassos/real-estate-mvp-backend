@@ -1,26 +1,25 @@
-import {
-  forwardRef,
-  Inject,
-  Injectable,
-  UnauthorizedException,
-} from "@nestjs/common";
+import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { Profile, Strategy } from "passport-google-oauth20";
 import { ConfigService } from "@nestjs/config";
-import { UserService } from "../../users/services/user.service";
+import { InjectRepository } from "@nestjs/typeorm";
+import { User } from "../../users/entities/user.entity";
+import { Repository } from "typeorm";
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
   constructor(
     private readonly configService: ConfigService,
-    @Inject(forwardRef(() => UserService))
-    private readonly userService: UserService,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
   ) {
-    const googleClientId = configService.get<string>("GOOGLE_CLIENT_ID");
-    const googleClientSecret = configService.get<string>(
+    const googleClientId = configService.getOrThrow<string>("GOOGLE_CLIENT_ID");
+    const googleClientSecret = configService.getOrThrow<string>(
       "GOOGLE_CLIENT_SECRET",
     );
-    const googleCallbackUrl = configService.get<string>("GOOGLE_CALLBACK_URL");
+    const googleCallbackUrl = configService.getOrThrow<string>(
+      "GOOGLE_CALLBACK_URL",
+    );
 
     if (!googleClientId || !googleClientSecret) {
       throw new Error(
@@ -43,7 +42,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
       throw new UnauthorizedException("User not found in database");
     }
 
-    const user = await this.userService.findByEmail(email);
+    const user = await this.userRepository.findOneBy({ email });
 
     if (!user) {
       throw new UnauthorizedException("User not found in database");

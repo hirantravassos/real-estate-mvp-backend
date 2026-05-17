@@ -1,34 +1,37 @@
-import { OAuth2Client, TokenPayload } from "google-auth-library";
-import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
+import {
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { User } from "../../users/entities/user.entity";
 import { ConfigService } from "@nestjs/config";
-import { UserRepository } from "../../users/repositories/user.repository";
-import { UserMapper } from "../../users/mappers/user.mapper";
 import { JwtService } from "@nestjs/jwt";
 import { TokenDto } from "../dtos/token.dto";
 import { AccessTokenDto } from "../dtos/access-token.dto";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
-import { Kanban } from "../../kanbans/entities/kanban.entity";
+import { PasswordLoginDto } from "../dtos/password-login.dto";
+import { CryptoUtils } from "../../../shared/utils/crypto.util";
+import { CreateAuthDto } from "../dtos/create-auth.dto";
+import { AuthGoogleService } from "./auth-google.service";
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
-
-  private readonly googleClient: OAuth2Client;
-  private readonly googleClientId: string;
   private readonly refreshSecret: string;
   private readonly accessExpirationTime: number;
   private readonly refreshExpirationTime: number;
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly userRepository: UserRepository,
     private readonly jwtService: JwtService,
-    @InjectRepository(Kanban)
-    private readonly kanbanRepository: Repository<Kanban>,
+    private readonly authGoogleService: AuthGoogleService,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
   ) {
-    const clientId = this.configService.get<string>("GOOGLE_CLIENT_ID");
     const refreshSecret = this.configService.get<string>("JWT_REFRESH_SECRET");
     const accessExpiration = this.configService.get<number>(
       "JWT_REFRESH_EXPIRATION_TIME",
@@ -37,41 +40,109 @@ export class AuthService {
       "MFA_TOKEN_EXPIRATION_MINUTES",
     );
 
-    if (!clientId) {
-      throw new Error("Google Client ID is not defined in the configuration");
-    }
-
     if (!refreshSecret) {
       throw new Error("JWT_REFRESH_SECRET is not defined in the configuration");
     }
 
-    this.googleClientId = clientId;
-    this.googleClient = new OAuth2Client(clientId);
     this.refreshSecret = refreshSecret;
     this.accessExpirationTime = accessExpiration ?? 3600;
     this.refreshExpirationTime = refreshExpiration ?? 604800;
   }
 
-  async authenticateWithGoogle(idToken: string): Promise<TokenDto> {
-    try {
-      const ticket = await this.googleClient.verifyIdToken({
-        idToken: idToken,
-        audience: this.googleClientId,
+  async register(dto: CreateAuthDto) {
+    const hashPassword = await CryptoUtils.hashPassword(dto.password);
+
+    const userAlreadyExists = await this.userRepository.exists({
+      where: [
+        {
+          email: dto.email,
+        },
+        {
+          phone: dto.phone,
+        },
+      ],
+    });
+
+    if (userAlreadyExists) {
+      throw new ConflictException(
+        "User already exists with email or phone number",
+      );
+    }
+
+    const newUser = await this.userRepository
+      .save({
+        email: dto.email,
+        phone: dto.phone,
+        name: dto.name,
+        password: hashPassword,
+        googleId: dto?.googleId,
+        facebookId: dto?.facebookId,
+        isPhoneValidated: false,
+        isEmailValidated: false,
+      })
+      .catch((err) => {
+        this.logger.error("register.save", err);
+        throw new InternalServerErrorException("[register.save]");
       });
 
-      const payload: TokenPayload | undefined = ticket.getPayload();
+    void this.authGoogleService.validateGoogleLink(newUser.googleId);
+  }
 
-      if (!payload) {
-        throw new UnauthorizedException("Invalid Google payload");
-      }
+  async authenticateWithPassword(dto: PasswordLoginDto): Promise<TokenDto> {
+    const email = dto.email;
+    const phone = dto.phone;
+    const password = dto.password;
 
-      const payloadUser = UserMapper.toEntityFromGoogle(payload);
-      let user = await this.userRepository.findByEmail(payloadUser.email);
+    let user: User | null = null;
 
-      if (!user) {
-        user = await this.userRepository.save(payloadUser);
-        await this.onboardNewUser(user);
-      }
+    if (email) {
+      user = await this.userRepository
+        .findOneOrFail({
+          where: { email },
+        })
+        .catch(() => {
+          throw new NotFoundException("Email not found");
+        });
+    }
+
+    if (phone) {
+      user = await this.userRepository
+        .findOneOrFail({
+          where: { phone },
+        })
+        .catch(() => {
+          throw new NotFoundException("Phone not found");
+        });
+    }
+
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
+    const isValid = await CryptoUtils.validateHash(password, user.password);
+
+    if (!isValid) {
+      throw new UnauthorizedException("Passwords do not match");
+    }
+
+    return this.generateTokens(user);
+  }
+
+  async authenticateWithGoogle(idToken: string): Promise<TokenDto> {
+    try {
+      const googleUser =
+        await this.authGoogleService.getOrThrowGooglePayload(idToken);
+
+      const user = await this.userRepository
+        .findOneByOrFail({
+          email: googleUser.email,
+          googleId: googleUser.id,
+        })
+        .catch(() => {
+          throw new UnauthorizedException(
+            "User not found with email and google payload",
+          );
+        });
 
       return this.generateTokens(user);
     } catch (error) {
@@ -127,35 +198,5 @@ export class AuthService {
       accessToken,
       refreshToken,
     };
-  }
-
-  private async onboardNewUser(user: User): Promise<void> {
-    try {
-      await this.kanbanRepository.save([
-        {
-          user,
-          name: "Leads",
-          active: true,
-          order: 0,
-        },
-        {
-          user,
-          name: "Atendimento",
-          active: true,
-          order: 1,
-        },
-        {
-          user,
-          name: "Propostas",
-          active: true,
-          order: 2,
-        },
-      ]);
-    } catch (error) {
-      this.logger.error(
-        "[AuthService.onboardNewUser]: Error onboarding new user]",
-        error,
-      );
-    }
   }
 }

@@ -2,6 +2,7 @@ import { User } from "../entities/user.entity.js";
 import { DateHelper } from "../../../shared/utils/date.util.js";
 import { UserCreateDto } from "../dtos/user-create.dto";
 import { TokenPayload } from "google-auth-library";
+import { GoogleUserDto } from "../../auth/dtos/google-user.dto";
 
 export class UserMapper {
   static toDto(user: User) {
@@ -27,13 +28,13 @@ export class UserMapper {
     return user;
   }
 
-  static toEntityFromGoogle(dto: TokenPayload): User {
-    const user = new User();
+  static toGoogleDto(payload: TokenPayload): GoogleUserDto {
+    const dto = new GoogleUserDto();
 
-    user.name = dto?.name as string;
-    user.email = dto?.email as string;
-    user.googleId = dto?.sub;
+    dto.name = payload?.name as string;
+    dto.email = payload?.email as string;
+    dto.id = payload?.sub;
 
-    return user;
+    return dto;
   }
 }

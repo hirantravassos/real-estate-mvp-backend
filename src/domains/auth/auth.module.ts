@@ -1,16 +1,16 @@
-import { forwardRef, Module } from "@nestjs/common";
+import { Module } from "@nestjs/common";
 import { PassportModule } from "@nestjs/passport";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { JwtModule, JwtModuleOptions } from "@nestjs/jwt";
 import { AuthController } from "./controllers/auth.controller";
 import { AuthService } from "./services/auth.service";
-import { UserModule } from "../users/user.module";
 import { User } from "../users/entities/user.entity";
 import { GoogleStrategy } from "./strategies/google.strategy";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { Kanban } from "../kanbans/entities/kanban.entity";
 import Joi from "joi";
+import { AuthGoogleService } from "./services/auth-google.service";
 
 @Module({
   imports: [
@@ -42,10 +42,9 @@ import Joi from "joi";
     }),
     PassportModule.register({ session: false }),
     TypeOrmModule.forFeature([User, Kanban]),
-    forwardRef(() => UserModule),
   ],
   controllers: [AuthController],
-  providers: [AuthService, GoogleStrategy, JwtStrategy],
-  exports: [AuthService, JwtModule, UserModule],
+  providers: [AuthService, AuthGoogleService, GoogleStrategy, JwtStrategy],
+  exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

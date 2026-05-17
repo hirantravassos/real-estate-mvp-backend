@@ -4,6 +4,7 @@ import { ColumnName } from "../../../shared/decorators/columns/column-name.decor
 import { ColumnEmail } from "../../../shared/decorators/columns/column-email.decorator.js";
 import { Customer } from "../../customers/entities/customer.entity";
 import { ColumnPhone } from "../../../shared/decorators/columns/column-phone.decorator";
+import { ColumnBoolean } from "../../../shared/decorators/columns/column-boolean.decorator";
 
 @Entity("users")
 export class User extends DatabaseBaseEntity {
@@ -19,9 +20,18 @@ export class User extends DatabaseBaseEntity {
   @ColumnName()
   name: string;
 
+  @ColumnName()
+  password: string;
+
   @Column({ type: "varchar", length: 1000 })
   googleId: string | null;
 
   @Column({ type: "varchar", length: 1000 })
   facebookId: string | null;
+
+  @ColumnBoolean()
+  isPhoneValidated: boolean;
+
+  @ColumnBoolean()
+  isEmailValidated: boolean;
 }
