@@ -92,7 +92,7 @@ export class AuthService {
       sendTo: newUser.email,
       template: "welcome",
       context: {
-        name: dto.name,
+        name: newUser.name,
       },
     });
   }

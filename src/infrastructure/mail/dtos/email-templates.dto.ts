@@ -8,6 +8,7 @@ interface EmailPasswordRecoveryTemplate {
 }
 
 interface EmailDefaultTemplate {
+  title: string;
   message: string;
 }
 

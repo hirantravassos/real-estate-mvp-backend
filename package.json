@@ -43,6 +43,7 @@
     "dayjs": "^1.11.19",
     "google-auth-library": "^10.6.1",
     "joi": "^18.2.1",
+    "libphonenumber-js": "^1.13.2",
     "mongoose": "^9.4.1",
     "mysql2": "^3.17.2",
     "nodemailer": "8.0.5",

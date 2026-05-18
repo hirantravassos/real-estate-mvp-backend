@@ -1,4 +1,5 @@
 import { applyDecorators } from "@nestjs/common";
+import { Transform } from "class-transformer";
 import {
   IsEmail as IsEmailValidator,
   IsNotEmpty,
@@ -21,6 +22,16 @@ export function ValidateEmail(
   const maxLength = options?.maxLength ?? EMAIL_MAX_LENGTH;
 
   const decorators: PropertyDecorator[] = [];
+
+  // Transform the value to lowercase if it is a string before running validations
+  decorators.push(
+    Transform(({ value }: { readonly value: unknown }) => {
+      if (typeof value === "string") {
+        return value.toLowerCase();
+      }
+      return value;
+    }),
+  );
 
   if (options?.isOptional) {
     decorators.push(IsOptional());

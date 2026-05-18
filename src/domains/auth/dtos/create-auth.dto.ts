@@ -1,7 +1,7 @@
 import { ValidateEmail } from "../../../shared/decorators/validation/email.decorator";
 import { ValidateName } from "../../../shared/decorators/validation/name.decorator";
-import { ValidateBrazilianPhoneNumber } from "../../../shared/decorators/validation/brazilian-phone-number.decorator";
 import { IsOptional, IsString } from "class-validator";
+import { ValidatePhone } from "../../../shared/decorators/validation/phone.decorator";
 
 export class CreateAuthDto {
   @ValidateEmail()
@@ -10,7 +10,7 @@ export class CreateAuthDto {
   @ValidateName()
   name: string;
 
-  @ValidateBrazilianPhoneNumber()
+  @ValidatePhone()
   phone: string;
 
   @IsString()

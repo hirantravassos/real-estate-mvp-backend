@@ -12,15 +12,21 @@ export class MailService {
   public async sendEmail<T extends keyof MailTemplateDto>(
     dto: EmailSendDto<T>,
   ): Promise<void> {
+    const subject = this.getSubject(dto.template);
     await this.mailerService
       .sendMail({
+        subject,
         to: dto.sendTo,
-        subject: this.getSubject(dto.template),
         template: dto.template,
-        context: dto.context,
+        context: {
+          ...dto.context,
+        },
+      })
+      .then(() => {
+        this.logger.debug(`Email sent: ${JSON.stringify(dto)}`);
       })
       .catch((err) => {
-        this.logger.error("Email was not sent because of error", err);
+        this.logger.error("Email was not sent because of error", err, { dto });
       });
   }
 
