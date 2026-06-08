@@ -10,6 +10,7 @@ import { BucketModule } from "./infrastructure/bucket/bucket.module";
 import { RedisModule } from "./infrastructure/redis/redis.module";
 import { DatabaseModule } from "./infrastructure/database/database.module";
 import Joi from "joi";
+import { PlanModule } from "./domains/plans/plan.module";
 
 // const THROTTLE_TTL_MS = 60_000;
 // const THROTTLE_LIMIT = 30;
@@ -32,6 +33,7 @@ import Joi from "joi";
     CustomerModule,
     KanbanModule,
     PropertyModule,
+    PlanModule,
   ],
 })
 export class AppModule {}

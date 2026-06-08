@@ -163,20 +163,20 @@ export class AuthService {
   }
 
   async refreshAccessToken(refreshToken: string): Promise<AccessTokenDto> {
+    const payload = this.jwtService.verify<{ id: string; email: string }>(
+      refreshToken,
+      {
+        secret: this.refreshSecret,
+      },
+    );
+
+    const user = await this.userRepository.findOneBy({ id: payload.id });
+
+    if (!user) {
+      throw new UnauthorizedException("User not found");
+    }
+
     try {
-      const payload = this.jwtService.verify<{ id: string; email: string }>(
-        refreshToken,
-        {
-          secret: this.refreshSecret,
-        },
-      );
-
-      const user = await this.userRepository.findOneBy({ id: payload.id });
-
-      if (!user) {
-        throw new UnauthorizedException("User not found");
-      }
-
       const accessToken = this.jwtService.sign(
         { id: user.id, email: user.email },
         { expiresIn: this.accessExpirationTime },
