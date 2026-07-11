@@ -18,10 +18,10 @@ import { MailModule } from "../../infrastructure/mail/mail.module";
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: Joi.object({
-        JWT_SECRET: Joi.string(),
-        JWT_EXPIRATION_TIME: Joi.number(),
-        JWT_REFRESH_SECRET: Joi.string(),
-        JWT_REFRESH_EXPIRATION_TIME: Joi.number().default(60),
+        JWT_SECRET: Joi.string().required(),
+        JWT_EXPIRATION_TIME: Joi.number().required(),
+        JWT_REFRESH_SECRET: Joi.string().required(),
+        JWT_REFRESH_EXPIRATION_TIME: Joi.number().required(),
         MFA_TOKEN_EXPIRATION_MINUTES: Joi.number(),
         MFA_TOKEN_LENGTH: Joi.number(),
         GOOGLE_CALLBACK_URL: Joi.string(),
@@ -33,8 +33,8 @@ import { MailModule } from "../../infrastructure/mail/mail.module";
       useFactory: (configService: ConfigService): JwtModuleOptions => ({
         secret: configService.getOrThrow<string>("JWT_SECRET"),
         signOptions: {
-          expiresIn: configService.getOrThrow<number>(
-            "JWT_REFRESH_EXPIRATION_TIME",
+          expiresIn: Number(
+            configService.getOrThrow<string | number>("JWT_EXPIRATION_TIME"),
           ),
         },
       }),

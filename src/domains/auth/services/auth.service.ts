@@ -36,11 +36,16 @@ export class AuthService {
     private readonly userRepository: Repository<User>,
   ) {
     const refreshSecret = this.configService.get<string>("JWT_REFRESH_SECRET");
-    const accessExpiration = this.configService.get<number>(
-      "JWT_EXPIRATION_TIME",
+    // Read as unknown/string on purpose: other ConfigModule.forRoot() registrations
+    // (e.g. GoogleModule) validate against schemas that don't declare these keys as
+    // Joi.number(), so depending on module init order this can come back as the raw
+    // string "3600" instead of the number 3600. jsonwebtoken's expiresIn treats a bare
+    // numeric string as milliseconds (via `ms`), not seconds, so it must be coerced here.
+    const accessExpiration = Number(
+      this.configService.get<string | number>("JWT_EXPIRATION_TIME"),
     );
-    const refreshExpiration = this.configService.get<number>(
-      "JWT_REFRESH_EXPIRATION_TIME",
+    const refreshExpiration = Number(
+      this.configService.get<string | number>("JWT_REFRESH_EXPIRATION_TIME"),
     );
 
     if (!refreshSecret) {
@@ -48,8 +53,12 @@ export class AuthService {
     }
 
     this.refreshSecret = refreshSecret;
-    this.accessExpirationTime = accessExpiration ?? 3600;
-    this.refreshExpirationTime = refreshExpiration ?? 604800;
+    this.accessExpirationTime = Number.isFinite(accessExpiration)
+      ? accessExpiration
+      : 3600;
+    this.refreshExpirationTime = Number.isFinite(refreshExpiration)
+      ? refreshExpiration
+      : 604800;
   }
 
   async register(dto: CreateAuthDto) {
@@ -193,6 +202,9 @@ export class AuthService {
         },
       );
     } catch (error) {
+      this.logger.warn(
+        `refreshAccessToken.verify: ${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`,
+      );
       throw new UnauthorizedException("Invalid or expired refresh token");
     }
 
