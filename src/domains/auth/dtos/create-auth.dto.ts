@@ -14,7 +14,8 @@ export class CreateAuthDto {
   phone: string;
 
   @IsString()
-  password: string;
+  @IsOptional()
+  password: string | null;
 
   @IsOptional()
   @IsString()

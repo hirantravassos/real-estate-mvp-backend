@@ -20,8 +20,8 @@ export class User extends DatabaseBaseEntity {
   @ColumnName()
   name: string;
 
-  @ColumnName()
-  password: string;
+  @ColumnName({ nullable: true })
+  password: string | null;
 
   @Column({ type: "varchar", length: 1000, nullable: true })
   googleId: string | null;

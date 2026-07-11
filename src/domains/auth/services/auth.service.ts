@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   InternalServerErrorException,
@@ -52,7 +53,23 @@ export class AuthService {
   }
 
   async register(dto: CreateAuthDto) {
-    const hashPassword = await CryptoUtils.hashPassword(dto.password);
+    let hashPassword = null;
+    const googleId = dto?.googleId;
+    const facebookId = dto?.facebookId;
+
+    const hasPasswordProvided = Boolean(dto.password);
+    const hasAnyOtherAuthenticationProvided =
+      Boolean(googleId) || Boolean(facebookId);
+
+    if (hasPasswordProvided && dto.password) {
+      hashPassword = await CryptoUtils.hashPassword(dto.password);
+    }
+
+    if (!hasPasswordProvided && !hasAnyOtherAuthenticationProvided) {
+      throw new BadRequestException(
+        "Missing authentication methods, found any",
+      );
+    }
 
     const userAlreadyExists = await this.userRepository.exists({
       where: [
@@ -77,8 +94,8 @@ export class AuthService {
         phone: dto.phone,
         name: dto.name,
         password: hashPassword,
-        googleId: dto?.googleId,
-        facebookId: dto?.facebookId,
+        googleId,
+        facebookId,
         isPhoneValidated: false,
         isEmailValidated: false,
       })
@@ -126,6 +143,10 @@ export class AuthService {
 
     if (!user) {
       throw new NotFoundException("User not found");
+    }
+
+    if (!user?.password) {
+      throw new UnauthorizedException("Passwords not allowed for this user");
     }
 
     const isValid = await CryptoUtils.validateHash(password, user.password);
