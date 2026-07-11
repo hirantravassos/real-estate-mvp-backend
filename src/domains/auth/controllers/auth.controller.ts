@@ -21,7 +21,7 @@ export class AuthController {
 
   @Post("login/google")
   googleLogin(@Body() dto: GoogleLoginDto) {
-    return this.authService.authenticateWithGoogle(dto.idToken);
+    return this.authService.authenticateWithGoogle(dto.authenticationCode);
   }
 
   @Post("refresh")

@@ -17,6 +17,10 @@ export class CreateAuthDto {
   @IsOptional()
   password: string | null;
 
+  @IsString()
+  @IsOptional()
+  confirmPassword: string | null;
+
   @IsOptional()
   @IsString()
   googleId: string;

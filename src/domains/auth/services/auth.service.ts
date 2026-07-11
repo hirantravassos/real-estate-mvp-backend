@@ -104,7 +104,6 @@ export class AuthService {
         throw new InternalServerErrorException("[register.save]");
       });
 
-    void this.authGoogleService.validateGoogleLink(newUser.googleId);
     void this.mailService.sendEmail({
       sendTo: newUser.email,
       template: "welcome",
@@ -158,29 +157,27 @@ export class AuthService {
     return this.generateTokens(user);
   }
 
-  async authenticateWithGoogle(idToken: string): Promise<TokenDto> {
-    try {
-      const googleUser =
-        await this.authGoogleService.getOrThrowGooglePayload(idToken);
+  async authenticateWithGoogle(authenticationCode: string): Promise<TokenDto> {
+    const googleUser = await this.authGoogleService
+      .getOrThrowGooglePayload(authenticationCode)
+      .catch(() => {
+        throw new UnauthorizedException(
+          "Authentication failed, google expired token",
+        );
+      });
 
-      const user = await this.userRepository
-        .findOneByOrFail({
-          email: googleUser.email,
-          googleId: googleUser.id,
-        })
-        .catch(() => {
-          throw new UnauthorizedException(
-            "User not found with email and google payload",
-          );
-        });
+    const user = await this.userRepository
+      .findOneByOrFail({
+        email: googleUser.email,
+        googleId: googleUser.id,
+      })
+      .catch(() => {
+        throw new NotFoundException(
+          "User not found with email and google payload",
+        );
+      });
 
-      return this.generateTokens(user);
-    } catch (error) {
-      console.error("Error authenticating with Google:", error);
-      throw new UnauthorizedException(
-        "Authentication failed, google expired token",
-      );
-    }
+    return this.generateTokens(user);
   }
 
   async refreshAccessToken(refreshToken: string): Promise<AccessTokenDto> {

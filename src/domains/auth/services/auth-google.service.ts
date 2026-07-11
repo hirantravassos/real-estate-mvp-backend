@@ -18,13 +18,25 @@ export class AuthGoogleService {
     private readonly userRepository: Repository<User>,
   ) {
     const clientId = this.configService.getOrThrow<string>("GOOGLE_CLIENT_ID");
+    const clientSecret = this.configService.getOrThrow<string>(
+      "GOOGLE_CLIENT_SECRET",
+    );
+
     this.googleClientId = clientId;
-    this.googleClient = new OAuth2Client(clientId);
+    this.googleClient = new OAuth2Client(clientId, clientSecret, "postmessage");
   }
 
-  async getOrThrowGooglePayload(googleTokenId: string): Promise<GoogleUserDto> {
+  async getOrThrowGooglePayload(
+    authenticationCode: string,
+  ): Promise<GoogleUserDto> {
+    const { tokens } = await this.googleClient.getToken(authenticationCode);
+
+    if (!tokens.id_token) {
+      throw new UnauthorizedException("Invalid Google ID token");
+    }
+
     const ticket = await this.googleClient.verifyIdToken({
-      idToken: googleTokenId,
+      idToken: tokens.id_token,
       audience: this.googleClientId,
     });
 
