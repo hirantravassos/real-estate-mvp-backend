@@ -10,7 +10,7 @@ import { GoogleStrategy } from "./strategies/google.strategy";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { Kanban } from "../kanbans/entities/kanban.entity";
 import Joi from "joi";
-import { AuthGoogleService } from "./services/auth-google.service";
+import { GoogleModule } from "../google/google.module";
 import { MailModule } from "../../infrastructure/mail/mail.module";
 
 @Module({
@@ -24,8 +24,6 @@ import { MailModule } from "../../infrastructure/mail/mail.module";
         JWT_REFRESH_EXPIRATION_TIME: Joi.number().default(60),
         MFA_TOKEN_EXPIRATION_MINUTES: Joi.number(),
         MFA_TOKEN_LENGTH: Joi.number(),
-        GOOGLE_CLIENT_ID: Joi.string(),
-        GOOGLE_CLIENT_SECRET: Joi.string(),
         GOOGLE_CALLBACK_URL: Joi.string(),
       }),
     }),
@@ -44,9 +42,10 @@ import { MailModule } from "../../infrastructure/mail/mail.module";
     PassportModule.register({ session: false }),
     TypeOrmModule.forFeature([User, Kanban]),
     MailModule,
+    GoogleModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, AuthGoogleService, GoogleStrategy, JwtStrategy],
+  providers: [AuthService, GoogleStrategy, JwtStrategy],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

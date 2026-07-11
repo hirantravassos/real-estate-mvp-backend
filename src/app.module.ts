@@ -3,6 +3,7 @@ import { ConfigModule } from "@nestjs/config";
 import { MailModule } from "./infrastructure/mail/mail.module.js";
 import { UserModule } from "./domains/users/user.module";
 import { AuthModule } from "./domains/auth/auth.module";
+import { GoogleModule } from "./domains/google/google.module";
 import { CustomerModule } from "./domains/customers/customer.module";
 import { KanbanModule } from "./domains/kanbans/kanban.module";
 import { PropertyModule } from "./domains/properties/property.module";
@@ -30,6 +31,7 @@ import { PlanModule } from "./domains/plans/plan.module";
     MailModule,
     UserModule,
     AuthModule,
+    GoogleModule,
     CustomerModule,
     KanbanModule,
     PropertyModule,

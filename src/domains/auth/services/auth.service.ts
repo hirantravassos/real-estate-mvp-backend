@@ -17,7 +17,7 @@ import { Repository } from "typeorm";
 import { PasswordLoginDto } from "../dtos/password-login.dto";
 import { CryptoUtils } from "../../../shared/utils/crypto.util";
 import { CreateAuthDto } from "../dtos/create-auth.dto";
-import { AuthGoogleService } from "./auth-google.service";
+import { GoogleService } from "../../google/services/google.service";
 import { MailService } from "../../../infrastructure/mail/services/mail.service";
 
 @Injectable()
@@ -31,7 +31,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly jwtService: JwtService,
     private readonly mailService: MailService,
-    private readonly authGoogleService: AuthGoogleService,
+    private readonly googleService: GoogleService,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
   ) {
@@ -56,6 +56,7 @@ export class AuthService {
     let hashPassword = null;
     const googleId = dto?.googleId;
     const facebookId = dto?.facebookId;
+    const picture = dto?.picture ?? null;
 
     const hasPasswordProvided = Boolean(dto.password);
     const hasAnyOtherAuthenticationProvided =
@@ -96,6 +97,7 @@ export class AuthService {
         password: hashPassword,
         googleId,
         facebookId,
+        picture,
         isPhoneValidated: false,
         isEmailValidated: false,
       })
@@ -158,7 +160,7 @@ export class AuthService {
   }
 
   async authenticateWithGoogle(authenticationCode: string): Promise<TokenDto> {
-    const googleUser = await this.authGoogleService
+    const googleUser = await this.googleService
       .getOrThrowGooglePayload(authenticationCode)
       .catch(() => {
         throw new UnauthorizedException(
@@ -181,12 +183,22 @@ export class AuthService {
   }
 
   async refreshAccessToken(refreshToken: string): Promise<AccessTokenDto> {
-    const payload = this.jwtService.verify<{ id: string; email: string }>(
-      refreshToken,
-      {
-        secret: this.refreshSecret,
-      },
-    );
+    let payload = null;
+
+    try {
+      payload = this.jwtService.verify<{ id: string; email: string }>(
+        refreshToken,
+        {
+          secret: this.refreshSecret,
+        },
+      );
+    } catch (error) {
+      throw new UnauthorizedException("Invalid or expired refresh token");
+    }
+
+    if (!payload) {
+      throw new UnauthorizedException("Token unavailable or not verified");
+    }
 
     const user = await this.userRepository.findOneBy({ id: payload.id });
 

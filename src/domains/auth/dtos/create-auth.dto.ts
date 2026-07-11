@@ -28,4 +28,8 @@ export class CreateAuthDto {
   @IsOptional()
   @IsString()
   facebookId: string;
+
+  @IsOptional()
+  @IsString()
+  picture: string;
 }

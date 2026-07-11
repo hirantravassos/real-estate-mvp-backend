@@ -44,11 +44,11 @@ export class CustomerService {
 
     const [data, total] = await this.customerRepository
       .createQueryBuilder("customer")
-      .leftJoinAndSelect("customer.kanban", "kanban")
-      .leftJoinAndSelect("customer.comments", "comments")
-      .leftJoinAndSelect("customer.visits", "visits")
+      // .leftJoinAndSelect("customer.kanban", "kanban")
+      // .leftJoinAndSelect("customer.comments", "comments")
+      // .leftJoinAndSelect("customer.visits", "visits")
       .where(where)
-      .orderBy("kanban.order", "DESC")
+      // .orderBy("kanban.order", "DESC")
       .addOrderBy("customer.name", "ASC")
       .skip(dto.skip)
       .take(dto.limit)

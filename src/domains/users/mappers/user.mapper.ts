@@ -2,7 +2,7 @@ import { User } from "../entities/user.entity.js";
 import { DateHelper } from "../../../shared/utils/date.util.js";
 import { UserCreateDto } from "../dtos/user-create.dto";
 import { TokenPayload } from "google-auth-library";
-import { GoogleUserDto } from "../../auth/dtos/google-user.dto";
+import { GoogleUserDto } from "../../google/dtos/google-user.dto";
 
 export class UserMapper {
   static toDto(user: User) {
@@ -11,6 +11,7 @@ export class UserMapper {
       email: user.email,
       name: user.name,
       phone: user.phone,
+      picture: user.picture,
       createdAt: DateHelper.formatUtcToIso(user.createdAt),
       updatedAt: DateHelper.formatUtcToIso(user.updatedAt),
     };
@@ -34,6 +35,7 @@ export class UserMapper {
     dto.name = payload?.name as string;
     dto.email = payload?.email as string;
     dto.id = payload?.sub;
+    dto.picture = payload?.picture as string;
 
     return dto;
   }
