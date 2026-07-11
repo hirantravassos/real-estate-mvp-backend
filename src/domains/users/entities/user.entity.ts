@@ -36,15 +36,11 @@ export class User extends DatabaseBaseEntity {
   /**
    * Encrypted (CryptoUtils.encrypt) Google OAuth refresh token, used to mint
    * new access tokens for Google API calls without re-prompting the user.
+   * Presence of this field is also our source of truth for whether the user
+   * has connected (vs. revoked) Google Contacts access.
    */
   @ColumnLongText({ nullable: true })
   googleRefreshToken: string | null;
-
-  @ColumnLongText({ nullable: true })
-  googleAccessToken: string | null;
-
-  @Column({ type: "bigint", nullable: true })
-  googleAccessTokenExpiresAt: number | null;
 
   @ColumnBoolean()
   isPhoneValidated: boolean;

@@ -17,6 +17,16 @@ export class GoogleController {
     return this.googleService.connectContacts(userId, dto.authenticationCode);
   }
 
+  @Post("contacts/disconnect")
+  disconnectContacts(@GetUser("id") userId: string) {
+    return this.googleService.disconnectContacts(userId);
+  }
+
+  @Get("contacts/status")
+  getConnectionStatus(@GetUser("id") userId: string) {
+    return this.googleService.getConnectionStatus(userId);
+  }
+
   @Get("contacts")
   getContacts(@GetUser("id") userId: string) {
     return this.googleService.getContacts(userId);

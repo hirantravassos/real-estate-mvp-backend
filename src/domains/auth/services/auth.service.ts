@@ -37,10 +37,10 @@ export class AuthService {
   ) {
     const refreshSecret = this.configService.get<string>("JWT_REFRESH_SECRET");
     const accessExpiration = this.configService.get<number>(
-      "JWT_REFRESH_EXPIRATION_TIME",
+      "JWT_EXPIRATION_TIME",
     );
     const refreshExpiration = this.configService.get<number>(
-      "MFA_TOKEN_EXPIRATION_MINUTES",
+      "JWT_REFRESH_EXPIRATION_TIME",
     );
 
     if (!refreshSecret) {
