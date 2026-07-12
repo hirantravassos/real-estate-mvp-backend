@@ -11,7 +11,7 @@ import {
   Query,
   UseGuards,
 } from "@nestjs/common";
-import { JwtGuard } from "../../auth/guards/jwt.guard";
+import { UserGuard } from "../../auth/guards/user.guard";
 import { KanbanCreateDto } from "../dtos/kanban-create.dto";
 import { KanbanReorderDto } from "../dtos/kanban-reorder.dto";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
@@ -20,7 +20,7 @@ import { KanbanMapper } from "../mappers/kanban.mapper";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 
 @Controller("kanbans")
-@UseGuards(JwtGuard)
+@UseGuards(UserGuard)
 export class KanbanController {
   constructor(private readonly kanbanService: KanbanService) {}
 

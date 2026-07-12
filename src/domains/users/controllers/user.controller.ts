@@ -4,10 +4,10 @@ import { UserMapper } from "../mappers/user.mapper.js";
 import { UserResponseDto } from "../dtos/user-response.dto.js";
 import { User } from "../entities/user.entity";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
-import { JwtGuard } from "../../auth/guards/jwt.guard";
+import { UserGuard } from "../../auth/guards/user.guard";
 
 @Controller("users")
-@UseGuards(JwtGuard)
+@UseGuards(UserGuard)
 export class UserController {
   constructor(private readonly userService: UserService) {}
 

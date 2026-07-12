@@ -34,10 +34,7 @@ export class PropertyCreateDto {
   price: string;
 
   @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => PropertyContactCreateDto)
-  contacts?: PropertyContactCreateDto[];
+  ownerId?: string | null;
 
   @IsOptional()
   @IsNumber()

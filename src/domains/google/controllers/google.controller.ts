@@ -1,11 +1,11 @@
 import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
-import { JwtGuard } from "../../auth/guards/jwt.guard";
+import { UserGuard } from "../../auth/guards/user.guard";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { GoogleService } from "../services/google.service";
 import { AuthorizationCodeDto } from "../dtos/authorization-code.dto";
 
 @Controller("google")
-@UseGuards(JwtGuard)
+@UseGuards(UserGuard)
 export class GoogleController {
   constructor(private readonly googleService: GoogleService) {}
 

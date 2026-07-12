@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { ConfigModule, ConfigService } from "@nestjs/config";
+import { SnakeNamingStrategy } from "typeorm-naming-strategies";
 import Joi from "joi";
 
 @Module({
@@ -25,6 +26,7 @@ import Joi from "joi";
         username: configService.getOrThrow<string>("DATABASE_USERNAME"),
         password: configService.getOrThrow<string>("DATABASE_PASSWORD"),
         database: configService.getOrThrow<string>("DATABASE_NAME"),
+        namingStrategy: new SnakeNamingStrategy(),
         autoLoadEntities: true,
         synchronize: true,
         logging: false,

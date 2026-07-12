@@ -22,9 +22,7 @@ export class KanbanService {
         active: true,
       },
       relations: {
-        customers: {
-          comments: true,
-        },
+        contacts: true,
       },
       order: {
         order: "ASC",
@@ -41,7 +39,7 @@ export class KanbanService {
       .findOneOrFail({
         where: { id, user: { id: user.id } },
         relations: {
-          customers: true,
+          contacts: true,
         },
       })
       .catch(() => {

@@ -1,4 +1,4 @@
-import { PropertyContactDto } from "./property-contact.dto";
+import { Contact } from "../../contacts/entities/contact.entity";
 
 export interface PropertyListDto {
   id: string;
@@ -10,5 +10,5 @@ export interface PropertyListDto {
   infoBathrooms: number | null;
   infoSquareMeters: number | null;
   createdAt: Date;
-  contacts: PropertyContactDto[];
+  owner: Contact | null;
 }

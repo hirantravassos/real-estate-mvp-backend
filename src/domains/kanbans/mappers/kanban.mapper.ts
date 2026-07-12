@@ -1,7 +1,6 @@
 import { KanbanCreateDto } from "../dtos/kanban-create.dto";
 import { Kanban } from "../entities/kanban.entity";
-import { Customer } from "../../customers/entities/customer.entity";
-import { CustomerComment } from "../../customers/entities/customer-comments.entity";
+import { Contact } from "../../contacts/entities/contact.entity";
 
 export class KanbanMapper {
   static toEntity(dto: KanbanCreateDto, id?: string) {
@@ -27,28 +26,17 @@ export class KanbanMapper {
         name: entity.name,
         description: entity.description,
         order: entity.order,
-        customers: this.toCustomerDto(entity.customers), // TODO: cannot keep, too much data
+        contacts: this.toContactDto(entity.contacts), // TODO: cannot keep, too much data
       };
     });
   }
 
-  private static toCustomerDto(customers: Customer[]) {
+  private static toContactDto(customers: Contact[]) {
     return customers.map((entity) => {
       return {
         id: entity.id,
         name: entity.name,
         phone: entity.phone,
-        budget: entity.budget,
-        comments: this.toCustomerCommentDto(entity.comments),
-      };
-    });
-  }
-
-  private static toCustomerCommentDto(entities: CustomerComment[]) {
-    return entities?.map((entity) => {
-      return {
-        id: entity.id,
-        comment: entity.comment,
       };
     });
   }

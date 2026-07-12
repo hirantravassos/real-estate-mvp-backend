@@ -1,12 +1,9 @@
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
 import { DatabaseBaseEntity } from "../../../infrastructure/database/entities/database-base.entity";
 import { User } from "../../users/entities/user.entity";
-import { PropertyContact } from "./property-contact.entity";
-import { ColumnBoolean } from "../../../shared/decorators/columns/column-boolean.decorator";
 import { ColumnCurrency } from "../../../shared/decorators/columns/column-currency.decorator";
-import { PropertyLiftEnum } from "../enums/property-lift.enum";
-import { PropertyFurnitureEnum } from "../enums/property-furniture.enum";
-import { PropertyConciergeServiceEnum } from "../enums/property-concierge.enum";
+import { PropertyCharacteristic } from "./property-characteristic.entity";
+import { Contact } from "../../contacts/entities/contact.entity";
 
 @Entity("properties")
 export class Property extends DatabaseBaseEntity {
@@ -17,90 +14,34 @@ export class Property extends DatabaseBaseEntity {
   @JoinColumn({ name: "userId" })
   user: User;
 
-  @Column({ type: "varchar", nullable: false })
+  @Column({ type: "varchar" })
   userId: string;
+
+  @ManyToOne(() => Contact, (contact) => contact.seller.properties, {
+    cascade: true,
+    onDelete: "SET NULL",
+  })
+  @JoinColumn({ name: "ownerId" })
+  owner: Contact;
+
+  @Column({ type: "varchar", nullable: true })
+  ownerId: string | null;
 
   @Column({ type: "varchar", nullable: true })
   alias: string | null;
 
-  @Column({ type: "text", nullable: false })
+  @Column({ type: "text" })
   address: string;
 
-  @Column({ type: "varchar", nullable: false })
+  @Column({ type: "varchar" })
   address2: string;
 
   @Column({ type: "text", nullable: true })
   comment: string | null;
 
-  @ColumnCurrency({ nullable: false })
+  @ColumnCurrency()
   price: string;
 
-  @OneToMany(() => PropertyContact, (contact) => contact.property, {
-    cascade: ["insert", "update", "remove", "soft-remove", "recover"],
-  })
-  contacts: PropertyContact[];
-
-  @Column({ type: "int", nullable: true })
-  infoBedrooms: number | null;
-
-  @Column({ type: "int", nullable: true })
-  infoSuiteBedrooms: number | null;
-
-  @Column({ type: "int", nullable: true })
-  infoBathrooms: number | null;
-
-  @Column({ type: "enum", enum: PropertyLiftEnum, nullable: true })
-  infoLift: PropertyLiftEnum | null;
-
-  @ColumnBoolean({ nullable: true })
-  infoHasPool: boolean | null;
-
-  @ColumnBoolean({ nullable: true })
-  infoHasBalcony: boolean | null;
-
-  @ColumnBoolean({ nullable: true })
-  infoHasFancyBalcony: boolean | null;
-
-  @Column({
-    type: "enum",
-    enum: PropertyFurnitureEnum,
-    nullable: true,
-  })
-  infoFurniture: PropertyFurnitureEnum | null;
-
-  @Column({ type: "int", nullable: true })
-  infoParkingSpaceUnits: number | null;
-
-  @ColumnBoolean({ nullable: true })
-  infoHasDedicatedParkingSpace: boolean | null;
-
-  @Column({ type: "numeric", nullable: true })
-  infoSquareMeters: number | null;
-
-  @ColumnCurrency({ nullable: true })
-  infoPropertyTax: string | null;
-
-  @ColumnCurrency({ nullable: true })
-  infoMaintenanceFee: string | null;
-
-  @Column({ type: "int", nullable: true })
-  infoFloor: number | null;
-
-  @Column({ type: "numeric", nullable: true })
-  infoBeachProximityInKm: number | null;
-
-  @Column({ type: "enum", enum: PropertyConciergeServiceEnum, nullable: true })
-  infoConciergeService: PropertyConciergeServiceEnum | null;
-
-  @ColumnBoolean({ nullable: true })
-  infoHasAirConditioningSystem: boolean | null;
-
-  @ColumnBoolean({ nullable: true })
-  infoHasGasWaterHeatingSystem: boolean | null;
-
-  @ColumnBoolean({ nullable: true })
-  infoHasGasSystem: boolean | null;
-
-  @ColumnBoolean({ nullable: true })
-  infoHasGym: boolean | null;
+  @Column(() => PropertyCharacteristic, { prefix: "info" })
+  characteristics: PropertyCharacteristic;
 }

@@ -4,7 +4,6 @@ import { MailModule } from "./infrastructure/mail/mail.module.js";
 import { UserModule } from "./domains/users/user.module";
 import { AuthModule } from "./domains/auth/auth.module";
 import { GoogleModule } from "./domains/google/google.module";
-import { CustomerModule } from "./domains/customers/customer.module";
 import { KanbanModule } from "./domains/kanbans/kanban.module";
 import { PropertyModule } from "./domains/properties/property.module";
 import { BucketModule } from "./infrastructure/bucket/bucket.module";
@@ -12,6 +11,7 @@ import { RedisModule } from "./infrastructure/redis/redis.module";
 import { DatabaseModule } from "./infrastructure/database/database.module";
 import Joi from "joi";
 import { PlanModule } from "./domains/plans/plan.module";
+import { ContactModule } from "./domains/contacts/contact.module";
 
 // const THROTTLE_TTL_MS = 60_000;
 // const THROTTLE_LIMIT = 30;
@@ -32,7 +32,7 @@ import { PlanModule } from "./domains/plans/plan.module";
     UserModule,
     AuthModule,
     GoogleModule,
-    CustomerModule,
+    ContactModule,
     KanbanModule,
     PropertyModule,
     PlanModule,

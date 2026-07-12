@@ -9,7 +9,7 @@ import {
   Query,
   UseGuards,
 } from "@nestjs/common";
-import { JwtGuard } from "../../auth/guards/jwt.guard";
+import { UserGuard } from "../../auth/guards/user.guard";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { User } from "../../users/entities/user.entity";
 import { PropertyMapper } from "../mappers/property.mapper";
@@ -18,7 +18,7 @@ import { PropertyFilterDto } from "../dtos/property-filter.dto";
 import { PropertyCreateDto } from "../dtos/property-create.dto";
 
 @Controller("properties")
-@UseGuards(JwtGuard)
+@UseGuards(UserGuard)
 export class PropertyController {
   constructor(private readonly propertyService: PropertyService) {}
 

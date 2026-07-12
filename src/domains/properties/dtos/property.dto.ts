@@ -2,6 +2,7 @@ import { PropertyFurnitureEnum } from "../enums/property-furniture.enum";
 import { PropertyConciergeServiceEnum } from "../enums/property-concierge.enum";
 import { PropertyContactDto } from "./property-contact.dto";
 import { PropertyLiftEnum } from "../enums/property-lift.enum";
+import { Contact } from "../../contacts/entities/contact.entity";
 
 export interface PropertyDto {
   id: string;
@@ -10,7 +11,7 @@ export interface PropertyDto {
   address2: string;
   comment: string | null;
   price: string;
-  contacts: PropertyContactDto[];
+  owner: Contact | null;
   infoBedrooms: number | null;
   infoSuiteBedrooms: number | null;
   infoBathrooms: number | null;
