@@ -17,7 +17,7 @@ import { PropertyCharacteristic } from "../../properties/entities/property-chara
 import { Property } from "../../properties/entities/property.entity";
 import { Kanban } from "../../kanbans/entities/kanban.entity";
 
-class Buyer {
+export class ContactBuyer {
   @ColumnBoolean({ default: false })
   isBuyer: boolean;
 
@@ -31,7 +31,7 @@ class Buyer {
   preferences: PropertyCharacteristic;
 }
 
-class Seller {
+export class ContactSeller {
   @ColumnBoolean({ default: false })
   isSeller: boolean;
 
@@ -39,7 +39,7 @@ class Seller {
   properties: Property[];
 }
 
-class Agent {
+export class ContactAgent {
   @ColumnBoolean({ default: false })
   isAgent: boolean;
 }
@@ -56,8 +56,8 @@ export class Contact extends DatabaseBaseEntity {
   @JoinColumn({ name: "userId" })
   user: User;
 
-  @Column({ type: "varchar" })
-  kanbanId: string;
+  @Column({ type: "varchar", nullable: true })
+  kanbanId: string | null;
 
   @ManyToOne(() => Kanban, (kanban) => kanban.contacts, {
     cascade: true,
@@ -74,12 +74,12 @@ export class Contact extends DatabaseBaseEntity {
   @ColumnEmail({ nullable: true })
   email: string | null;
 
-  @Column(() => Buyer, { prefix: "buyer" })
-  buyer: Buyer;
+  @Column(() => ContactBuyer, { prefix: "buyer" })
+  buyer: ContactBuyer;
 
-  @Column(() => Seller, { prefix: "seller" })
-  seller: Seller;
+  @Column(() => ContactSeller, { prefix: "seller" })
+  seller: ContactSeller;
 
-  @Column(() => Agent, { prefix: "agent" })
-  agent: Agent;
+  @Column(() => ContactAgent, { prefix: "agent" })
+  agent: ContactAgent;
 }

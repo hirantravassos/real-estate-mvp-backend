@@ -1,10 +1,7 @@
-import { PropertyFurnitureEnum } from "../enums/property-furniture.enum";
-import { PropertyConciergeServiceEnum } from "../enums/property-concierge.enum";
-import { PropertyContactDto } from "./property-contact.dto";
-import { PropertyLiftEnum } from "../enums/property-lift.enum";
 import { Contact } from "../../contacts/entities/contact.entity";
+import { PropertyCreateCharacteristics } from "./property-create-characteristics.dto";
 
-export interface PropertyDto {
+export interface PropertyDto extends PropertyCreateCharacteristics {
   id: string;
   alias: string | null;
   address: string;
@@ -12,26 +9,6 @@ export interface PropertyDto {
   comment: string | null;
   price: string;
   owner: Contact | null;
-  infoBedrooms: number | null;
-  infoSuiteBedrooms: number | null;
-  infoBathrooms: number | null;
-  infoLift: PropertyLiftEnum | null;
-  infoHasPool: boolean | null;
-  infoHasBalcony: boolean | null;
-  infoHasFancyBalcony: boolean | null;
-  infoFurniture: PropertyFurnitureEnum | null;
-  infoParkingSpaceUnits: number | null;
-  infoHasDedicatedParkingSpace: boolean | null;
-  infoSquareMeters: number | null;
-  infoPropertyTax: string | null;
-  infoMaintenanceFee: string | null;
-  infoFloor: number | null;
-  infoBeachProximityInKm: number | null;
-  infoConciergeService: PropertyConciergeServiceEnum | null;
-  infoHasAirConditioningSystem: boolean | null;
-  infoHasGasWaterHeatingSystem: boolean | null;
-  infoHasGasSystem: boolean | null;
-  infoHasGym: boolean | null;
   createdAt: Date;
   updatedAt: Date;
   active: boolean;

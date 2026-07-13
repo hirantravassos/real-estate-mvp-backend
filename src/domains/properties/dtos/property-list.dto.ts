@@ -6,9 +6,9 @@ export interface PropertyListDto {
   address: string;
   address2: string;
   price: string;
-  infoBedrooms: number | null;
-  infoBathrooms: number | null;
-  infoSquareMeters: number | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  squareMeters: number | null;
   createdAt: Date;
   owner: Contact | null;
 }

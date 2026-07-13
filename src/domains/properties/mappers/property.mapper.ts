@@ -7,37 +7,46 @@ import { Contact } from "../../contacts/entities/contact.entity";
 export class PropertyMapper {
   static toEntity(dto: PropertyCreateDto, id?: string) {
     const entity = new Property();
+
     entity.alias = dto.alias ?? null;
     entity.address = dto.address;
     entity.address2 = dto.address2;
     entity.comment = dto.comment ?? null;
     entity.price = dto.price;
 
-    entity.characteristics.bedrooms = dto.infoBedrooms ?? null;
-    entity.characteristics.suiteBedrooms = dto.infoSuiteBedrooms ?? null;
-    entity.characteristics.bathrooms = dto.infoBathrooms ?? null;
-    entity.characteristics.lift = dto.infoLift ?? null;
-    entity.characteristics.hasPool = dto.infoHasPool ?? null;
-    entity.characteristics.hasBalcony = dto.infoHasBalcony ?? null;
-    entity.characteristics.hasFancyBalcony = dto.infoHasFancyBalcony ?? null;
-    entity.characteristics.furniture = dto.infoFurniture ?? null;
+    entity.characteristics.bedrooms = dto.characteristics.bedrooms ?? null;
+    entity.characteristics.suiteBedrooms =
+      dto.characteristics.suiteBedrooms ?? null;
+    entity.characteristics.bathrooms = dto.characteristics.bathrooms ?? null;
+    entity.characteristics.lift = dto.characteristics.lift ?? null;
+    entity.characteristics.hasPool = dto.characteristics.hasPool ?? null;
+    entity.characteristics.hasBalcony = dto.characteristics.hasBalcony ?? null;
+    entity.characteristics.hasFancyBalcony =
+      dto.characteristics.hasFancyBalcony ?? null;
+    entity.characteristics.furniture = dto.characteristics.furniture ?? null;
     entity.characteristics.parkingSpaceUnits =
-      dto.infoParkingSpaceUnits ?? null;
+      dto.characteristics.parkingSpaceUnits ?? null;
     entity.characteristics.hasDedicatedParkingSpace =
-      dto.infoHasDedicatedParkingSpace ?? null;
-    entity.characteristics.squareMeters = dto.infoSquareMeters ?? null;
-    entity.characteristics.propertyTax = dto.infoPropertyTax ?? null;
-    entity.characteristics.maintenanceFee = dto.infoMaintenanceFee ?? null;
-    entity.characteristics.floor = dto.infoFloor ?? null;
+      dto.characteristics.hasDedicatedParkingSpace ?? null;
+    entity.characteristics.squareMeters =
+      dto.characteristics.squareMeters ?? null;
+    entity.characteristics.propertyTax =
+      dto.characteristics.propertyTax ?? null;
+    entity.characteristics.maintenanceFee =
+      dto.characteristics.maintenanceFee ?? null;
+    entity.characteristics.floor = dto.characteristics.floor ?? null;
     entity.characteristics.beachProximityInKm =
-      dto.infoBeachProximityInKm ?? null;
-    entity.characteristics.conciergeService = dto.infoConciergeService ?? null;
+      dto.characteristics.beachProximityInKm ?? null;
+    entity.characteristics.conciergeService =
+      dto.characteristics.conciergeService ?? null;
     entity.characteristics.hasAirConditioningSystem =
-      dto.infoHasAirConditioningSystem ?? null;
+      dto.characteristics.hasAirConditioningSystem ?? null;
     entity.characteristics.hasGasWaterHeatingSystem =
-      dto.infoHasGasWaterHeatingSystem ?? null;
-    entity.characteristics.hasGasSystem = dto.infoHasGasSystem ?? null;
-    entity.characteristics.hasGym = dto.infoHasGym ?? null;
+      dto.characteristics.hasGasWaterHeatingSystem ?? null;
+    entity.characteristics.hasGasSystem =
+      dto.characteristics.hasGasSystem ?? null;
+    entity.characteristics.hasGym = dto.characteristics.hasGym ?? null;
+
     entity.ownerId = dto?.ownerId ?? null;
 
     if (id) {
@@ -55,29 +64,26 @@ export class PropertyMapper {
       address2: entity.address2,
       comment: entity.comment,
       price: entity.price,
-      infoBedrooms: entity.characteristics.bedrooms,
-      infoSuiteBedrooms: entity.characteristics.suiteBedrooms,
-      infoBathrooms: entity.characteristics.bathrooms,
-      infoLift: entity.characteristics.lift,
-      infoHasPool: entity.characteristics.hasPool,
-      infoHasBalcony: entity.characteristics.hasBalcony,
-      infoHasFancyBalcony: entity.characteristics.hasFancyBalcony,
-      infoFurniture: entity.characteristics.furniture,
-      infoParkingSpaceUnits: entity.characteristics.parkingSpaceUnits,
-      infoHasDedicatedParkingSpace:
-        entity.characteristics.hasDedicatedParkingSpace,
-      infoSquareMeters: entity.characteristics.squareMeters,
-      infoPropertyTax: entity.characteristics.propertyTax,
-      infoMaintenanceFee: entity.characteristics.maintenanceFee,
-      infoFloor: entity.characteristics.floor,
-      infoBeachProximityInKm: entity.characteristics.beachProximityInKm,
-      infoConciergeService: entity.characteristics.conciergeService,
-      infoHasAirConditioningSystem:
-        entity.characteristics.hasAirConditioningSystem,
-      infoHasGasWaterHeatingSystem:
-        entity.characteristics.hasGasWaterHeatingSystem,
-      infoHasGasSystem: entity.characteristics.hasGasSystem,
-      infoHasGym: entity.characteristics.hasGym,
+      bedrooms: entity.characteristics.bedrooms,
+      suiteBedrooms: entity.characteristics.suiteBedrooms,
+      bathrooms: entity.characteristics.bathrooms,
+      lift: entity.characteristics.lift,
+      hasPool: entity.characteristics.hasPool,
+      hasBalcony: entity.characteristics.hasBalcony,
+      hasFancyBalcony: entity.characteristics.hasFancyBalcony,
+      furniture: entity.characteristics.furniture,
+      parkingSpaceUnits: entity.characteristics.parkingSpaceUnits,
+      hasDedicatedParkingSpace: entity.characteristics.hasDedicatedParkingSpace,
+      squareMeters: entity.characteristics.squareMeters,
+      propertyTax: entity.characteristics.propertyTax,
+      maintenanceFee: entity.characteristics.maintenanceFee,
+      floor: entity.characteristics.floor,
+      beachProximityInKm: entity.characteristics.beachProximityInKm,
+      conciergeService: entity.characteristics.conciergeService,
+      hasAirConditioningSystem: entity.characteristics.hasAirConditioningSystem,
+      hasGasWaterHeatingSystem: entity.characteristics.hasGasWaterHeatingSystem,
+      hasGasSystem: entity.characteristics.hasGasSystem,
+      hasGym: entity.characteristics.hasGym,
       owner: this.toContact(entity.owner),
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
@@ -93,9 +99,9 @@ export class PropertyMapper {
         address: entity.address,
         address2: entity.address2,
         price: entity.price,
-        infoBedrooms: entity.characteristics.bedrooms,
-        infoBathrooms: entity.characteristics.bathrooms,
-        infoSquareMeters: entity.characteristics.squareMeters,
+        bedrooms: entity.characteristics.bedrooms,
+        bathrooms: entity.characteristics.bathrooms,
+        squareMeters: entity.characteristics.squareMeters,
         createdAt: entity.createdAt,
         owner: this.toContact(entity.owner),
       };
