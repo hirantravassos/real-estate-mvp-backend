@@ -63,8 +63,8 @@ export class AuthService {
 
   async register(dto: CreateAuthDto) {
     let hashPassword = null;
-    const googleId = dto?.googleId;
     const facebookId = dto?.facebookId;
+    const googleId = dto?.googleId;
     const picture = dto?.picture ?? null;
 
     const hasPasswordProvided = Boolean(dto.password);
@@ -104,7 +104,6 @@ export class AuthService {
         phone: dto.phone,
         name: dto.name,
         password: hashPassword,
-        googleId,
         facebookId,
         picture,
         isPhoneValidated: false,
@@ -180,7 +179,6 @@ export class AuthService {
     const user = await this.userRepository
       .findOneByOrFail({
         email: googleUser.email,
-        googleId: googleUser.id,
       })
       .catch(() => {
         throw new NotFoundException(

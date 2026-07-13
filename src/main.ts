@@ -6,7 +6,9 @@ import { GlobalExceptionFilter } from "./shared/filters/global-exception.filter.
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { rawBody: true });
 
-  const cors = process.env.APP_CORS_ORIGIN || "http://localhost:3000";
+  const cors: string[] = process.env.APP_CORS_ORIGIN?.split(",") || [
+    "http://localhost:3000",
+  ];
 
   app.enableCors({
     origin: cors,
@@ -30,7 +32,7 @@ async function bootstrap(): Promise<void> {
   const port = parseInt(process.env.APP_PORT || "3001", 10);
   await app.listen(port, "0.0.0.0");
   console.log(`🚀 Backend running on http://localhost:${port}/api`);
-  console.log(`🚀 Cors allowed for: ${cors}`);
+  console.log(`🚀 Cors allowed for: ${cors?.join(", ")}`);
 }
 
 void bootstrap();

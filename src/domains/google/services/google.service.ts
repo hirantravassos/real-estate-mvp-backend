@@ -162,6 +162,7 @@ export class GoogleService {
         },
       })
       .catch((error) => {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         if (error?.response?.data?.error === "invalid_grant") {
           throw this.googleNotConnectedError();
         }
@@ -170,30 +171,6 @@ export class GoogleService {
       });
 
     return GoogleContactMapper.toDtoList(response.data.connections ?? []);
-  }
-
-  /**
-   * This method will auto-validate email for the user
-   * */
-  async validateGoogleLink(authenticationCode?: string): Promise<void> {
-    if (!authenticationCode) return;
-
-    const googlePayload =
-      await this.getOrThrowGooglePayload(authenticationCode);
-    const foundUser = await this.userRepository.findOneBy({
-      email: googlePayload.email,
-    });
-
-    if (!foundUser) return;
-
-    await this.userRepository.update(
-      { id: foundUser.id },
-      {
-        googleId: googlePayload.id,
-        picture: googlePayload.picture,
-        isEmailValidated: true,
-      },
-    );
   }
 
   private async findUserOrThrow(userId: string): Promise<User> {

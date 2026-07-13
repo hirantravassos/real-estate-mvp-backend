@@ -25,9 +25,6 @@ export class User extends DatabaseBaseEntity {
   password: string | null;
 
   @Column({ type: "varchar", length: 1000, nullable: true })
-  googleId: string | null;
-
-  @Column({ type: "varchar", length: 1000, nullable: true })
   facebookId: string | null;
 
   @Column({ type: "varchar", length: 1000, nullable: true })
