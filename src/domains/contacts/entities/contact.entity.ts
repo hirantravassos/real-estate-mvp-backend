@@ -18,9 +18,6 @@ import { Property } from "../../properties/entities/property.entity";
 import { Kanban } from "../../kanbans/entities/kanban.entity";
 
 export class ContactBuyer {
-  @ColumnBoolean({ default: false })
-  isBuyer: boolean;
-
   @ColumnCurrency()
   minBudget: string;
 
@@ -32,17 +29,11 @@ export class ContactBuyer {
 }
 
 export class ContactSeller {
-  @ColumnBoolean({ default: false })
-  isSeller: boolean;
-
   @OneToMany(() => Property, (property) => property.owner)
   properties: Property[];
 }
 
-export class ContactAgent {
-  @ColumnBoolean({ default: false })
-  isAgent: boolean;
-}
+export class ContactAgent {}
 
 @Entity("contacts")
 @Unique(["userId", "phone"])
@@ -73,6 +64,15 @@ export class Contact extends DatabaseBaseEntity {
 
   @ColumnEmail({ nullable: true })
   email: string | null;
+
+  @ColumnBoolean({ default: false })
+  isBuyer: boolean;
+
+  @ColumnBoolean({ default: false })
+  isSeller: boolean;
+
+  @ColumnBoolean({ default: false })
+  isAgent: boolean;
 
   @Column(() => ContactBuyer, { prefix: "buyer" })
   buyer: ContactBuyer;

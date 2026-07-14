@@ -8,13 +8,19 @@ import {
 } from "@nestjs/common";
 import { ContactCreateDto } from "../dtos/contact-create.dto";
 import { ContactMapper } from "../mappers/contact.mapper";
+import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
+import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 
 @Injectable()
 export class ContactService {
   constructor(private readonly contactRepository: ContactRepository) {}
 
-  async findAll(user: User, filter: ContactFilterDto) {
-    return await this.contactRepository.find({
+  async findAll(
+    user: User,
+    pagination: PaginationRequestDto,
+    filter: ContactFilterDto,
+  ) {
+    const [data, total] = await this.contactRepository.findAndCount({
       where: {
         userId: user.id,
       },
@@ -29,6 +35,7 @@ export class ContactService {
       take: filter.limit,
       skip: filter.skip,
     });
+    return PaginationMapper.toDto([data, total], pagination);
   }
 
   async findOne(user: User, contactId: string) {
@@ -58,10 +65,6 @@ export class ContactService {
         where: {
           phone: phone,
           userId: user.id,
-        },
-        select: {
-          id: true,
-          name: true,
         },
       })
       .catch(() => {

@@ -21,8 +21,11 @@ export class ContactMapper {
     }
 
     entity.name = dto.name;
-    entity.phone = dto.phone;
+    entity.phone = dto.phone?.replaceAll(" ", "");
     entity.email = dto.email ?? null;
+    entity.isAgent = dto.isAgent;
+    entity.isBuyer = dto.isBuyer;
+    entity.isSeller = dto.isSeller;
 
     if (dto.isBuyer) {
       entity.buyer.minBudget = dto?.buyer?.minBudget;
