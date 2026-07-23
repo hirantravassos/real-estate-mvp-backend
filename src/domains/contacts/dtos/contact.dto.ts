@@ -1,7 +1,11 @@
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
-import { IsBoolean, IsOptional } from "class-validator";
+import { IsBoolean, IsOptional, IsString } from "class-validator";
 
 export class ContactFilterDto extends PaginationRequestDto {
+  @IsString()
+  @IsOptional()
+  search?: string;
+
   @IsBoolean()
   @IsOptional()
   buyers?: boolean;

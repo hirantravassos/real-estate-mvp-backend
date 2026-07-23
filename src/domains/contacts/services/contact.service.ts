@@ -9,6 +9,8 @@ import {
 import { ContactCreateDto } from "../dtos/contact-create.dto";
 import { ContactMapper } from "../mappers/contact.mapper";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
+import { FindOptionsWhere, ILike } from "typeorm";
+import { Contact } from "../entities/contact.entity";
 
 @Injectable()
 export class ContactService {
@@ -16,12 +18,7 @@ export class ContactService {
 
   async findAll(user: User, filter: ContactFilterDto) {
     const [data, total] = await this.contactRepository.findAndCount({
-      where: {
-        userId: user.id,
-        seller: filter?.sellers ?? false,
-        buyer: filter?.buyers ?? false,
-        agent: filter?.agents ?? false,
-      },
+      where: this.getWhereProps(user, filter),
       relations: {
         seller: {
           properties: true,
@@ -92,5 +89,23 @@ export class ContactService {
       ...entity,
       userId: user.id,
     });
+  }
+
+  private getWhereProps(
+    user: User,
+    filter: ContactFilterDto,
+  ): FindOptionsWhere<Contact>[] {
+    const baseWhere: FindOptionsWhere<Contact> = {
+      userId: user.id,
+      isSeller: filter?.sellers,
+      isBuyer: filter?.buyers,
+      isAgent: filter?.agents,
+    };
+
+    return [
+      { ...baseWhere, name: ILike(`%${filter?.search ?? ""}%`) },
+      { ...baseWhere, phone: ILike(`%${filter?.search ?? ""}%`) },
+      { ...baseWhere, email: ILike(`%${filter?.search ?? ""}%`) },
+    ];
   }
 }
