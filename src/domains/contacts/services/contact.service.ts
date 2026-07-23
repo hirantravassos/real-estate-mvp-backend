@@ -9,20 +9,18 @@ import {
 import { ContactCreateDto } from "../dtos/contact-create.dto";
 import { ContactMapper } from "../mappers/contact.mapper";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
-import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 
 @Injectable()
 export class ContactService {
   constructor(private readonly contactRepository: ContactRepository) {}
 
-  async findAll(
-    user: User,
-    pagination: PaginationRequestDto,
-    filter: ContactFilterDto,
-  ) {
+  async findAll(user: User, filter: ContactFilterDto) {
     const [data, total] = await this.contactRepository.findAndCount({
       where: {
         userId: user.id,
+        seller: filter?.sellers ?? false,
+        buyer: filter?.buyers ?? false,
+        agent: filter?.agents ?? false,
       },
       relations: {
         seller: {
@@ -32,10 +30,17 @@ export class ContactService {
           preferences: true,
         },
       },
+      order: {
+        name: "ASC",
+      },
       take: filter.limit,
       skip: filter.skip,
     });
-    return PaginationMapper.toDto([data, total], pagination);
+    return PaginationMapper.toDto([data, total], {
+      page: filter.page,
+      limit: filter.limit,
+      skip: filter.skip,
+    });
   }
 
   async findOne(user: User, contactId: string) {
@@ -59,7 +64,7 @@ export class ContactService {
       });
   }
 
-  async findDuplicated(user: User, phone: string) {
+  async findDuplicatedByPhone(user: User, phone: string) {
     return await this.contactRepository
       .findOneOrFail({
         where: {
@@ -82,10 +87,10 @@ export class ContactService {
     }
 
     const entity = ContactMapper.toEntity(dto, contactId);
-    const saved = await this.contactRepository.save({
+
+    return await this.contactRepository.save({
       ...entity,
       userId: user.id,
     });
-    return saved;
   }
 }
