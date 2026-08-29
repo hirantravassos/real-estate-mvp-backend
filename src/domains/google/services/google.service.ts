@@ -53,7 +53,23 @@ export class GoogleService {
   ): Promise<GoogleConnectionStatusDto> {
     const user = await this.findUserOrThrow(userId);
 
-    return { connected: Boolean(user.googleRefreshToken) };
+    if (!user.googleRefreshToken) {
+      return { connected: false };
+    }
+
+    const oauthClient = new OAuth2Client(
+      this.googleClientId,
+      this.googleClientSecret,
+    );
+    oauthClient.setCredentials({ refresh_token: user.googleRefreshToken });
+
+    try {
+      await oauthClient.getAccessToken();
+      return { connected: true };
+    } catch {
+      // await this.userRepository.update(userId, { googleRefreshToken: null });
+      return { connected: false };
+    }
   }
 
   /**
