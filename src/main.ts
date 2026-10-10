@@ -1,10 +1,14 @@
 import { NestFactory } from "@nestjs/core";
+import { NestExpressApplication } from "@nestjs/platform-express";
 import { ValidationPipe } from "@nestjs/common";
 import { AppModule } from "./app.module.js";
 import { GlobalExceptionFilter } from "./shared/filters/global-exception.filter.js";
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // WhatsApp webhooks carry message thumbnails, bigger than the 100 KB default.
+  app.useBodyParser("json", { limit: "10mb" });
 
   const cors = process.env.APP_CORS_ORIGIN || "http://localhost:3000";
 

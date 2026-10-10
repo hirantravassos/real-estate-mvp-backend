@@ -167,6 +167,19 @@ export class PropertyMediaService {
     );
   }
 
+  /** Media of a property with the storage keys, to send through WhatsApp. */
+  async findForMessaging(userId: string, propertyId: string) {
+    return this.mediaRepository
+      .createQueryBuilder("media")
+      .addSelect("media.s3Key")
+      .where("media.propertyId = :propertyId", { propertyId })
+      .andWhere("media.userId = :userId", { userId })
+      .andWhere("media.active = :active", { active: true })
+      .orderBy("media.sortOrder", "ASC")
+      .addOrderBy("media.createdAt", "ASC")
+      .getMany();
+  }
+
   async reorder(
     userId: string,
     propertyId: string,

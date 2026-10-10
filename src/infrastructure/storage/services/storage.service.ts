@@ -43,11 +43,17 @@ export const ALLOWED_MEDIA_VIDEO_TYPES = new Set([
 ]);
 
 const MAX_DOCUMENT_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
+const MAX_INBOX_IMAGE_SIZE_BYTES = 16 * 1024 * 1024; // 16 MB, WhatsApp limit
+const MAX_INBOX_VIDEO_SIZE_BYTES = 64 * 1024 * 1024; // 64 MB
+const MAX_INBOX_AUDIO_SIZE_BYTES = 16 * 1024 * 1024; // 16 MB
+const MAX_INBOX_DOCUMENT_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB
 const MAX_IMAGE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 const MAX_VIDEO_SIZE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
 
 const PRESIGNED_DOWNLOAD_EXPIRY_SECONDS = 15 * 60; // 15 minutes
 const PRESIGNED_UPLOAD_EXPIRY_SECONDS = 60 * 60; // 60 minutes (for large video uploads)
+
+export type InboxAttachmentKind = "image" | "video" | "audio" | "document";
 
 export type DocumentOwnerDomain = "customers" | "properties";
 
@@ -161,6 +167,59 @@ export class StorageService {
     return isImage ? "image" : "video";
   }
 
+  inboxS3KeyPrefix(userId: string, conversationId: string) {
+    return `inbox/${userId}/${conversationId}/`;
+  }
+
+  generateInboxS3Key(
+    userId: string,
+    conversationId: string,
+    originalName: string,
+  ): string {
+    const ext = path
+      .extname(originalName)
+      .toLowerCase()
+      .replace(/[^a-z0-9.]/g, "");
+    return `${this.inboxS3KeyPrefix(userId, conversationId)}${randomUUID()}${ext}`;
+  }
+
+  /** Classifies a chat attachment and checks it fits what WhatsApp accepts. */
+  validateInboxUpload(
+    mimeType: string,
+    sizeBytes: number,
+  ): InboxAttachmentKind {
+    const baseMimeType = mimeType.split(";")[0].trim().toLowerCase();
+    let kind: InboxAttachmentKind = "document";
+    if (ALLOWED_MEDIA_IMAGE_TYPES.has(baseMimeType)) kind = "image";
+    else if (baseMimeType.startsWith("video/")) kind = "video";
+    else if (baseMimeType.startsWith("audio/")) kind = "audio";
+
+    const limits: Record<InboxAttachmentKind, [number, string]> = {
+      image: [MAX_INBOX_IMAGE_SIZE_BYTES, "Imagem excede o limite de 16 MB."],
+      video: [MAX_INBOX_VIDEO_SIZE_BYTES, "Vídeo excede o limite de 64 MB."],
+      audio: [MAX_INBOX_AUDIO_SIZE_BYTES, "Áudio excede o limite de 16 MB."],
+      document: [
+        MAX_INBOX_DOCUMENT_SIZE_BYTES,
+        "Arquivo excede o limite de 100 MB.",
+      ],
+    };
+    const [maximumBytes, message] = limits[kind];
+    if (sizeBytes > maximumBytes) throw new BadRequestException(message);
+
+    return kind;
+  }
+
+  async uploadBuffer(s3Key: string, buffer: Buffer, mimeType: string) {
+    await this.s3Client.send(
+      new PutObjectCommand({
+        Bucket: this.bucketConfiguration.name,
+        Key: s3Key,
+        Body: buffer,
+        ContentType: mimeType,
+      }),
+    );
+  }
+
   async generatePresignedUploadUrl(
     s3Key: string,
     mimeType: string,
@@ -192,14 +251,20 @@ export class StorageService {
     }
   }
 
-  async getPresignedUrl(s3Key: string): Promise<string> {
+  async getPresignedUrl(
+    s3Key: string,
+    options: { downloadFileName?: string; expiresInSeconds?: number } = {},
+  ): Promise<string> {
     const command = new GetObjectCommand({
       Bucket: this.bucketConfiguration.name,
       Key: s3Key,
+      ResponseContentDisposition: options.downloadFileName
+        ? `attachment; filename*=UTF-8''${encodeURIComponent(options.downloadFileName)}`
+        : undefined,
     });
 
     return getSignedUrl(this.s3Client, command, {
-      expiresIn: PRESIGNED_DOWNLOAD_EXPIRY_SECONDS,
+      expiresIn: options.expiresInSeconds ?? PRESIGNED_DOWNLOAD_EXPIRY_SECONDS,
     });
   }
 

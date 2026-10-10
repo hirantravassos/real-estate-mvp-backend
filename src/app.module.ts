@@ -15,6 +15,11 @@ import { VisitModule } from "./domains/visits/visit.module";
 import { PropertyModule } from "./domains/properties/property.module";
 import { bucketConfig } from "./config/bucket.config";
 import { mongoConfig } from "./config/mongo.config";
+import { evolutionConfig } from "./config/evolution.config";
+import { openaiConfig } from "./config/openai.config";
+import { creditsConfig } from "./config/credits.config";
+import { CreditModule } from "./domains/credits/credit.module";
+import { InboxModule } from "./domains/inbox/inbox.module";
 
 // const THROTTLE_TTL_MS = 60_000;
 // const THROTTLE_LIMIT = 30;
@@ -31,6 +36,9 @@ import { mongoConfig } from "./config/mongo.config";
         jwtConfig,
         bucketConfig,
         mongoConfig,
+        evolutionConfig,
+        openaiConfig,
+        creditsConfig,
       ],
       envFilePath: ".env",
     }),
@@ -62,6 +70,8 @@ import { mongoConfig } from "./config/mongo.config";
     KanbanModule,
     VisitModule,
     PropertyModule,
+    CreditModule,
+    InboxModule,
   ],
   // providers: [
   //   {

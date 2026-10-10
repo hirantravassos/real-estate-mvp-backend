@@ -1,0 +1,243 @@
+import { ConflictException, Injectable, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { randomBytes } from "crypto";
+import { Repository } from "typeorm";
+import { EvolutionApiService } from "../../../infrastructure/evolution/services/evolution-api.service";
+import {
+  EvolutionConnectionUpdate,
+  EvolutionQrCode,
+  EvolutionQrCodeUpdate,
+} from "../../../infrastructure/evolution/types/evolution.type";
+import { RealtimeGateway } from "../../../infrastructure/realtime/realtime.gateway";
+import { User } from "../../users/entities/user.entity";
+import { WhatsappConnection } from "../entities/whatsapp-connection.entity";
+import { WhatsappConnectionStatus } from "../enums/inbox.enum";
+import { numberFromJid } from "../helpers/whatsapp-phone.helper";
+import { InboxMapper } from "../mappers/inbox.mapper";
+
+/** WhatsApp answers 401 when the phone removed the linked device. */
+const LOGGED_OUT_STATUS_REASON = 401;
+
+@Injectable()
+export class WhatsappConnectionService {
+  private readonly logger = new Logger(WhatsappConnectionService.name);
+
+  constructor(
+    @InjectRepository(WhatsappConnection)
+    private readonly connectionRepository: Repository<WhatsappConnection>,
+    private readonly evolutionApiService: EvolutionApiService,
+    private readonly realtimeGateway: RealtimeGateway,
+  ) {}
+
+  async status(user: User) {
+    let connection = await this.connectionRepository.findOneBy({
+      userId: user.id,
+    });
+
+    if (connection && this.evolutionApiService.isConfigured) {
+      connection = await this.syncState(connection);
+    }
+
+    return InboxMapper.toConnectionDto(
+      connection,
+      this.evolutionApiService.isConfigured,
+    );
+  }
+
+  /** Creates the Evolution instance when needed and returns a fresh QR code. */
+  async connect(user: User) {
+    const connection = await this.findOrCreate(user.id);
+    const token = await this.webhookTokenOf(connection.id);
+    const webhookUrl = this.evolutionApiService.webhookUrlFor(token);
+
+    let qrCode: EvolutionQrCode | undefined;
+
+    const exists = await this.evolutionApiService.instanceExists(
+      connection.instanceName,
+    );
+
+    if (!exists) {
+      const created = await this.evolutionApiService.createInstance(
+        connection.instanceName,
+        webhookUrl,
+      );
+      qrCode = created?.qrcode;
+    } else {
+      await this.evolutionApiService.setWebhook(
+        connection.instanceName,
+        webhookUrl,
+      );
+      const state = await this.evolutionApiService.connectionState(
+        connection.instanceName,
+      );
+      if (state === "open") {
+        return this.status(user);
+      }
+    }
+
+    if (!qrCode?.base64) {
+      qrCode = await this.evolutionApiService.connect(connection.instanceName);
+    }
+
+    connection.status = WhatsappConnectionStatus.CONNECTING;
+    this.applyQrCode(connection, qrCode);
+    await this.save(connection);
+
+    return InboxMapper.toConnectionDto(connection, true);
+  }
+
+  async disconnect(user: User) {
+    const connection = await this.connectionRepository.findOneBy({
+      userId: user.id,
+    });
+    if (!connection) return this.status(user);
+
+    await this.evolutionApiService.logout(connection.instanceName);
+    await this.evolutionApiService
+      .deleteInstance(connection.instanceName)
+      .catch((error: unknown) => {
+        this.logger.warn(`Delete instance failed: ${String(error)}`);
+      });
+
+    connection.status = WhatsappConnectionStatus.DISCONNECTED;
+    connection.qrCode = null;
+    connection.pairingCode = null;
+    connection.connectedAt = null;
+    await this.save(connection);
+
+    return InboxMapper.toConnectionDto(connection, true);
+  }
+
+  async findByWebhookToken(token: string) {
+    if (!token || token.length !== 64) return null;
+    return this.connectionRepository
+      .createQueryBuilder("connection")
+      .where("connection.webhookToken = :token", { token })
+      .getOne();
+  }
+
+  async requireConnected(userId: string) {
+    const connection = await this.connectionRepository.findOneBy({ userId });
+    if (
+      !connection ||
+      connection.status !== WhatsappConnectionStatus.CONNECTED
+    ) {
+      throw new ConflictException(
+        "Conecte o seu WhatsApp para enviar mensagens.",
+      );
+    }
+    return connection;
+  }
+
+  async handleConnectionUpdate(
+    connection: WhatsappConnection,
+    update: EvolutionConnectionUpdate,
+  ) {
+    if (update.state === "open") {
+      connection.status = WhatsappConnectionStatus.CONNECTED;
+      connection.qrCode = null;
+      connection.pairingCode = null;
+      connection.connectedAt = connection.connectedAt ?? new Date();
+      if (update.wuid) connection.phone = numberFromJid(update.wuid);
+      if (update.profileName) connection.profileName = update.profileName;
+      if (update.profilePictureUrl) {
+        connection.profilePictureUrl = update.profilePictureUrl;
+      }
+    } else if (update.state === "connecting") {
+      connection.status = WhatsappConnectionStatus.CONNECTING;
+      connection.connectedAt = null;
+    } else if (update.state === "close") {
+      connection.status = WhatsappConnectionStatus.DISCONNECTED;
+      connection.connectedAt = null;
+      if (update.statusReason === LOGGED_OUT_STATUS_REASON) {
+        connection.qrCode = null;
+        connection.pairingCode = null;
+      }
+    }
+    await this.save(connection);
+  }
+
+  async handleQrCodeUpdate(
+    connection: WhatsappConnection,
+    update: EvolutionQrCodeUpdate,
+  ) {
+    if (!update.qrcode?.base64) return;
+    connection.status = WhatsappConnectionStatus.CONNECTING;
+    this.applyQrCode(connection, update.qrcode);
+    await this.save(connection);
+  }
+
+  private async syncState(connection: WhatsappConnection) {
+    const state = await this.evolutionApiService
+      .connectionState(connection.instanceName)
+      .catch(() => null);
+    if (!state) return connection;
+
+    const expected: Record<string, WhatsappConnectionStatus> = {
+      open: WhatsappConnectionStatus.CONNECTED,
+      connecting: WhatsappConnectionStatus.CONNECTING,
+      close: WhatsappConnectionStatus.DISCONNECTED,
+    };
+
+    if (expected[state] === connection.status) return connection;
+
+    if (state === "open") {
+      const information = await this.evolutionApiService
+        .fetchInstance(connection.instanceName)
+        .catch(() => null);
+      await this.handleConnectionUpdate(connection, {
+        state,
+        wuid: information?.ownerJid ?? undefined,
+        profileName: information?.profileName ?? undefined,
+        profilePictureUrl: information?.profilePicUrl ?? undefined,
+      });
+    } else {
+      await this.handleConnectionUpdate(connection, { state });
+    }
+    return connection;
+  }
+
+  private applyQrCode(
+    connection: WhatsappConnection,
+    qrCode: EvolutionQrCode | undefined,
+  ) {
+    if (!qrCode?.base64) return;
+    connection.qrCode = qrCode.base64.startsWith("data:")
+      ? qrCode.base64
+      : `data:image/png;base64,${qrCode.base64}`;
+    connection.pairingCode = qrCode.pairingCode ?? null;
+    connection.qrCodeUpdatedAt = new Date();
+  }
+
+  private async findOrCreate(userId: string) {
+    const existing = await this.connectionRepository.findOneBy({ userId });
+    if (existing) return existing;
+
+    return this.connectionRepository.save(
+      this.connectionRepository.create({
+        userId,
+        instanceName: this.evolutionApiService.instanceNameFor(userId),
+        webhookToken: randomBytes(32).toString("hex"),
+        status: WhatsappConnectionStatus.DISCONNECTED,
+      }),
+    );
+  }
+
+  private async webhookTokenOf(connectionId: string) {
+    const connection = await this.connectionRepository
+      .createQueryBuilder("connection")
+      .addSelect("connection.webhookToken")
+      .where("connection.id = :connectionId", { connectionId })
+      .getOneOrFail();
+    return connection.webhookToken;
+  }
+
+  private async save(connection: WhatsappConnection) {
+    await this.connectionRepository.save(connection);
+    this.realtimeGateway.emitToUser(
+      connection.userId,
+      "connection.updated",
+      InboxMapper.toConnectionDto(connection, true),
+    );
+  }
+}
