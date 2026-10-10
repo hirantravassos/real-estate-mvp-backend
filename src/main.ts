@@ -1,10 +1,20 @@
 import { NestFactory } from "@nestjs/core";
 import { ValidationPipe } from "@nestjs/common";
+import { DataSource } from "typeorm";
 import { AppModule } from "./app.module.js";
+import { assertNoPendingMigrations } from "./infrastructure/database/pending-migrations.guard";
 import { GlobalExceptionFilter } from "./shared/filters/global-exception.filter.js";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
+
+  try {
+    await assertNoPendingMigrations(app.get(DataSource));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    await app.close();
+    process.exit(1);
+  }
 
   const cors = process.env.APP_CORS_ORIGIN || "http://localhost:3000";
 

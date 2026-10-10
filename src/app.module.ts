@@ -16,6 +16,8 @@ import { PropertyModule } from "./domains/properties/property.module";
 import { bucketConfig } from "./config/bucket.config";
 import { BucketModule } from "./infrastructure/bucket/bucket.module";
 import { mongoConfig } from "./config/mongo.config";
+import { databaseMigrationOptions } from "./infrastructure/database/database-migration.options";
+import { HealthModule } from "./infrastructure/health/health.module";
 
 // const THROTTLE_TTL_MS = 60_000;
 // const THROTTLE_LIMIT = 30;
@@ -46,7 +48,7 @@ import { mongoConfig } from "./config/mongo.config";
         password: configService.getOrThrow<string>("database.password"),
         database: configService.getOrThrow<string>("database.database"),
         autoLoadEntities: true,
-        synchronize: true,
+        ...databaseMigrationOptions,
         logging: false,
       }),
     }),
@@ -56,6 +58,7 @@ import { mongoConfig } from "./config/mongo.config";
     //     limit: THROTTLE_LIMIT,
     //   },
     // ]),
+    HealthModule,
     BucketModule,
     MailModule,
     UserModule,
