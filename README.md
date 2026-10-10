@@ -31,6 +31,16 @@
 $ npm install
 ```
 
+## Database migrations
+
+The schema is changed only by migrations (`synchronize` is off). Before touching an entity or
+deploying, read [docs/database-migrations.md](docs/database-migrations.md).
+
+```bash
+# build and apply pending migrations on the database configured in .env
+$ npm run db:migrate
+```
+
 ## Compile and run the project
 
 ```bash
