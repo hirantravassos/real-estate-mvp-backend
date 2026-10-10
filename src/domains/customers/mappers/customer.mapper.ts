@@ -53,6 +53,8 @@ export class CustomerMapper {
         kanban: this.toKanban(entity.kanban),
         comments: this.toComments(entity.comments),
         visits: this.toVisit(entity.visits),
+        createdAt: entity.createdAt,
+        updatedAt: entity.updatedAt,
       };
     });
   }
