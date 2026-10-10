@@ -14,7 +14,6 @@ import { KanbanModule } from "./domains/kanbans/kanban.module";
 import { VisitModule } from "./domains/visits/visit.module";
 import { PropertyModule } from "./domains/properties/property.module";
 import { bucketConfig } from "./config/bucket.config";
-import { BucketModule } from "./infrastructure/bucket/bucket.module";
 import { mongoConfig } from "./config/mongo.config";
 import { databaseMigrationOptions } from "./infrastructure/database/database-migration.options";
 import { HealthModule } from "./infrastructure/health/health.module";
@@ -59,7 +58,6 @@ import { HealthModule } from "./infrastructure/health/health.module";
     //   },
     // ]),
     HealthModule,
-    BucketModule,
     MailModule,
     UserModule,
     AuthModule,

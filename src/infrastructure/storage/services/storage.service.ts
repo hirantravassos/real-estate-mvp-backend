@@ -71,8 +71,11 @@ export class StorageService {
     private readonly bucketConfiguration: ConfigType<typeof bucketConfig>,
   ) {
     this.s3Client = new S3Client({
-      region: "auto",
+      region: this.bucketConfiguration.region,
       endpoint: this.bucketConfiguration.url,
+      forcePathStyle: this.bucketConfiguration.forcePathStyle,
+      requestChecksumCalculation: "WHEN_REQUIRED",
+      responseChecksumValidation: "WHEN_REQUIRED",
       credentials: {
         accessKeyId: this.bucketConfiguration.key,
         secretAccessKey: this.bucketConfiguration.secret,
@@ -110,7 +113,6 @@ export class StorageService {
         Key: s3Key,
         Body: fileBuffer,
         ContentType: mimeType,
-        ServerSideEncryption: "AES256",
         Metadata: {
           "original-name": Buffer.from(originalName, "utf-8").toString(
             "base64",
