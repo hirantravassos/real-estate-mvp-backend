@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { In } from "typeorm";
 import { Document, DocumentOwnerType } from "../entities/document.entity";
 import { DocumentRepository } from "../repositories/document.repository";
 import {
@@ -21,6 +22,18 @@ export class DocumentService {
     return this.documentRepository.find({
       where: { userId, ownerType, ownerId, active: true },
       order: { createdAt: "DESC" },
+    });
+  }
+
+  async findAllByOwners(
+    userId: string,
+    ownerType: DocumentOwnerType,
+    ownerIds: string[],
+  ) {
+    if (ownerIds.length === 0) return [];
+    return this.documentRepository.find({
+      where: { userId, ownerType, ownerId: In(ownerIds), active: true },
+      order: { createdAt: "ASC" },
     });
   }
 
@@ -62,6 +75,14 @@ export class DocumentService {
     return { url, expiresIn: 900 };
   }
 
+  /** Short lived link for a document the caller already checked belongs to them. */
+  async getPresignedUrlForDocument(
+    document: Document,
+  ): Promise<{ url: string; expiresIn: number }> {
+    const url = await this.storageService.getPresignedUrl(document.s3Key);
+    return { url, expiresIn: 900 };
+  }
+
   async rename(
     userId: string,
     documentId: string,
@@ -79,10 +100,7 @@ export class DocumentService {
     await this.documentRepository.save(document);
   }
 
-  private async findOneOrThrow(
-    userId: string,
-    documentId: string,
-  ): Promise<Document> {
+  async findOneOrThrow(userId: string, documentId: string): Promise<Document> {
     const document = await this.documentRepository
       .createQueryBuilder("document")
       .addSelect("document.s3Key")

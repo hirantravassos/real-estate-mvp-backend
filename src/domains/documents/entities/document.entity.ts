@@ -5,6 +5,10 @@ import { User } from "../../users/entities/user.entity";
 export enum DocumentOwnerType {
   CUSTOMER = "customer",
   PROPERTY = "property",
+  /** Contract and signed copies of a sale. */
+  DEAL = "deal",
+  /** Files sent for one item of a sale checklist. */
+  DEAL_ITEM = "deal_item",
 }
 
 @Entity("documents")

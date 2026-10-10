@@ -13,13 +13,14 @@ export type RealtimeEvent =
   | "message.created"
   | "message.updated"
   | "message.removed"
-  | "credits.updated";
+  | "credits.updated"
+  | "deal.updated";
 
 const userRoom = (userId: string) => `user:${userId}`;
 
 /**
  * One socket per open app. Each broker joins their own room and receives
- * only their own inbox and credit updates.
+ * only their own inbox, credit and sale updates.
  */
 @WebSocketGateway({
   namespace: "/realtime",

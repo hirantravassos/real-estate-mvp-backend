@@ -55,7 +55,7 @@ const PRESIGNED_UPLOAD_EXPIRY_SECONDS = 60 * 60; // 60 minutes (for large video 
 
 export type InboxAttachmentKind = "image" | "video" | "audio" | "document";
 
-export type DocumentOwnerDomain = "customers" | "properties";
+export type DocumentOwnerDomain = "customers" | "properties" | "deals";
 
 export interface UploadResult {
   s3Key: string;

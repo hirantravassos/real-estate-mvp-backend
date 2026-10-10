@@ -20,6 +20,7 @@ import { openaiConfig } from "./config/openai.config";
 import { creditsConfig } from "./config/credits.config";
 import { CreditModule } from "./domains/credits/credit.module";
 import { InboxModule } from "./domains/inbox/inbox.module";
+import { DealModule } from "./domains/deals/deal.module";
 
 // const THROTTLE_TTL_MS = 60_000;
 // const THROTTLE_LIMIT = 30;
@@ -72,6 +73,7 @@ import { InboxModule } from "./domains/inbox/inbox.module";
     PropertyModule,
     CreditModule,
     InboxModule,
+    DealModule,
   ],
   // providers: [
   //   {
