@@ -1,5 +1,6 @@
 import {
   forwardRef,
+  ForbiddenException,
   Inject,
   Injectable,
   UnauthorizedException,
@@ -8,6 +9,7 @@ import { PassportStrategy } from "@nestjs/passport";
 import { Profile, Strategy } from "passport-google-oauth20";
 import { ConfigService } from "@nestjs/config";
 import { UserService } from "../../users/services/user.service";
+import { EmailWhitelistService } from "../services/email-whitelist.service";
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
@@ -15,6 +17,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
     private readonly configService: ConfigService,
     @Inject(forwardRef(() => UserService))
     private readonly userService: UserService,
+    private readonly emailWhitelistService: EmailWhitelistService,
   ) {
     const googleClientId = configService.get<string>("auth.googleClientId");
     const googleClientSecret = configService.get<string>(
@@ -43,6 +46,12 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
 
     if (!email) {
       throw new UnauthorizedException("User not found in database");
+    }
+
+    if (!this.emailWhitelistService.isAllowed(email)) {
+      throw new ForbiddenException(
+        "This email is not allowed to access the system",
+      );
     }
 
     const user = await this.userService.findByEmail(email);

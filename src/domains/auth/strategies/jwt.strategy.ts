@@ -4,12 +4,14 @@ import { ExtractJwt, Strategy } from "passport-jwt";
 import { ConfigService } from "@nestjs/config";
 import { UserRepository } from "../../users/repositories/user.repository";
 import { User } from "../../users/entities/user.entity";
+import { EmailWhitelistService } from "../services/email-whitelist.service";
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     private readonly configService: ConfigService,
     private readonly userRepository: UserRepository,
+    private readonly emailWhitelistService: EmailWhitelistService,
   ) {
     const jwtSecret = configService.get<string>("jwt.secret");
 
@@ -32,6 +34,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     if (!user) {
       throw new UnauthorizedException("User not found or token invalid");
+    }
+
+    if (!this.emailWhitelistService.isAllowed(user.email)) {
+      throw new UnauthorizedException(
+        "User is not allowed to access the system",
+      );
     }
 
     return user;

@@ -10,6 +10,7 @@ import { User } from "../users/entities/user.entity";
 import { GoogleStrategy } from "./strategies/google.strategy";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { Kanban } from "../kanbans/entities/kanban.entity";
+import { EmailWhitelistService } from "./services/email-whitelist.service";
 
 @Module({
   imports: [
@@ -38,7 +39,7 @@ import { Kanban } from "../kanbans/entities/kanban.entity";
     forwardRef(() => UserModule),
   ],
   controllers: [AuthController],
-  providers: [AuthService, GoogleStrategy, JwtStrategy],
+  providers: [AuthService, EmailWhitelistService, GoogleStrategy, JwtStrategy],
   exports: [AuthService, JwtModule, UserModule],
 })
 export class AuthModule {}

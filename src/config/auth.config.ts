@@ -19,4 +19,5 @@ export const authConfig = registerAs("auth", () => ({
   googleCallbackUrl:
     process.env.GOOGLE_CALLBACK_URL ||
     "http://localhost:3001/api/auth/google/callback",
+  emailWhitelist: process.env.AUTH_EMAIL_WHITELIST ?? "",
 }));

@@ -1,5 +1,10 @@
 import { OAuth2Client, TokenPayload } from "google-auth-library";
-import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { User } from "../../users/entities/user.entity";
 import { ConfigService } from "@nestjs/config";
 import { UserRepository } from "../../users/repositories/user.repository";
@@ -10,6 +15,7 @@ import { AccessTokenDto } from "../dtos/access-token.dto";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Kanban } from "../../kanbans/entities/kanban.entity";
+import { EmailWhitelistService } from "./email-whitelist.service";
 
 @Injectable()
 export class AuthService {
@@ -25,6 +31,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly userRepository: UserRepository,
     private readonly jwtService: JwtService,
+    private readonly emailWhitelistService: EmailWhitelistService,
     @InjectRepository(Kanban)
     private readonly kanbanRepository: Repository<Kanban>,
   ) {
@@ -67,6 +74,20 @@ export class AuthService {
         throw new UnauthorizedException("Invalid Google payload");
       }
 
+      const isEmailVerified = payload.email_verified === true;
+
+      if (
+        !isEmailVerified ||
+        !this.emailWhitelistService.isAllowed(payload.email)
+      ) {
+        this.logger.warn(
+          `Login rejected for ${payload.email} (email verified: ${isEmailVerified})`,
+        );
+        throw new ForbiddenException(
+          "This email is not allowed to access the system",
+        );
+      }
+
       const payloadUser = UserMapper.toEntityFromGoogle(payload);
       let user = await this.userRepository.findByEmail(payloadUser.email);
 
@@ -77,6 +98,10 @@ export class AuthService {
 
       return this.generateTokens(user);
     } catch (error) {
+      if (error instanceof ForbiddenException) {
+        throw error;
+      }
+
       console.error("Error authenticating with Google:", error);
       throw new UnauthorizedException(
         "Authentication failed, google expired token",
@@ -97,6 +122,12 @@ export class AuthService {
 
       if (!user) {
         throw new UnauthorizedException("User not found");
+      }
+
+      if (!this.emailWhitelistService.isAllowed(user.email)) {
+        throw new UnauthorizedException(
+          "User is not allowed to access the system",
+        );
       }
 
       const accessToken = this.jwtService.sign(
