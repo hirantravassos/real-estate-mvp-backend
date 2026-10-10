@@ -4,6 +4,7 @@ import { ColumnName } from "../../../shared/decorators/columns/column-name.decor
 import { ColumnEmail } from "../../../shared/decorators/columns/column-email.decorator.js";
 import { Customer } from "../../customers/entities/customer.entity";
 import { Visit } from "../../visits/entities/visit.entity";
+import { CustomerAvatar } from "../../customers/dtos/customer-avatar.dto";
 
 @Entity("users")
 export class User extends BaseEntity {
@@ -24,4 +25,8 @@ export class User extends BaseEntity {
 
   @Column({ type: "text", nullable: true })
   profileImage: string | null;
+
+  /** The broker's own character, same look options as the customers'. */
+  @Column({ type: "json", nullable: true })
+  avatar: CustomerAvatar | null;
 }

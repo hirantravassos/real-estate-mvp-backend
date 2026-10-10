@@ -10,6 +10,7 @@ export class UserMapper {
       email: user.email,
       name: user.name,
       profileImage: user.profileImage,
+      avatar: user.avatar ?? null,
       createdAt: DateHelper.formatUtcToIso(user.createdAt),
       updatedAt: DateHelper.formatUtcToIso(user.updatedAt),
     };
