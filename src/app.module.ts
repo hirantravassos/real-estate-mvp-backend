@@ -14,7 +14,6 @@ import { KanbanModule } from "./domains/kanbans/kanban.module";
 import { VisitModule } from "./domains/visits/visit.module";
 import { PropertyModule } from "./domains/properties/property.module";
 import { bucketConfig } from "./config/bucket.config";
-import { BucketModule } from "./infrastructure/bucket/bucket.module";
 import { mongoConfig } from "./config/mongo.config";
 
 // const THROTTLE_TTL_MS = 60_000;
@@ -56,7 +55,6 @@ import { mongoConfig } from "./config/mongo.config";
     //     limit: THROTTLE_LIMIT,
     //   },
     // ]),
-    BucketModule,
     MailModule,
     UserModule,
     AuthModule,
