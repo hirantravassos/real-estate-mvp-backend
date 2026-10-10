@@ -12,7 +12,8 @@ import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
 import { ValidateName } from "../../../shared/decorators/validation/name.decorator";
 import { ValidateBrazilianPhoneNumber } from "../../../shared/decorators/validation/brazilian-phone-number.decorator";
 import { ValidateLongText } from "../../../shared/decorators/validation/long-text.decorator";
-import { IsOptional, IsString, IsUUID } from "class-validator";
+import { IsOptional, IsString, IsUUID, ValidateNested } from "class-validator";
+import { Type } from "class-transformer";
 import { ValidateCurrency } from "../../../shared/decorators/validation/currency.decorator";
 import dayjs from "dayjs";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
@@ -21,6 +22,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { CustomerComment } from "../entities/customer-comments.entity";
 import { ValidateBoolean } from "../../../shared/decorators/validation/boolean.decorator";
 import { Visit } from "../../visits/entities/visit.entity";
+import { CustomerAvatarDto } from "../dtos/customer-avatar.dto";
 
 dayjs.extend(isSameOrAfter);
 
@@ -42,6 +44,11 @@ export class CustomerCreateDto {
   @IsOptional()
   @ValidateLongText({ isOptional: true })
   comment: string | null;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CustomerAvatarDto)
+  avatar?: CustomerAvatarDto | null;
 }
 
 export class CustomerFilterDto extends PaginationRequestDto {

@@ -7,6 +7,7 @@ import { ColumnCurrency } from "../../../shared/decorators/columns/column-curren
 import {
   PropertyConciergeServiceEnum,
   PropertyFurnitureEnum,
+  PropertyKindEnum,
   PropertyLiftEnum,
 } from "../mappers/property.mapper";
 
@@ -21,6 +22,9 @@ export class Property extends BaseEntity {
 
   @Column({ type: "varchar", nullable: false })
   userId: string;
+
+  @Column({ type: "enum", enum: PropertyKindEnum, nullable: true })
+  kind: PropertyKindEnum | null;
 
   @Column({ type: "varchar", nullable: true })
   alias: string | null;

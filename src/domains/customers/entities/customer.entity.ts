@@ -15,6 +15,7 @@ import { CustomerComment } from "./customer-comments.entity";
 import { Visit } from "../../visits/entities/visit.entity";
 import { ColumnCurrency } from "../../../shared/decorators/columns/column-currency.decorator";
 import { ColumnBoolean } from "../../../shared/decorators/columns/column-boolean.decorator";
+import { CustomerAvatar } from "../dtos/customer-avatar.dto";
 
 @Entity("customers")
 @Unique(["userId", "phone"])
@@ -56,4 +57,7 @@ export class Customer extends BaseEntity {
 
   @ColumnBoolean({ default: false })
   lost: boolean;
+
+  @Column({ type: "json", nullable: true })
+  avatar: CustomerAvatar | null;
 }

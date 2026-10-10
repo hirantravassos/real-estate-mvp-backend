@@ -2,6 +2,12 @@ import { Property } from "../entities/property.entity";
 import { PropertyCreateDto } from "../services/property.service";
 import { PropertyContact } from "../entities/property-contact.entity";
 
+export enum PropertyKindEnum {
+  HOUSE = "house",
+  APARTMENT = "apartment",
+  COMMERCIAL = "commercial",
+}
+
 export enum PropertyLiftEnum {
   PRIVATE = "private",
   COMMON = "common",
@@ -28,6 +34,7 @@ export interface PropertyContactDto {
 
 export interface PropertyDto {
   id: string;
+  kind: PropertyKindEnum | null;
   alias: string | null;
   address: string;
   address2: string;
@@ -61,6 +68,7 @@ export interface PropertyDto {
 
 export interface PropertyListDto {
   id: string;
+  kind: PropertyKindEnum | null;
   alias: string | null;
   address: string;
   address2: string;
@@ -75,6 +83,7 @@ export interface PropertyListDto {
 export class PropertyMapper {
   static toEntity(dto: PropertyCreateDto, id?: string) {
     const entity = new Property();
+    entity.kind = dto.kind ?? null;
     entity.alias = dto.alias ?? null;
     entity.address = dto.address;
     entity.address2 = dto.address2;
@@ -121,6 +130,7 @@ export class PropertyMapper {
   static toDto(entity: Property): PropertyDto {
     return {
       id: entity.id,
+      kind: entity.kind ?? null,
       alias: entity.alias,
       address: entity.address,
       address2: entity.address2,
@@ -157,6 +167,7 @@ export class PropertyMapper {
     return entities.map((entity) => {
       return {
         id: entity.id,
+        kind: entity.kind ?? null,
         alias: entity.alias,
         address: entity.address,
         address2: entity.address2,

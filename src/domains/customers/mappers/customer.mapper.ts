@@ -22,6 +22,9 @@ export class CustomerMapper {
     if (dto?.budget) {
       entity.budget = dto.budget;
     }
+    if (dto?.avatar !== undefined) {
+      entity.avatar = dto.avatar ?? null;
+    }
     if (id) entity.id = id;
     return entity;
   }
@@ -34,6 +37,7 @@ export class CustomerMapper {
       kanban: entity.kanban,
       budget: entity.budget,
       lost: entity.lost,
+      avatar: entity.avatar ?? null,
       comments: this.toComments(entity.comments),
       visits: this.toVisit(entity.visits),
       createdAt: entity.createdAt,
@@ -50,6 +54,7 @@ export class CustomerMapper {
         phone: entity.phone,
         lost: entity.lost,
         budget: entity.budget,
+        avatar: entity.avatar ?? null,
         kanban: this.toKanban(entity.kanban),
         comments: this.toComments(entity.comments),
         visits: this.toVisit(entity.visits),

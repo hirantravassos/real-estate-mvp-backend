@@ -40,6 +40,7 @@ export class KanbanMapper {
         name: entity.name,
         phone: entity.phone,
         budget: entity.budget,
+        avatar: entity.avatar ?? null,
         comments: this.toCustomerCommentDto(entity.comments),
         visits: this.toCustomerVisit(entity.visits),
       };

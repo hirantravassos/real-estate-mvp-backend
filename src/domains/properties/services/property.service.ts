@@ -28,6 +28,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import {
   PropertyConciergeServiceEnum,
   PropertyFurnitureEnum,
+  PropertyKindEnum,
   PropertyLiftEnum,
   PropertyMapper,
 } from "../mappers/property.mapper";
@@ -42,6 +43,10 @@ export class PropertyContactCreateDto {
 }
 
 export class PropertyCreateDto {
+  @IsOptional()
+  @IsEnum(PropertyKindEnum)
+  kind?: PropertyKindEnum | null;
+
   @IsOptional()
   @IsString()
   alias?: string | null;
@@ -153,6 +158,7 @@ function parseBoolean({ value }: any) {
 
 export class PropertyFilterDto extends PaginationRequestDto {
   @IsOptional() @IsString() search?: string | null;
+  @IsOptional() @IsEnum(PropertyKindEnum) kind?: PropertyKindEnum | null;
   @IsOptional() @IsString() minPrice?: string | null;
   @IsOptional() @IsString() maxPrice?: string | null;
   @IsOptional() @IsString() minPropertyTax?: string | null;
@@ -250,6 +256,7 @@ export class PropertyService {
         dto.maxBeachProximityInKm,
       );
 
+    if (dto.kind) baseWhere.kind = dto.kind;
     if (dto.infoLift) baseWhere.infoLift = dto.infoLift;
     if (dto.infoFurniture) baseWhere.infoFurniture = dto.infoFurniture;
     if (dto.infoConciergeService)

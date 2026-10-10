@@ -1,6 +1,8 @@
 import { Visit } from "../entities/visit.entity";
 import { Customer } from "../../customers/entities/customer.entity";
 import { Property } from "../../properties/entities/property.entity";
+import { CustomerAvatar } from "../../customers/dtos/customer-avatar.dto";
+import { PropertyKindEnum } from "../../properties/mappers/property.mapper";
 
 export interface VisitResponseDto {
   id: string;
@@ -19,10 +21,12 @@ export interface VisitResponseCustomerDto {
   id: string;
   name: string;
   phone: string;
+  avatar: CustomerAvatar | null;
 }
 
 export interface VisitResponsePropertyDto {
   id: string;
+  kind: PropertyKindEnum | null;
   alias: string | null;
   address: string;
 }
@@ -67,6 +71,7 @@ export class VisitMapper {
       id: entity.id,
       name: entity.name,
       phone: entity.phone,
+      avatar: entity.avatar ?? null,
     };
   }
 
@@ -75,6 +80,7 @@ export class VisitMapper {
 
     return {
       id: entity.id,
+      kind: entity.kind ?? null,
       alias: entity.alias,
       address: entity.address,
     };
