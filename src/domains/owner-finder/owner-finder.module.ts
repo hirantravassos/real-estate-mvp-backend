@@ -5,6 +5,7 @@ import { CreditModule } from "../credits/credit.module";
 import { PropertyContact } from "../properties/entities/property-contact.entity";
 import { Property } from "../properties/entities/property.entity";
 import { PropertyModule } from "../properties/property.module";
+import { PropertyHuntModule } from "../property-hunts/property-hunt.module";
 import { OwnerFinderController } from "./controllers/owner-finder.controller";
 import { OwnerFinderService } from "./services/owner-finder.service";
 
@@ -14,6 +15,7 @@ import { OwnerFinderService } from "./services/owner-finder.service";
     AiModule,
     CreditModule,
     PropertyModule,
+    PropertyHuntModule,
   ],
   controllers: [OwnerFinderController],
   providers: [OwnerFinderService],

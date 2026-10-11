@@ -7,6 +7,7 @@ import { Property } from "../../properties/entities/property.entity";
 import { PropertyContact } from "../../properties/entities/property-contact.entity";
 import { PropertyKindEnum } from "../../properties/mappers/property.mapper";
 import { PropertyService } from "../../properties/services/property.service";
+import { ListingPageReaderService } from "../../property-hunts/services/listing-page-reader.service";
 import { User } from "../../users/entities/user.entity";
 import {
   OWNER_LISTING_SOURCES,
@@ -20,9 +21,16 @@ import {
   OwnerLeadSaveDto,
   OwnerSearchDto,
 } from "../dtos/owner-finder.dto";
+import {
+  advertiserSignalOf,
+  phoneFromContacts,
+} from "../helpers/advertiser-signals.helper";
 
 /** Most listings the AI brings back in one search. */
 const MAXIMUM_LEADS = 12;
+/** Listing pages opened to confirm who posted them and to get the phone. */
+const MAXIMUM_PAGES_CHECKED = 10;
+const PAGE_CHECK_TIMEOUT_MILLISECONDS = 50_000;
 
 const kindWords: Record<PropertyKindEnum, string> = {
   [PropertyKindEnum.HOUSE]: "casa",
@@ -113,15 +121,17 @@ const LEADS_SCHEMA = {
   },
 };
 
-const INSTRUCTIONS = `Você ajuda um corretor de imóveis brasileiro a captar imóveis direto com o proprietário, sem imobiliária ou outro corretor no meio.
-Pesquise na internet anúncios que combinem com o pedido, somente nos sites permitidos.
-Prefira anúncios publicados pelo próprio dono: selo "Particular" na OLX, vendedor pessoa física, textos como "direto com o proprietário", "direto com o dono", "sem corretor", "não aceito corretor", anúncios sem CRECI e sem nome de imobiliária.
-Classifique cada anúncio em advertiserType: "owner" quando há sinais claros de ser o dono, "agency" quando é imobiliária, corretor ou tem CRECI, "unknown" quando não dá para saber.
-Use apenas dados que aparecem na página do anúncio. Nunca invente telefone, nome, preço ou endereço; quando não aparecer, use null.
-O telefone só entra se estiver escrito no anúncio, com DDD.
+const INSTRUCTIONS = `Você ajuda um corretor de imóveis brasileiro a encontrar PROPRIETÁRIOS: a pessoa dona do imóvel e o contato dela, para o corretor captar o imóvel. O objetivo não é achar imóveis parecidos, é achar donos que anunciam por conta própria.
+Pesquise na internet somente nos sites permitidos e traga só anúncios publicados pelo próprio dono.
+Quando o pedido citar um endereço, rua, prédio ou condomínio, procure primeiro anúncios desse mesmo lugar; o tipo, os quartos e o valor servem só para confirmar que é o mesmo imóvel.
+Sinais de dono: selo "Particular" na OLX, vendedor pessoa física, "direto com o proprietário", "direto com o dono", "sem corretor", "não aceito corretor", "vendo meu", anúncio nos sites que só aceitam proprietários, sem CRECI e sem nome de imobiliária.
+Sinais de imobiliária: CRECI, nome de imobiliária ou de corretor, "consultor", "plantão", lançamento de construtora, vários imóveis do mesmo anunciante.
+Classifique cada anúncio em advertiserType: "owner" só com sinais claros de ser o dono, "agency" quando há qualquer sinal de imobiliária ou corretor, "unknown" quando não dá para saber. Na dúvida entre owner e agency, use agency.
+advertiserName é o nome da pessoa que anuncia, como aparece no anúncio.
+O telefone só entra se estiver escrito no anúncio, com DDD. Nunca invente telefone, nome, preço ou endereço; quando não aparecer, use null.
 url deve ser o link direto do anúncio, não de uma lista de resultados.
-evidence explica em uma frase curta, em português, o que indica quem é o anunciante.
-Traga no máximo ${MAXIMUM_LEADS} anúncios, os de donos primeiro. Se não achar nada, devolva a lista vazia.`;
+evidence explica em uma frase curta, em português, o que mostra que o anunciante é o dono.
+Traga no máximo ${MAXIMUM_LEADS} anúncios, os de donos com telefone primeiro. Se não achar nenhum dono, devolva a lista vazia em vez de anúncios de imobiliárias.`;
 
 @Injectable()
 export class OwnerFinderService {
@@ -133,6 +143,7 @@ export class OwnerFinderService {
     private readonly propertyRepository: Repository<Property>,
     @InjectRepository(PropertyContact)
     private readonly propertyContactRepository: Repository<PropertyContact>,
+    private readonly pageReader: ListingPageReaderService,
   ) {}
 
   /** Free search links: listing sites and the official registries. */
@@ -186,7 +197,7 @@ export class OwnerFinderService {
     );
     const parsed = this.parse(result.text);
     const seen = new Set<string>();
-    const leads: OwnerLead[] = [];
+    const candidates: { lead: AiLead; source: OwnerListingSource }[] = [];
     let ignoredAgencyLeads = 0;
 
     for (const lead of parsed) {
@@ -200,14 +211,52 @@ export class OwnerFinderService {
         ignoredAgencyLeads += 1;
         continue;
       }
+      candidates.push({ lead, source });
+    }
+
+    // Opens each listing to confirm who posted it and press "ver telefone".
+    const pages = await this.pageReader.readPages(
+      user.id,
+      candidates.map(({ lead }) => lead.url),
+      {
+        limit: MAXIMUM_PAGES_CHECKED,
+        timeoutMilliseconds: PAGE_CHECK_TIMEOUT_MILLISECONDS,
+      },
+    );
+
+    const leads: OwnerLead[] = [];
+    for (const { lead, source } of candidates) {
+      const page = pages.get(lead.url);
+      let advertiserType = lead.advertiserType;
+      let evidence = lead.evidence.trim();
+      let phone = this.normalizePhone(lead.phone);
+
+      if (page) {
+        const signal = advertiserSignalOf(
+          page.text,
+          source.kind === "owner_portal",
+        );
+        if (signal.type === "agency") {
+          ignoredAgencyLeads += 1;
+          continue;
+        }
+        if (signal.type === "owner") {
+          advertiserType = "owner";
+          evidence = `Conferido no anúncio: ${signal.reason ?? evidence}`;
+        }
+        phone ??= phoneFromContacts(page.contacts, advertiserType === "owner");
+      }
+
+      // Without any sign of an owner nor a phone, the lead only adds noise.
+      if (advertiserType !== "owner" && !phone) continue;
 
       leads.push({
         title: lead.title.trim().slice(0, 200) || source.name,
         url: lead.url,
         source: source.name,
-        advertiserType: lead.advertiserType,
+        advertiserType,
         advertiserName: lead.advertiserName?.trim() || null,
-        phone: this.normalizePhone(lead.phone),
+        phone,
         price:
           lead.priceInReais && lead.priceInReais > 0
             ? Math.round(lead.priceInReais)
@@ -216,8 +265,8 @@ export class OwnerFinderService {
         kind: lead.kind,
         bedrooms: lead.bedrooms,
         squareMeters: lead.squareMeters,
-        evidence: lead.evidence.trim(),
-        verified: citedUrls.has(comparable),
+        evidence,
+        verified: Boolean(page) || citedUrls.has(this.comparableUrl(lead.url)),
       });
     }
 

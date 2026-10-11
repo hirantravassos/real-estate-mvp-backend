@@ -5,7 +5,7 @@ import { User } from "../../users/entities/user.entity";
 import { OwnerLeadSaveDto, OwnerSearchDto } from "../dtos/owner-finder.dto";
 import { OwnerFinderService } from "../services/owner-finder.service";
 
-/** Finds properties advertised by their owners, with no broker in between. */
+/** Finds property owners who advertise by themselves, with no broker in between. */
 @Controller("owner-finder")
 @UseGuards(JwtGuard)
 export class OwnerFinderController {
