@@ -1,6 +1,10 @@
 import { PropertyKindEnum } from "../../properties/mappers/property.mapper";
 import { HuntCriteria } from "../types/hunt-criteria.type";
-import { MatchFacts, MINIMUM_MATCH_SCORE, scoreMatch } from "./match-score.helper";
+import {
+  MatchFacts,
+  MINIMUM_MATCH_SCORE,
+  scoreMatch,
+} from "./match-score.helper";
 
 /** 3 quartos, suíte, vaga, condomínio até 500, academia, 500 m da praia, até 800 mil, Embaré. */
 const embareCriteria: HuntCriteria = {
@@ -98,7 +102,10 @@ describe("scoreMatch", () => {
   });
 
   it("tolerates a price a little over the budget", () => {
-    const result = scoreMatch({ ...perfectFacts, price: 830000 }, embareCriteria);
+    const result = scoreMatch(
+      { ...perfectFacts, price: 830000 },
+      embareCriteria,
+    );
     expect(result.score).toBeGreaterThan(80);
     expect(result.warnings[0]).toContain("Um pouco acima");
   });

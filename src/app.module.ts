@@ -24,6 +24,8 @@ import { DealModule } from "./domains/deals/deal.module";
 import { ContactImportModule } from "./domains/contact-imports/contact-import.module";
 import { PropertyHuntModule } from "./domains/property-hunts/property-hunt.module";
 import { portalsConfig } from "./config/portals.config";
+import { AssistantModule } from "./domains/assistant/assistant.module";
+import { OwnerFinderModule } from "./domains/owner-finder/owner-finder.module";
 
 // const THROTTLE_TTL_MS = 60_000;
 // const THROTTLE_LIMIT = 30;
@@ -80,6 +82,8 @@ import { portalsConfig } from "./config/portals.config";
     DealModule,
     ContactImportModule,
     PropertyHuntModule,
+    AssistantModule,
+    OwnerFinderModule,
   ],
   // providers: [
   //   {

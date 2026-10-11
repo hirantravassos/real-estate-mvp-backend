@@ -16,4 +16,25 @@ export const openaiConfig = registerAs("openai", () => ({
   outputCostPerMillionUsd: parseFloat(
     process.env.OPENAI_OUTPUT_COST_PER_MILLION_USD || "2",
   ),
+  /** Turns the broker's voice into text for the assistant. */
+  transcriptionModel:
+    process.env.OPENAI_TRANSCRIPTION_MODEL || "gpt-4o-mini-transcribe",
+  /** What OpenAI charges for transcriptions billed by tokens. */
+  transcriptionAudioCostPerMillionUsd: parseFloat(
+    process.env.OPENAI_TRANSCRIPTION_AUDIO_COST_PER_MILLION_USD || "3",
+  ),
+  transcriptionTextCostPerMillionUsd: parseFloat(
+    process.env.OPENAI_TRANSCRIPTION_TEXT_COST_PER_MILLION_USD || "5",
+  ),
+  /** What OpenAI charges for transcriptions billed by the minute. */
+  transcriptionCostPerMinuteUsd: parseFloat(
+    process.env.OPENAI_TRANSCRIPTION_COST_PER_MINUTE_USD || "0.006",
+  ),
+  /** What OpenAI charges us for each web search the model runs, in US dollars. */
+  webSearchCostPerCallUsd: parseFloat(
+    process.env.OPENAI_WEB_SEARCH_COST_PER_CALL_USD || "0.01",
+  ),
+  /** Web search does not run with minimal reasoning, this effort is used instead. */
+  webSearchReasoningEffort:
+    process.env.OPENAI_WEB_SEARCH_REASONING_EFFORT || "low",
 }));

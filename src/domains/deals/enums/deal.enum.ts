@@ -43,11 +43,29 @@ export enum DealParty {
   PROPERTY = "property",
 }
 
+/** Who holds the property title, it decides the seller paperwork. */
+export enum DealSellerType {
+  /** One or more people, with their spouses when married. */
+  INDIVIDUAL = "individual",
+  /** A company, usually a family or real estate holding. */
+  COMPANY = "company",
+  /** The heirs of an owner who passed away, still in probate. */
+  ESTATE = "estate",
+}
+
+export const DEAL_SELLER_TYPE_LABELS: Record<DealSellerType, string> = {
+  [DealSellerType.INDIVIDUAL]: "Pessoa física",
+  [DealSellerType.COMPANY]: "Empresa ou holding",
+  [DealSellerType.ESTATE]: "Espólio ou herdeiros",
+};
+
 export enum DealChecklistStatus {
   PENDING = "pending",
   SUBMITTED = "submitted",
   APPROVED = "approved",
   REJECTED = "rejected",
+  /** A certificate came back positive: something blocks the sale for now. */
+  RESTRICTED = "restricted",
 }
 
 export enum DealSignerRole {

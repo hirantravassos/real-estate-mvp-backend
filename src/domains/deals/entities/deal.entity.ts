@@ -12,7 +12,12 @@ import { ColumnBoolean } from "../../../shared/decorators/columns/column-boolean
 import { User } from "../../users/entities/user.entity";
 import { Customer } from "../../customers/entities/customer.entity";
 import { Property } from "../../properties/entities/property.entity";
-import { DealPaymentMethod, DealStage, DealStatus } from "../enums/deal.enum";
+import {
+  DealPaymentMethod,
+  DealSellerType,
+  DealStage,
+  DealStatus,
+} from "../enums/deal.enum";
 import { DealChecklistItem } from "./deal-checklist-item.entity";
 import { DealSigner } from "./deal-signer.entity";
 import { DealMilestone } from "./deal-milestone.entity";
@@ -63,6 +68,13 @@ export class Deal extends BaseEntity {
 
   @ColumnBoolean({ default: false })
   usesFgts: boolean;
+
+  @Column({
+    type: "enum",
+    enum: DealSellerType,
+    default: DealSellerType.INDIVIDUAL,
+  })
+  sellerType: DealSellerType;
 
   /** Total commission of the sale, before splitting with partners. */
   @Column({ type: "decimal", precision: 5, scale: 2, nullable: true })
