@@ -26,6 +26,9 @@ import { PropertyHuntModule } from "./domains/property-hunts/property-hunt.modul
 import { portalsConfig } from "./config/portals.config";
 import { AssistantModule } from "./domains/assistant/assistant.module";
 import { OwnerFinderModule } from "./domains/owner-finder/owner-finder.module";
+import { infosimplesConfig } from "./config/infosimples.config";
+import { DocumentLookupModule } from "./domains/document-lookups/document-lookup.module";
+import { BrokerPageModule } from "./domains/broker-pages/broker-page.module";
 
 // const THROTTLE_TTL_MS = 60_000;
 // const THROTTLE_LIMIT = 30;
@@ -46,6 +49,7 @@ import { OwnerFinderModule } from "./domains/owner-finder/owner-finder.module";
         openaiConfig,
         creditsConfig,
         portalsConfig,
+        infosimplesConfig,
       ],
       envFilePath: ".env",
     }),
@@ -84,6 +88,8 @@ import { OwnerFinderModule } from "./domains/owner-finder/owner-finder.module";
     PropertyHuntModule,
     AssistantModule,
     OwnerFinderModule,
+    DocumentLookupModule,
+    BrokerPageModule,
   ],
   // providers: [
   //   {

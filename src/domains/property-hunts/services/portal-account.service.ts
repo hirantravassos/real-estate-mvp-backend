@@ -9,8 +9,6 @@ import type { ConfigType } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
 import { IsNull, Repository } from "typeorm";
 import { portalsConfig } from "../../../config/portals.config";
-import { RealtimeGateway } from "../../../infrastructure/realtime/realtime.gateway";
-import { User } from "../../users/entities/user.entity";
 import { PORTAL_KEYS } from "../constants/portals.constant";
 import { PortalAccountSaveDto } from "../dtos/property-hunt.dto";
 import { PortalAccount } from "../entities/portal-account.entity";
@@ -22,15 +20,16 @@ import {
 import { PropertyHuntMapper } from "../mappers/property-hunt.mapper";
 import { PortalSessionService, SignInResult } from "./portal-session.service";
 
-/** A signed in session ready for a hunt, the broker's own or the platform's. */
+/** A signed in session of the platform, ready for a hunt. */
 export interface PortalSession {
   account: PortalAccount;
   storageState: string | null;
 }
 
 /**
- * Keeps the portal logins, encrypted, and their signed in sessions. A
- * broker's own account always wins over the platform account.
+ * Keeps the platform's logins on the portals, encrypted, and their signed in
+ * sessions. Every broker's hunts browse with these accounts, so no broker
+ * has to connect anything.
  */
 @Injectable()
 export class PortalAccountService {
@@ -40,56 +39,55 @@ export class PortalAccountService {
     @InjectRepository(PortalAccount)
     private readonly accountRepository: Repository<PortalAccount>,
     private readonly sessionService: PortalSessionService,
-    private readonly realtimeGateway: RealtimeGateway,
   ) {}
 
-  async listForUser(user: User) {
-    const [own, platform] = await Promise.all([
-      this.accountRepository.find({ where: { userId: user.id, active: true } }),
-      this.accountRepository.find({
-        where: {
-          userId: IsNull(),
-          active: true,
-          status: PortalAccountStatus.CONNECTED,
-        },
-      }),
-    ]);
+  /** Which portals are signed in, shown to the brokers before a hunt. */
+  async readiness() {
+    const connected = await this.accountRepository.find({
+      where: {
+        userId: IsNull(),
+        active: true,
+        status: PortalAccountStatus.CONNECTED,
+      },
+    });
     return {
       browserReady: this.sessionService.isAvailable,
       portals: PORTAL_KEYS.map((portal) =>
         PropertyHuntMapper.toPortalDto(
           portal,
-          own.find((account) => account.portal === portal) ?? null,
-          platform.some((account) => account.portal === portal),
+          null,
+          connected.some((account) => account.portal === portal),
         ),
       ),
     };
   }
 
-  async listPlatform() {
+  /** Every platform account with its status, for the admin page. */
+  async list() {
     const accounts = await this.accountRepository.find({
       where: { userId: IsNull(), active: true },
     });
-    return PORTAL_KEYS.map((portal) =>
-      PropertyHuntMapper.toPortalDto(
-        portal,
-        accounts.find((account) => account.portal === portal) ?? null,
-        false,
-      ),
-    );
+    return {
+      browserReady: this.sessionService.isAvailable,
+      portals: PORTAL_KEYS.map((portal) => {
+        const account =
+          accounts.find((candidate) => candidate.portal === portal) ?? null;
+        return PropertyHuntMapper.toPortalDto(
+          portal,
+          account,
+          account?.status === PortalAccountStatus.CONNECTED,
+        );
+      }),
+    };
   }
 
-  /** Saves the login and signs in right away, so the broker sees it working. */
-  async connect(
-    userId: string | null,
-    portal: PortalKey,
-    dto: PortalAccountSaveDto,
-  ) {
+  /** Saves the login and signs in right away, so the admin sees it working. */
+  async connect(portal: PortalKey, dto: PortalAccountSaveDto) {
     this.ensureReady();
     const account =
-      (await this.findAccount(userId, portal, true)) ??
+      (await this.findAccount(portal, true)) ??
       this.accountRepository.create({
-        userId,
+        userId: null,
         portal,
         status: PortalAccountStatus.UNCHECKED,
       });
@@ -113,8 +111,8 @@ export class PortalAccountService {
     return this.applySignIn(saved, result);
   }
 
-  async submitCode(userId: string | null, portal: PortalKey, code: string) {
-    const account = await this.findAccount(userId, portal);
+  async submitCode(portal: PortalKey, code: string) {
+    const account = await this.findAccount(portal);
     if (!account)
       throw new NotFoundException("Conta do portal não encontrada.");
     const result = await this.sessionService.submitCode(account.id, code);
@@ -122,9 +120,9 @@ export class PortalAccountService {
   }
 
   /** Signs in again with the saved password, to test or refresh the session. */
-  async check(userId: string | null, portal: PortalKey) {
+  async check(portal: PortalKey) {
     this.ensureReady();
-    const account = await this.findAccount(userId, portal, true);
+    const account = await this.findAccount(portal, true);
     if (!account)
       throw new NotFoundException("Conta do portal não encontrada.");
     const result = await this.sessionService.signIn(
@@ -136,8 +134,8 @@ export class PortalAccountService {
     return this.applySignIn(account, result);
   }
 
-  async remove(userId: string | null, portal: PortalKey) {
-    const account = await this.findAccount(userId, portal);
+  async remove(portal: PortalKey) {
+    const account = await this.findAccount(portal);
     if (!account) return;
     await this.sessionService.discardPending(account.id);
     await this.accountRepository.update(
@@ -149,25 +147,18 @@ export class PortalAccountService {
         status: PortalAccountStatus.UNCHECKED,
       },
     );
-    if (userId) this.notify(userId);
   }
 
   /** The session a hunt uses on this portal, or null to browse signed out. */
-  async sessionFor(
-    userId: string,
-    portal: PortalKey,
-  ): Promise<PortalSession | null> {
-    const candidates = [
-      await this.findAccount(userId, portal, true),
-      await this.findAccount(null, portal, true),
-    ];
-    const account = candidates.find(
-      (candidate) =>
-        candidate &&
-        (candidate.status === PortalAccountStatus.CONNECTED ||
-          candidate.passwordCipher),
-    );
-    if (!account) return null;
+  async sessionFor(portal: PortalKey): Promise<PortalSession | null> {
+    const account = await this.findAccount(portal, true);
+    if (
+      !account ||
+      (account.status !== PortalAccountStatus.CONNECTED &&
+        !account.passwordCipher)
+    ) {
+      return null;
+    }
     return { account, storageState: this.decrypt(account.sessionCipher) };
   }
 
@@ -187,7 +178,7 @@ export class PortalAccountService {
     if (result.status === "awaiting_code") {
       await this.sessionService.discardPending(account.id);
     }
-    await this.applySignIn(account, result, false);
+    await this.applySignIn(account, result);
     return result.status === "connected" ? result.storageState : null;
   }
 
@@ -208,14 +199,9 @@ export class PortalAccountService {
           "A sessão expirou. Conecte de novo para ver os telefones.",
       },
     );
-    if (account.userId) this.notify(account.userId);
   }
 
-  private async applySignIn(
-    account: PortalAccount,
-    result: SignInResult,
-    notify = true,
-  ) {
+  private async applySignIn(account: PortalAccount, result: SignInResult) {
     if (result.status === "connected") {
       account.status = PortalAccountStatus.CONNECTED;
       account.statusMessage = null;
@@ -239,22 +225,20 @@ export class PortalAccountService {
           : {}),
       },
     );
-    if (notify && account.userId) this.notify(account.userId);
-    return PropertyHuntMapper.toPortalDto(account.portal, account, false);
+    return PropertyHuntMapper.toPortalDto(
+      account.portal,
+      account,
+      account.status === PortalAccountStatus.CONNECTED,
+    );
   }
 
-  private async findAccount(
-    userId: string | null,
-    portal: PortalKey,
-    withSecrets = false,
-  ) {
+  private async findAccount(portal: PortalKey, withSecrets = false) {
     const query = this.accountRepository
       .createQueryBuilder("account")
       .where("account.portal = :portal", { portal })
       .andWhere("account.active = :active", { active: true })
+      .andWhere("account.userId IS NULL")
       .orderBy("account.updatedAt", "DESC");
-    if (userId) query.andWhere("account.userId = :userId", { userId });
-    else query.andWhere("account.userId IS NULL");
     if (withSecrets) {
       query.addSelect(["account.passwordCipher", "account.sessionCipher"]);
     }
@@ -284,9 +268,5 @@ export class PortalAccountService {
   private decrypt(value: string | null | undefined) {
     if (!value || !this.configuration.credentialsSecret) return null;
     return decryptSecret(this.configuration.credentialsSecret, value);
-  }
-
-  private notify(userId: string) {
-    this.realtimeGateway.emitToUser(userId, "portal-accounts.updated", {});
   }
 }

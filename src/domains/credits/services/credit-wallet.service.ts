@@ -48,7 +48,7 @@ export class CreditWalletService {
     if (balance < required) {
       throw new HttpException(
         {
-          message: `Créditos insuficientes. Essa ação precisa de cerca de ${required} créditos e você tem ${balance}.`,
+          message: `Créditos insuficientes. Essa ação pede pelo menos ${required} créditos de saldo e você tem ${balance}.`,
           required,
           balance,
         },
@@ -58,7 +58,11 @@ export class CreditWalletService {
     return balance;
   }
 
-  /** Spends credits, never leaving the balance below zero. */
+  /**
+   * Spends what was really used, even past the balance: the provider
+   * already charged us, so the rest stays as a debt that blocks new AI
+   * calls (see ensureBalance) and is paid by the next purchase.
+   */
   async spend(userId: string, change: Omit<CreditChange, "kind">) {
     await this.findOrCreate(userId);
     return this.dataSource.transaction((manager) =>
@@ -91,10 +95,7 @@ export class CreditWalletService {
       lock: { mode: "pessimistic_write" },
     });
 
-    const amount =
-      change.amount < 0
-        ? -Math.min(wallet.balance, -change.amount)
-        : change.amount;
+    const amount = change.amount;
 
     wallet.balance += amount;
     await manager.save(wallet);

@@ -1,11 +1,13 @@
 import { Property } from "../entities/property.entity";
 import { PropertyCreateDto } from "../services/property.service";
 import { PropertyContact } from "../entities/property-contact.entity";
+import type { PropertySourceDetails } from "../helpers/customer-safe.helper";
 
 export enum PropertyKindEnum {
   HOUSE = "house",
   APARTMENT = "apartment",
   COMMERCIAL = "commercial",
+  LAND = "land",
 }
 
 export enum PropertyLiftEnum {
@@ -63,6 +65,8 @@ export interface PropertyDto {
   infoHasGym: boolean | null;
   sourcePortal: string | null;
   sourceUrl: string | null;
+  showOnLanding: boolean;
+  sourceDetails: PropertySourceDetails | null;
   createdAt: Date;
   updatedAt: Date;
   active: boolean;
@@ -79,6 +83,7 @@ export interface PropertyListDto {
   infoBathrooms: number | null;
   infoSquareMeters: number | null;
   sourcePortal: string | null;
+  showOnLanding: boolean;
   createdAt: Date;
   contacts: PropertyContactDto[];
 }
@@ -161,6 +166,8 @@ export class PropertyMapper {
       infoHasGym: entity.infoHasGym,
       sourcePortal: entity.sourcePortal ?? null,
       sourceUrl: entity.sourceUrl ?? null,
+      showOnLanding: entity.showOnLanding ?? false,
+      sourceDetails: entity.sourceDetails ?? null,
       contacts: [], // Must be ALWAYS empty!!!
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
@@ -181,6 +188,7 @@ export class PropertyMapper {
         infoBathrooms: entity.infoBathrooms,
         infoSquareMeters: entity.infoSquareMeters,
         sourcePortal: entity.sourcePortal ?? null,
+        showOnLanding: entity.showOnLanding ?? false,
         createdAt: entity.createdAt,
         contacts: this.toContacts(entity.contacts),
       };

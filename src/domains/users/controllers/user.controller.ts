@@ -17,6 +17,7 @@ import { JwtGuard } from "../../auth/guards/jwt.guard";
 import { CustomerAvatarDto } from "../../customers/dtos/customer-avatar.dto";
 import { readRequestEvidence } from "../../../shared/utils/request-evidence.util";
 import { UserTermsAcceptDto } from "../dtos/user-terms-accept.dto";
+import { UserProfileUpdateDto } from "../dtos/user-profile-update.dto";
 
 @Controller("users")
 @UseGuards(JwtGuard)
@@ -25,7 +26,16 @@ export class UserController {
 
   @Get("me")
   async me(@GetUser() user: User): Promise<UserResponseDto> {
-    const entity = await this.userService.findById(user.id);
+    const entity = await this.userService.findByIdWithSlug(user.id);
+    return UserMapper.toDto(entity);
+  }
+
+  @Patch("me/profile")
+  async updateProfile(
+    @GetUser() user: User,
+    @Body() dto: UserProfileUpdateDto,
+  ): Promise<UserResponseDto> {
+    const entity = await this.userService.updateProfile(user.id, dto);
     return UserMapper.toDto(entity);
   }
 

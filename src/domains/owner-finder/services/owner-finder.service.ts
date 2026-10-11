@@ -48,6 +48,7 @@ const kindWords: Record<PropertyKindEnum, string> = {
   [PropertyKindEnum.HOUSE]: "casa",
   [PropertyKindEnum.APARTMENT]: "apartamento",
   [PropertyKindEnum.COMMERCIAL]: "imóvel comercial",
+  [PropertyKindEnum.LAND]: "terreno",
 };
 
 const confidenceOrder: Record<MatchConfidence, number> = {
@@ -218,7 +219,6 @@ export class OwnerFinderService {
 
     // Opens each ad to confirm who posted it and press "ver telefone".
     const pages = await this.pageReader.readPages(
-      user.id,
       candidates.map(({ contact }) => contact.sourceUrl),
       {
         limit: MAXIMUM_PAGES_CHECKED,

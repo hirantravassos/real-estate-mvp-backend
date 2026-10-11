@@ -3,6 +3,8 @@ import {
   Injectable,
   ServiceUnavailableException,
 } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
 import {
   OpenaiCitation,
   OpenaiJsonSchema,
@@ -15,6 +17,8 @@ import {
 import { CreditPricingService } from "../../credits/services/credit-pricing.service";
 import { CreditWalletService } from "../../credits/services/credit-wallet.service";
 import { AI_FEATURES, AiFeature } from "../ai-features.constant";
+import { User } from "../../users/entities/user.entity";
+import { describeBrokerContext } from "../../users/helpers/broker-context.helper";
 
 export interface AiRequest {
   feature: AiFeature;
@@ -69,6 +73,8 @@ export class AiService {
     private readonly openaiService: OpenaiService,
     private readonly pricingService: CreditPricingService,
     private readonly walletService: CreditWalletService,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
   ) {}
 
   async generate(
@@ -78,22 +84,30 @@ export class AiService {
     this.requireConfigured();
 
     const feature = AI_FEATURES[request.feature];
-    const worstCaseCredits =
+    const instructions = await this.withBrokerContext(
+      userId,
+      request.feature,
+      request.instructions,
+    );
+    const estimatedCredits =
       request.fixedCredits ??
       this.pricingService.creditsForUsage(
         Math.max(
-          this.openaiService.estimateTokens(
-            request.instructions + request.input,
-          ),
+          this.openaiService.estimateTokens(instructions + request.input),
           request.webSearch ? feature.typicalInputTokens : 0,
         ),
         feature.maximumOutputTokens,
         request.webSearch ? (feature.typicalWebSearchCalls ?? 1) : 0,
       );
-    await this.walletService.ensureBalance(userId, worstCaseCredits);
+    // Web searches can read many more pages than usual, the reserve keeps
+    // the balance able to pay for them.
+    await this.walletService.ensureBalance(
+      userId,
+      Math.ceil(estimatedCredits * (feature.reserveMultiplier ?? 1)),
+    );
 
     const result = await this.openaiService.generate({
-      instructions: request.instructions,
+      instructions,
       input: request.input,
       maximumOutputTokens: feature.maximumOutputTokens,
       jsonSchema: request.jsonSchema,
@@ -155,10 +169,14 @@ export class AiService {
       this.pricingService.featurePrice(options.feature),
     );
 
+    const brokerContext = feature.usesBrokerContext
+      ? await this.brokerContextOf(userId)
+      : "";
     const usage = { model: this.openaiService.model, input: 0, output: 0 };
     const respond: AiSessionRespond = async (request) => {
       const result = await this.openaiService.respond({
         ...request,
+        instructions: appendContext(request.instructions, brokerContext),
         maximumOutputTokens: feature.maximumOutputTokens,
       });
       usage.model = result.model;
@@ -223,6 +241,23 @@ export class AiService {
     return { text: result.text, creditsCharged: charged, balance };
   }
 
+  private async withBrokerContext(
+    userId: string,
+    feature: AiFeature,
+    instructions: string,
+  ): Promise<string> {
+    if (!AI_FEATURES[feature].usesBrokerContext) return instructions;
+    return appendContext(instructions, await this.brokerContextOf(userId));
+  }
+
+  /** The broker's profile and memory; a failure here never blocks the AI. */
+  private async brokerContextOf(userId: string): Promise<string> {
+    const user = await this.userRepository
+      .findOneBy({ id: userId })
+      .catch(() => null);
+    return user ? describeBrokerContext(user) : "";
+  }
+
   private requireConfigured() {
     if (!this.openaiService.isConfigured) {
       throw new ServiceUnavailableException(
@@ -231,3 +266,6 @@ export class AiService {
     }
   }
 }
+
+const appendContext = (instructions: string, context: string) =>
+  context ? `${instructions}\n\n${context}` : instructions;

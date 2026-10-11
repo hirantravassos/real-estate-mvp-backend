@@ -28,23 +28,36 @@ export interface AiFeatureDefinition {
   typicalCostInUsd?: number;
   /** Web searches a usual call runs, for features that search the web. */
   typicalWebSearchCalls?: number;
+  /**
+   * The balance asked before a call, as a multiple of a usual call. Set
+   * for calls whose real size is only known after they run.
+   */
+  reserveMultiplier?: number;
+  /**
+   * Adds the broker's profile and AI memory to the instructions, for the
+   * features that write for the broker or pick things on their behalf.
+   */
+  usesBrokerContext?: boolean;
 }
 
 export const AI_FEATURES: Record<AiFeature, AiFeatureDefinition> = {
   reply_suggestions: {
     label: "Sugestões de resposta",
+    usesBrokerContext: true,
     maximumOutputTokens: 1600,
     typicalInputTokens: 2500,
     typicalOutputTokens: 700,
   },
   rewrite: {
     label: "Melhorar mensagem",
+    usesBrokerContext: true,
     maximumOutputTokens: 1000,
     typicalInputTokens: 900,
     typicalOutputTokens: 400,
   },
   presentation: {
     label: "Apresentação de imóvel",
+    usesBrokerContext: true,
     maximumOutputTokens: 2400,
     typicalInputTokens: 2500,
     typicalOutputTokens: 1200,
@@ -67,12 +80,14 @@ export const AI_FEATURES: Record<AiFeature, AiFeatureDefinition> = {
   },
   hunt_criteria: {
     label: "Caça imóveis: entender o pedido",
+    usesBrokerContext: true,
     maximumOutputTokens: 1400,
     typicalInputTokens: 1200,
     typicalOutputTokens: 500,
   },
   hunt_conversation: {
     label: "Caça imóveis: perfil pela conversa",
+    usesBrokerContext: true,
     maximumOutputTokens: 2000,
     typicalInputTokens: 4000,
     typicalOutputTokens: 800,
@@ -80,6 +95,7 @@ export const AI_FEATURES: Record<AiFeature, AiFeatureDefinition> = {
   /** Priced per listing read: one listing's share of a batch call. */
   hunt_listing: {
     label: "Caça imóveis com IA",
+    usesBrokerContext: true,
     maximumOutputTokens: 6000,
     typicalInputTokens: 3800,
     typicalOutputTokens: 900,
@@ -92,6 +108,7 @@ export const AI_FEATURES: Record<AiFeature, AiFeatureDefinition> = {
    */
   assistant: {
     label: "Assistente",
+    usesBrokerContext: true,
     /** Room for a whole document written in one step. */
     maximumOutputTokens: 8000,
     typicalInputTokens: 14000,
@@ -112,5 +129,6 @@ export const AI_FEATURES: Record<AiFeature, AiFeatureDefinition> = {
     typicalInputTokens: 30000,
     typicalOutputTokens: 3000,
     typicalWebSearchCalls: 4,
+    reserveMultiplier: 3,
   },
 };

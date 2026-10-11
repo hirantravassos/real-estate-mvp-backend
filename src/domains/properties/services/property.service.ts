@@ -26,6 +26,10 @@ import { ValidateCurrency } from "../../../shared/decorators/validation/currency
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 import { InjectRepository } from "@nestjs/typeorm";
 import {
+  customerAddressOf,
+  isFromPortal,
+} from "../helpers/customer-safe.helper";
+import {
   PropertyConciergeServiceEnum,
   PropertyFurnitureEnum,
   PropertyKindEnum,
@@ -210,6 +214,11 @@ export class PropertyFilterDto extends PaginationRequestDto {
   @IsOptional() @Transform(parseBoolean) @IsBoolean() hasGym?: boolean | null;
 }
 
+export class PropertyLandingVisibilityDto {
+  @IsBoolean()
+  visible: boolean;
+}
+
 @Injectable()
 export class PropertyService {
   constructor(
@@ -371,6 +380,25 @@ export class PropertyService {
     return await this.propertyRepository.save(entity);
   }
 
+  /** Shows or hides the property on the broker's public page. */
+  async setLandingVisibility(user: User, id: string, visible: boolean) {
+    const result = await this.propertyRepository.update(
+      { id, user: { id: user.id }, active: true },
+      { showOnLanding: visible },
+    );
+    if (!result.affected) throw new NotFoundException("Property not found");
+    return this.findOne(user, id);
+  }
+
+  /** What the broker's public page lists, newest first. */
+  async findForLanding(userId: string, limit: number) {
+    return this.propertyRepository.find({
+      where: { userId, active: true, showOnLanding: true },
+      order: { createdAt: "DESC" },
+      take: limit,
+    });
+  }
+
   async remove(user: User, id: string) {
     await this.propertyRepository.update(
       { id, user: { id: user.id } },
@@ -394,13 +422,20 @@ export class PropertyService {
       comment: _comment, // eslint-disable-line @typescript-eslint/no-unused-vars
       sourcePortal: _sourcePortal, // eslint-disable-line @typescript-eslint/no-unused-vars
       sourceUrl: _sourceUrl, // eslint-disable-line @typescript-eslint/no-unused-vars
+      showOnLanding: _showOnLanding, // eslint-disable-line @typescript-eslint/no-unused-vars
+      sourceDetails: _sourceDetails, // eslint-disable-line @typescript-eslint/no-unused-vars
       ...presentation
     } = dto;
     return {
       ...presentation,
+      // A property found on a portal shows only its neighborhood and city.
+      ...(isFromPortal(dto)
+        ? { address: customerAddressOf(dto), address2: "" }
+        : {}),
       agent: {
         name: entity.user.name,
         profileImage: entity.user.profileImage,
+        slug: entity.user.slug ?? null,
       },
     };
   }

@@ -40,7 +40,13 @@ export class CreditPricingService {
   }
 
   creditsForCostInUsd(costInUsd: number) {
-    const costInBrl = costInUsd * this.configuration.usdToBrlRate;
+    return this.creditsForCostInBrl(
+      costInUsd * this.configuration.usdToBrlRate,
+    );
+  }
+
+  /** For providers billed in reais, like the public certificates lookups. */
+  creditsForCostInBrl(costInBrl: number) {
     const priceInBrl = costInBrl * this.configuration.profitMultiplier;
     return Math.max(1, Math.ceil(priceInBrl / this.cheapestCreditPriceInBrl));
   }

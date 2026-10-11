@@ -255,7 +255,7 @@ export class PropertyHuntRunnerService implements OnApplicationBootstrap {
     }
 
     const definition = PORTALS[portal];
-    const session = await this.accountService.sessionFor(hunt.userId, portal);
+    const session = await this.accountService.sessionFor(portal);
     let context: BrowserContext | null = null;
     let reconnected = false;
 

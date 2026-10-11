@@ -131,6 +131,10 @@ export class PropertyMediaService {
       media.displayName = dto.displayName;
     }
 
+    if (dto.visibleToCustomer !== undefined) {
+      media.visibleToCustomer = dto.visibleToCustomer;
+    }
+
     if (dto.isCover === true) {
       if (media.type !== PropertyMediaType.IMAGE) {
         throw new BadRequestException("Apenas imagens podem ser capa.");
@@ -151,6 +155,7 @@ export class PropertyMediaService {
       .addSelect("media.s3Key")
       .where("media.propertyId = :propertyId", { propertyId })
       .andWhere("media.active = :active", { active: true })
+      .andWhere("media.visibleToCustomer = :visible", { visible: true })
       .orderBy("media.sortOrder", "ASC")
       .addOrderBy("media.createdAt", "ASC")
       .getMany();
@@ -167,7 +172,42 @@ export class PropertyMediaService {
     );
   }
 
-  /** Media of a property with the storage keys, to send through WhatsApp. */
+  /** One picture per property, the cover or else the first, for listings. */
+  async findCoversForPresentation(
+    propertyIds: string[],
+  ): Promise<Map<string, string>> {
+    if (!propertyIds.length) return new Map();
+
+    const images = await this.mediaRepository
+      .createQueryBuilder("media")
+      .addSelect("media.s3Key")
+      .where("media.propertyId IN (:...propertyIds)", { propertyIds })
+      .andWhere("media.active = :active", { active: true })
+      .andWhere("media.type = :type", { type: PropertyMediaType.IMAGE })
+      .andWhere("media.visibleToCustomer = :visible", { visible: true })
+      .orderBy("media.isCover", "DESC")
+      .addOrderBy("media.sortOrder", "ASC")
+      .addOrderBy("media.createdAt", "ASC")
+      .getMany();
+
+    const keys = new Map<string, string>();
+    for (const image of images) {
+      if (!keys.has(image.propertyId)) keys.set(image.propertyId, image.s3Key);
+    }
+
+    const covers = new Map<string, string>();
+    await Promise.all(
+      [...keys].map(async ([propertyId, s3Key]) => {
+        covers.set(
+          propertyId,
+          await this.storageService.getPresignedUrl(s3Key),
+        );
+      }),
+    );
+    return covers;
+  }
+
+  /** Media a customer may see, with the storage keys, to send through WhatsApp. */
   async findForMessaging(userId: string, propertyId: string) {
     return this.mediaRepository
       .createQueryBuilder("media")
@@ -175,6 +215,7 @@ export class PropertyMediaService {
       .where("media.propertyId = :propertyId", { propertyId })
       .andWhere("media.userId = :userId", { userId })
       .andWhere("media.active = :active", { active: true })
+      .andWhere("media.visibleToCustomer = :visible", { visible: true })
       .orderBy("media.sortOrder", "ASC")
       .addOrderBy("media.createdAt", "ASC")
       .getMany();

@@ -316,6 +316,7 @@ export class AssistantActionService {
             .where("media.id IN (:...mediaIds)", { mediaIds })
             .andWhere("media.userId = :userId", { userId: user.id })
             .andWhere("media.active = :active", { active: true })
+            .andWhere("media.visibleToCustomer = :visible", { visible: true })
             .getMany()
         : Promise.resolve([]),
     ]);

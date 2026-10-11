@@ -17,8 +17,7 @@ export type RealtimeEvent =
   | "deal.updated"
   | "customers.updated"
   | "hunt.updated"
-  | "matches.updated"
-  | "portal-accounts.updated";
+  | "matches.updated";
 
 const userRoom = (userId: string) => `user:${userId}`;
 

@@ -3,11 +3,13 @@ import {
   PropertyFurnitureEnum,
   PropertyKindEnum,
 } from "../../properties/mappers/property.mapper";
+import { customerAddressOf } from "../../properties/helpers/customer-safe.helper";
 
 export const KIND_LABEL: Record<PropertyKindEnum, string> = {
   [PropertyKindEnum.HOUSE]: "Casa",
   [PropertyKindEnum.APARTMENT]: "Apartamento",
   [PropertyKindEnum.COMMERCIAL]: "Ponto comercial",
+  [PropertyKindEnum.LAND]: "Terreno",
 };
 
 export const formatBrl = (value: string | number | null | undefined) => {
@@ -26,7 +28,7 @@ export const describePropertyFacts = (property: PropertyDto) => {
   if (property.kind) facts.push(`Tipo: ${KIND_LABEL[property.kind]}`);
   if (property.alias) facts.push(`Nome: ${property.alias}`);
   facts.push(
-    `Endereço: ${[property.address, property.address2].filter(Boolean).join(", ")}`,
+    `${property.sourcePortal ? "Região" : "Endereço"}: ${customerAddressOf(property)}`,
   );
   const price = formatBrl(property.price);
   if (price) facts.push(`Valor: ${price}`);
@@ -95,9 +97,7 @@ export const formatPropertyPitch = (
   const title = property.alias?.trim()
     ? `*${property.alias.trim()}*`
     : `*${property.kind ? KIND_LABEL[property.kind] : "Imóvel"}*`;
-  sections.push(
-    `${title}\n📍 ${[property.address, property.address2].filter(Boolean).join(", ")}`,
-  );
+  sections.push(`${title}\n📍 ${customerAddressOf(property)}`);
 
   const specs: string[] = [];
   if (property.infoSquareMeters)

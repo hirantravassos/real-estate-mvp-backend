@@ -22,8 +22,8 @@ export interface ReadPagesOptions {
 }
 
 /**
- * Opens a few listing links in the browser and reads them, signed in on the
- * portals the broker connected, pressing "ver telefone" on each one. Shared
+ * Opens a few listing links in the browser and reads them, signed in with the
+ * platform accounts, pressing "ver telefone" on each one. Shared
  * with other features that need to check a listing for real.
  */
 @Injectable()
@@ -40,7 +40,7 @@ export class ListingPageReaderService {
   }
 
   /** Pages that could not be read are left out of the result. */
-  async readPages(userId: string, urls: string[], options: ReadPagesOptions) {
+  async readPages(urls: string[], options: ReadPagesOptions) {
     const pages = new Map<string, ListingPage>();
     if (!this.isAvailable) return pages;
 
@@ -55,14 +55,13 @@ export class ListingPageReaderService {
     // One tab per site at the same time, one page after the other inside it.
     await Promise.all(
       [...byHost.entries()].map(([host, siteUrls]) =>
-        this.readSite(userId, host, siteUrls, deadline, pages),
+        this.readSite(host, siteUrls, deadline, pages),
       ),
     );
     return pages;
   }
 
   private async readSite(
-    userId: string,
     host: string,
     urls: string[],
     deadline: number,
@@ -70,7 +69,7 @@ export class ListingPageReaderService {
   ) {
     const portal = portalOfHost(host);
     const session = portal
-      ? await this.accountService.sessionFor(userId, portal).catch(() => null)
+      ? await this.accountService.sessionFor(portal).catch(() => null)
       : null;
     let context: BrowserContext | null = null;
 
