@@ -24,6 +24,15 @@ export interface DealProgressDto {
   milestonesCompleted: number;
 }
 
+/** How far the restriction screening of the seller and the property is. */
+export interface DealScreeningDto {
+  total: number;
+  /** Came back clean, or the restriction was solved. */
+  cleared: number;
+  /** Positive results that block the sale until solved. */
+  restricted: number;
+}
+
 export interface DealPropertySummaryDto {
   id: string;
   kind: PropertyKindEnum | null;
@@ -106,6 +115,21 @@ export class DealMapper {
     };
   }
 
+  static toScreening(deal: Deal): DealScreeningDto {
+    const screening = (deal.checklistItems ?? []).filter(
+      (item) => item.active && item.screening,
+    );
+    return {
+      total: screening.length,
+      cleared: screening.filter(
+        (item) => item.status === DealChecklistStatus.APPROVED,
+      ).length,
+      restricted: screening.filter(
+        (item) => item.status === DealChecklistStatus.RESTRICTED,
+      ).length,
+    };
+  }
+
   static toProperty(property: Property | null): DealPropertySummaryDto | null {
     if (!property) return null;
     return {
@@ -144,6 +168,7 @@ export class DealMapper {
       customer: this.toCustomer(deal),
       property: this.toProperty(deal.property),
       progress: this.toProgress(deal),
+      screening: this.toScreening(deal),
       closedAt: deal.closedAt,
       createdAt: deal.createdAt,
       updatedAt: deal.updatedAt,
@@ -159,6 +184,7 @@ export class DealMapper {
       ...this.toListDto(deal),
       downPaymentAmount: deal.downPaymentAmount,
       usesFgts: deal.usesFgts,
+      sellerType: deal.sellerType,
       notes: deal.notes,
       portalToken: deal.portalToken,
       portalEnabled: deal.portalEnabled,
@@ -220,6 +246,7 @@ export class DealMapper {
       status: item.status,
       rejectionReason: item.rejectionReason,
       requestedFromCustomer: item.requestedFromCustomer,
+      screening: item.screening,
       submittedAt: item.submittedAt,
       reviewedAt: item.reviewedAt,
       documents: (documents.byItem.get(item.id) ?? []).map((document) =>

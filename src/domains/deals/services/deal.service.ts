@@ -20,12 +20,15 @@ import { DealChecklistItem } from "../entities/deal-checklist-item.entity";
 import { DealSigner } from "../entities/deal-signer.entity";
 import { DealMilestone } from "../entities/deal-milestone.entity";
 import {
+  DEAL_SELLER_TYPE_LABELS,
   DEAL_STAGE_LABELS,
   DEAL_STAGE_ORDER,
   DealChecklistStatus,
   DealEventActor,
   DealEventKind,
+  DealParty,
   DealPaymentMethod,
+  DealSellerType,
   DealStage,
   DealStatus,
   DealSignerStatus,
@@ -33,6 +36,7 @@ import {
 import {
   buildChecklistTemplate,
   buildMilestoneTemplate,
+  buildSellerTemplate,
 } from "../constants/deal-templates.constant";
 import {
   DealCancelDto,
@@ -171,6 +175,7 @@ export class DealService {
 
     const paymentMethod = dto.paymentMethod ?? null;
     const usesFgts = dto.usesFgts ?? false;
+    const sellerType = dto.sellerType ?? DealSellerType.INDIVIDUAL;
 
     const dealId = await this.dataSource.transaction(async (manager) => {
       const deal = await manager.getRepository(Deal).save(
@@ -182,6 +187,7 @@ export class DealService {
           downPaymentAmount: dto.downPaymentAmount ?? null,
           paymentMethod,
           usesFgts,
+          sellerType,
           commissionPercentage:
             dto.commissionPercentage === null ||
             dto.commissionPercentage === undefined
@@ -193,7 +199,7 @@ export class DealService {
 
       const checklistRepository = manager.getRepository(DealChecklistItem);
       await checklistRepository.save(
-        buildChecklistTemplate({ paymentMethod, usesFgts }).map(
+        buildChecklistTemplate({ paymentMethod, usesFgts, sellerType }).map(
           (template, templateIndex) =>
             checklistRepository.create({
               ...template,
@@ -205,13 +211,12 @@ export class DealService {
 
       const milestoneRepository = manager.getRepository(DealMilestone);
       await milestoneRepository.save(
-        buildMilestoneTemplate({ paymentMethod, usesFgts }).map(
-          (title, titleIndex) =>
-            milestoneRepository.create({
-              title,
-              dealId: deal.id,
-              sortOrder: titleIndex,
-            }),
+        buildMilestoneTemplate({ paymentMethod }).map((title, titleIndex) =>
+          milestoneRepository.create({
+            title,
+            dealId: deal.id,
+            sortOrder: titleIndex,
+          }),
         ),
       );
 
@@ -234,6 +239,7 @@ export class DealService {
   async update(user: User, id: string, dto: DealUpdateDto) {
     const deal = await this.findOwnedOrThrow(user.id, id);
     const proposalBefore = this.describeProposal(deal, "");
+    const sellerTypeBefore = deal.sellerType;
 
     if (dto.propertyId !== undefined) {
       if (dto.propertyId)
@@ -246,6 +252,7 @@ export class DealService {
     }
     if (dto.paymentMethod !== undefined) deal.paymentMethod = dto.paymentMethod;
     if (dto.usesFgts !== undefined) deal.usesFgts = dto.usesFgts;
+    if (dto.sellerType !== undefined) deal.sellerType = dto.sellerType;
     if (dto.commissionPercentage !== undefined) {
       deal.commissionPercentage =
         dto.commissionPercentage === null
@@ -255,6 +262,10 @@ export class DealService {
     if (dto.notes !== undefined) deal.notes = dto.notes || null;
 
     await this.dealRepository.save(deal);
+
+    if (deal.sellerType !== sellerTypeBefore) {
+      await this.swapSellerTemplate(deal, sellerTypeBefore);
+    }
 
     const proposalAfter = this.describeProposal(deal, "");
     if (proposalAfter !== proposalBefore) {
@@ -414,6 +425,7 @@ export class DealService {
         title: dto.title,
         description: dto.description || null,
         requestedFromCustomer: dto.requestedFromCustomer ?? false,
+        screening: dto.screening ?? false,
         sortOrder: (lastItem?.sortOrder ?? -1) + 1,
       }),
     );
@@ -433,6 +445,7 @@ export class DealService {
     if (dto.requestedFromCustomer !== undefined) {
       item.requestedFromCustomer = dto.requestedFromCustomer;
     }
+    if (dto.screening !== undefined) item.screening = dto.screening;
     await this.checklistRepository.save(item);
     return this.findOne(user, id);
   }
@@ -448,21 +461,28 @@ export class DealService {
     item.reviewedAt =
       dto.status === DealChecklistStatus.PENDING ? null : new Date();
     item.rejectionReason =
-      dto.status === DealChecklistStatus.REJECTED
+      dto.status === DealChecklistStatus.REJECTED ||
+      dto.status === DealChecklistStatus.RESTRICTED
         ? dto.rejectionReason || null
         : null;
     await this.checklistRepository.save(item);
 
     if (dto.status !== DealChecklistStatus.PENDING) {
-      const approved = dto.status === DealChecklistStatus.APPROVED;
+      const reason = item.rejectionReason ? `: ${item.rejectionReason}` : "";
+      const messages: Partial<Record<DealChecklistStatus, string>> = {
+        [DealChecklistStatus.APPROVED]: `"${item.title}" foi aprovado`,
+        [DealChecklistStatus.REJECTED]: `"${item.title}" precisa ser enviado de novo${reason}`,
+        [DealChecklistStatus.RESTRICTED]: `Restrição encontrada em "${item.title}"${reason}`,
+      };
       await this.activityService.record({
         dealId: item.dealId,
         kind: DealEventKind.DOCUMENT,
         actor: DealEventActor.BROKER,
-        message: approved
-          ? `"${item.title}" foi aprovado`
-          : `"${item.title}" precisa ser enviado de novo${item.rejectionReason ? `: ${item.rejectionReason}` : ""}`,
-        visibleToCustomer: item.requestedFromCustomer,
+        message: messages[dto.status] ?? `"${item.title}" foi conferido`,
+        // Restrictions are about the seller, the buyer hears it from the broker.
+        visibleToCustomer:
+          item.requestedFromCustomer &&
+          dto.status !== DealChecklistStatus.RESTRICTED,
       });
     }
 
@@ -795,6 +815,69 @@ export class DealService {
         "Esta venda está encerrada. Reabra para continuar.",
       );
     }
+  }
+
+  /**
+   * The seller turned out to be a company or an estate, for example. Adds
+   * the paperwork of the new kind of seller and drops the old one that was
+   * never touched, keeping anything already sent or checked.
+   */
+  private async swapSellerTemplate(deal: Deal, previousType: DealSellerType) {
+    const previousTitles = new Set(
+      buildSellerTemplate(previousType).map((template) => template.title),
+    );
+    const nextTemplates = buildSellerTemplate(deal.sellerType);
+    const nextTitles = new Set(nextTemplates.map((template) => template.title));
+
+    await this.dataSource.transaction(async (manager) => {
+      const repository = manager.getRepository(DealChecklistItem);
+      const sellerItems = await repository.find({
+        where: { dealId: deal.id, party: DealParty.SELLER, active: true },
+      });
+
+      const untouchedLeftovers = sellerItems.filter(
+        (item) =>
+          previousTitles.has(item.title) &&
+          !nextTitles.has(item.title) &&
+          item.status === DealChecklistStatus.PENDING &&
+          !item.submittedAt,
+      );
+      if (untouchedLeftovers.length > 0) {
+        await repository.update(
+          { id: In(untouchedLeftovers.map((item) => item.id)) },
+          { active: false },
+        );
+      }
+
+      const existingTitles = new Set(sellerItems.map((item) => item.title));
+      const lastItem = await repository.findOne({
+        where: { dealId: deal.id },
+        order: { sortOrder: "DESC" },
+      });
+      const firstSortOrder = (lastItem?.sortOrder ?? -1) + 1;
+      await repository.save(
+        nextTemplates
+          .filter((template) => !existingTitles.has(template.title))
+          .map((template, templateIndex) =>
+            repository.create({
+              ...template,
+              dealId: deal.id,
+              sortOrder: firstSortOrder + templateIndex,
+            }),
+          ),
+      );
+
+      await this.activityService.record(
+        {
+          dealId: deal.id,
+          kind: DealEventKind.DOCUMENT,
+          actor: DealEventActor.BROKER,
+          message: `Vendedor agora é ${DEAL_SELLER_TYPE_LABELS[deal.sellerType].toLowerCase()}, documentos do vendedor atualizados`,
+          visibleToCustomer: false,
+        },
+        manager,
+      );
+    });
   }
 
   private async findOwnedOrThrow(

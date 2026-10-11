@@ -33,8 +33,16 @@ export class DealChecklistItem extends BaseEntity {
   })
   status: DealChecklistStatus;
 
+  /** Why it was asked again, or which restriction the certificate shows. */
   @Column({ type: "varchar", length: 500, nullable: true })
   rejectionReason: string | null;
+
+  /**
+   * Part of the restriction screening: a certificate or search that tells
+   * whether the owner can really sell, like debts, lawsuits or liens.
+   */
+  @ColumnBoolean({ default: false })
+  screening: boolean;
 
   /** Shown on the customer area so the customer sends it themselves. */
   @ColumnBoolean({ default: false })
