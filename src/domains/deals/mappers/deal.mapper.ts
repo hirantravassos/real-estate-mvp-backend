@@ -7,6 +7,7 @@ import { DealChecklistItem } from "../entities/deal-checklist-item.entity";
 import { DealSigner } from "../entities/deal-signer.entity";
 import { DealMilestone } from "../entities/deal-milestone.entity";
 import { DealEvent } from "../entities/deal-event.entity";
+import { DealPartner } from "../entities/deal-partner.entity";
 import {
   DealChecklistStatus,
   DealSignerRole,
@@ -47,6 +48,9 @@ const byOrder = <T extends { sortOrder: number; createdAt: Date }>(
 const byCreation = (first: DealSigner, second: DealSigner) =>
   first.createdAt.getTime() - second.createdAt.getTime();
 
+const byPartnerCreation = (first: DealPartner, second: DealPartner) =>
+  first.createdAt.getTime() - second.createdAt.getTime();
+
 const byNewest = (first: DealEvent, second: DealEvent) =>
   second.createdAt.getTime() - first.createdAt.getTime();
 
@@ -58,6 +62,21 @@ const shortName = (name: string) => {
   const [first, ...rest] = name.trim().split(/\s+/);
   const last = rest.at(-1);
   return last ? `${first} ${last.charAt(0).toUpperCase()}.` : first;
+};
+
+const activePartners = (deal: Deal) =>
+  (deal.partners ?? [])
+    .filter((partner) => partner.active)
+    .sort(byPartnerCreation);
+
+/** Value of a commission share, when the sale numbers are known. */
+const commissionAmountOf = (deal: Deal, share: string | null) => {
+  if (!deal.offerAmount || deal.commissionPercentage === null || !share) {
+    return null;
+  }
+  const total =
+    (Number(deal.offerAmount) * Number(deal.commissionPercentage)) / 100;
+  return Math.round(total * Number(share)) / 100;
 };
 
 export class DealMapper {
@@ -117,6 +136,11 @@ export class DealMapper {
       offerAmount: deal.offerAmount,
       paymentMethod: deal.paymentMethod,
       commissionPercentage: toNumberOrNull(deal.commissionPercentage),
+      /** Sum of what the partners take, from 0 to 100 of the commission. */
+      partnersCommissionShare: activePartners(deal).reduce(
+        (total, partner) => total + Number(partner.commissionShare ?? 0),
+        0,
+      ),
       customer: this.toCustomer(deal),
       property: this.toProperty(deal.property),
       progress: this.toProgress(deal),
@@ -158,9 +182,32 @@ export class DealMapper {
         .filter((milestone) => milestone.active)
         .sort(byOrder)
         .map((milestone) => this.toMilestone(milestone)),
+      partners: activePartners(deal).map((partner) =>
+        this.toPartner(partner, deal),
+      ),
       events: (deal.events ?? [])
         .sort(byNewest)
         .map((event) => this.toEvent(event)),
+    };
+  }
+
+  static toPartner(partner: DealPartner, deal: Deal) {
+    const signer = (deal.signers ?? []).find(
+      (item) => item.active && item.partnerId === partner.id,
+    );
+    return {
+      id: partner.id,
+      customerId: partner.customerId,
+      name: partner.name,
+      phone: partner.phone,
+      email: partner.email,
+      creci: partner.creci,
+      commissionShare: toNumberOrNull(partner.commissionShare),
+      accessToken: partner.accessToken,
+      signer: signer
+        ? { id: signer.id, status: signer.status, signedAt: signer.signedAt }
+        : null,
+      createdAt: partner.createdAt,
     };
   }
 
@@ -223,6 +270,82 @@ export class DealMapper {
       message: event.message,
       visibleToCustomer: event.visibleToCustomer,
       createdAt: event.createdAt,
+    };
+  }
+
+  /**
+   * What a partner broker sees: the whole paperwork and contract, their own
+   * commission share, never the broker's notes or the other partners' shares.
+   */
+  static toPartnerAreaDto(
+    deal: Deal,
+    partner: DealPartner,
+    documents: DealDocumentsDto,
+  ) {
+    const contractDocument = deal.contractDocumentId
+      ? (documents.byId.get(deal.contractDocumentId) ?? null)
+      : null;
+
+    return {
+      stage: deal.stage,
+      status: deal.status,
+      offerAmount: deal.offerAmount,
+      downPaymentAmount: deal.downPaymentAmount,
+      paymentMethod: deal.paymentMethod,
+      usesFgts: deal.usesFgts,
+      partner: {
+        name: partner.name,
+        commissionShare: toNumberOrNull(partner.commissionShare),
+        commissionAmount: commissionAmountOf(deal, partner.commissionShare),
+      },
+      customer: { name: shortName(deal.customer.name) },
+      broker: {
+        name: deal.user.name,
+        profileImage: deal.user.profileImage,
+        avatar: deal.user.avatar ?? null,
+      },
+      property: this.toProperty(deal.property),
+      progress: this.toProgress(deal),
+      checklist: (deal.checklistItems ?? [])
+        .filter((item) => item.active)
+        .sort(byOrder)
+        .map((item) => this.toChecklistItem(item, documents)),
+      contract: contractDocument
+        ? {
+            document: DocumentMapper.toDto(contractDocument),
+            sha256: deal.contractSha256,
+            uploadedAt: deal.contractUploadedAt,
+          }
+        : null,
+      signers: (deal.signers ?? [])
+        .filter((signer) => signer.active)
+        .sort(byCreation)
+        .map((signer) => ({
+          id: signer.id,
+          name: shortName(signer.name),
+          role: signer.role,
+          status: signer.status,
+          signedAt: signer.signedAt,
+          // Partners only get their own signing link.
+          signingToken:
+            signer.partnerId === partner.id ? signer.signingToken : null,
+        })),
+      milestones: (deal.milestones ?? [])
+        .filter((milestone) => milestone.active)
+        .sort(byOrder)
+        .map((milestone) => this.toMilestone(milestone)),
+      events: (deal.events ?? [])
+        .filter((event) => event.visibleToCustomer)
+        .sort(byNewest)
+        .slice(0, 30)
+        .map((event) => ({
+          id: event.id,
+          kind: event.kind,
+          actor: event.actor,
+          message: event.message,
+          createdAt: event.createdAt,
+        })),
+      closedAt: deal.closedAt,
     };
   }
 

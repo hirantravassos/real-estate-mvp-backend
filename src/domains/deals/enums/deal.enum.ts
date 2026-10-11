@@ -55,6 +55,8 @@ export enum DealSignerRole {
   SELLER = "seller",
   BROKER = "broker",
   WITNESS = "witness",
+  /** A partner broker who shares the sale and the commission. */
+  PARTNER = "partner",
 }
 
 export enum DealSignerStatus {
@@ -76,6 +78,7 @@ export enum DealSignatureMethod {
 export enum DealEventActor {
   BROKER = "broker",
   CUSTOMER = "customer",
+  PARTNER = "partner",
   SYSTEM = "system",
 }
 
@@ -88,6 +91,7 @@ export enum DealEventKind {
   SIGNATURE = "signature",
   MILESTONE = "milestone",
   MESSAGE = "message",
+  PARTNER = "partner",
   WON = "won",
   CANCELLED = "cancelled",
 }

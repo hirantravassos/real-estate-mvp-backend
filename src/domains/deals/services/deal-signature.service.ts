@@ -16,6 +16,7 @@ import {
   DealEventActor,
   DealEventKind,
   DealSignatureMethod,
+  DealSignerRole,
   DealSignerStatus,
   DealStage,
   DealStatus,
@@ -39,6 +40,12 @@ const CLEARED_SIGNATURE = {
 };
 
 const firstNameOf = (name: string) => name.trim().split(/\s+/)[0];
+
+/** Who shows on the history when a signer acts from their own link. */
+const signerActorOf = (signer: DealSigner) =>
+  signer.role === DealSignerRole.PARTNER
+    ? DealEventActor.PARTNER
+    : DealEventActor.CUSTOMER;
 
 /**
  * Contract signatures. Three ways in: accepting on our signing page (simple
@@ -129,7 +136,7 @@ export class DealSignatureService {
     await this.activityService.record({
       dealId: deal.id,
       kind: DealEventKind.SIGNATURE,
-      actor: DealEventActor.CUSTOMER,
+      actor: signerActorOf(signer),
       message: `${firstNameOf(signer.name)} assinou o contrato`,
     });
     await this.completeContractWhenEveryoneSigned(deal);
@@ -172,7 +179,7 @@ export class DealSignatureService {
     await this.activityService.record({
       dealId: deal.id,
       kind: DealEventKind.SIGNATURE,
-      actor: DealEventActor.CUSTOMER,
+      actor: signerActorOf(signer),
       message: `${firstNameOf(signer.name)} enviou o contrato assinado pelo gov.br`,
     });
     this.activityService.notifyBroker(deal.userId, deal.id);

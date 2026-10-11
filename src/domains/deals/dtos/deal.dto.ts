@@ -194,6 +194,86 @@ export class DealSignerCreateDto {
   phone?: string | null;
 }
 
+export class DealPartnerCreateDto {
+  /** The contact this partner came from, optional. */
+  @IsOptional()
+  @IsUUID()
+  customerId?: string | null;
+
+  @Transform(trimText)
+  @IsString()
+  @MinLength(2)
+  @MaxLength(255)
+  name: string;
+
+  @IsOptional()
+  @Transform(onlyDigits)
+  @IsString()
+  @MaxLength(20)
+  phone?: string | null;
+
+  @IsOptional()
+  @Transform(trimText)
+  @IsEmail()
+  @MaxLength(255)
+  email?: string | null;
+
+  @IsOptional()
+  @Transform(trimText)
+  @IsString()
+  @MaxLength(20)
+  creci?: string | null;
+
+  /** Part of the commission that goes to the partner, from 0 to 100. */
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(100)
+  commissionShare?: number | null;
+
+  /** Adds the partner to the contract signers. */
+  @IsOptional()
+  @IsBoolean()
+  signsContract?: boolean;
+}
+
+export class DealPartnerUpdateDto {
+  @IsOptional()
+  @Transform(trimText)
+  @IsString()
+  @MinLength(2)
+  @MaxLength(255)
+  name?: string;
+
+  @IsOptional()
+  @Transform(onlyDigits)
+  @IsString()
+  @MaxLength(20)
+  phone?: string | null;
+
+  @IsOptional()
+  @Transform(trimText)
+  @IsEmail()
+  @MaxLength(255)
+  email?: string | null;
+
+  @IsOptional()
+  @Transform(trimText)
+  @IsString()
+  @MaxLength(20)
+  creci?: string | null;
+
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(100)
+  commissionShare?: number | null;
+
+  @IsOptional()
+  @IsBoolean()
+  signsContract?: boolean;
+}
+
 export class DealSignerReviewDto {
   @IsBoolean()
   approved: boolean;

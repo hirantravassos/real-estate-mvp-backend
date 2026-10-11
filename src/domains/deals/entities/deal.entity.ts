@@ -17,6 +17,7 @@ import { DealChecklistItem } from "./deal-checklist-item.entity";
 import { DealSigner } from "./deal-signer.entity";
 import { DealMilestone } from "./deal-milestone.entity";
 import { DealEvent } from "./deal-event.entity";
+import { DealPartner } from "./deal-partner.entity";
 
 /**
  * The closing room of one sale: proposal, paperwork, contract signatures and
@@ -63,6 +64,7 @@ export class Deal extends BaseEntity {
   @ColumnBoolean({ default: false })
   usesFgts: boolean;
 
+  /** Total commission of the sale, before splitting with partners. */
   @Column({ type: "decimal", precision: 5, scale: 2, nullable: true })
   commissionPercentage: string | null;
 
@@ -105,4 +107,7 @@ export class Deal extends BaseEntity {
 
   @OneToMany(() => DealEvent, (event) => event.deal)
   events: DealEvent[];
+
+  @OneToMany(() => DealPartner, (partner) => partner.deal)
+  partners: DealPartner[];
 }

@@ -65,6 +65,7 @@ const DEAL_DETAIL_RELATIONS = {
   signers: true,
   milestones: true,
   events: true,
+  partners: true,
 } as const;
 
 const formatMoney = (value: string | number | null) =>
@@ -111,6 +112,7 @@ export class DealService {
         checklistItems: true,
         signers: true,
         milestones: true,
+        partners: true,
       },
       order: { updatedAt: "DESC" },
     });
@@ -127,6 +129,7 @@ export class DealService {
         checklistItems: true,
         signers: true,
         milestones: true,
+        partners: true,
       },
       order: { createdAt: "DESC" },
     });
@@ -485,14 +488,15 @@ export class DealService {
   }
 
   /**
-   * Files the broker sends count as checked. Files the customer sends wait
-   * for the broker to look at them.
+   * Files the broker sends count as checked. Files the customer or a
+   * partner sends wait for the broker to look at them.
    */
   async attachChecklistDocument(
     deal: Deal,
     item: DealChecklistItem,
     file: Express.Multer.File,
     actor: DealEventActor,
+    partnerName?: string,
   ) {
     await this.documentService.upload(
       deal.userId,
@@ -517,7 +521,9 @@ export class DealService {
       actor,
       message: sentByBroker
         ? `"${item.title}" foi guardado pelo corretor`
-        : `"${item.title}" foi enviado para conferência`,
+        : actor === DealEventActor.PARTNER
+          ? `"${item.title}" foi enviado por ${partnerName ?? "parceria"} para conferência`
+          : `"${item.title}" foi enviado para conferência`,
       visibleToCustomer: item.requestedFromCustomer,
     });
   }
