@@ -6,6 +6,7 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   UploadedFile,
@@ -20,12 +21,15 @@ import { User } from "../../users/entities/user.entity";
 import {
   AssistantActionConfirmDto,
   AssistantAskDto,
+  AssistantChatListDto,
+  AssistantChatRenameDto,
   AssistantHistoryDto,
   AssistantUploadDto,
   AssistantUploadRequestDto,
 } from "../dtos/assistant.dto";
 import { AssistantDocumentService } from "../services/assistant-document.service";
 import { AssistantActionService } from "../services/assistant-action.service";
+import { AssistantChatService } from "../services/assistant-chat.service";
 import { AssistantService } from "../services/assistant.service";
 
 /** Formats the transcription accepts, by what browsers record. */
@@ -55,6 +59,7 @@ export class AssistantController {
     private readonly assistantService: AssistantService,
     private readonly actionService: AssistantActionService,
     private readonly documentService: AssistantDocumentService,
+    private readonly chatService: AssistantChatService,
   ) {}
 
   /** Where the browser puts a file attached in the chat, before asking. */
@@ -77,19 +82,41 @@ export class AssistantController {
     return this.documentService.downloadUrl(user, documentId);
   }
 
-  @Get("messages")
-  history(@GetUser() user: User, @Query() dto: AssistantHistoryDto) {
-    return this.assistantService.history(user, dto);
+  @Get("chats")
+  chats(@GetUser() user: User, @Query() dto: AssistantChatListDto) {
+    return this.chatService.list(user, dto);
   }
 
+  @Get("chats/:chatId/messages")
+  history(
+    @GetUser() user: User,
+    @Param("chatId", ParseUUIDPipe) chatId: string,
+    @Query() dto: AssistantHistoryDto,
+  ) {
+    return this.assistantService.history(user, chatId, dto);
+  }
+
+  @Patch("chats/:chatId")
+  renameChat(
+    @GetUser() user: User,
+    @Param("chatId", ParseUUIDPipe) chatId: string,
+    @Body() dto: AssistantChatRenameDto,
+  ) {
+    return this.chatService.rename(user, chatId, dto.title);
+  }
+
+  @Delete("chats/:chatId")
+  removeChat(
+    @GetUser() user: User,
+    @Param("chatId", ParseUUIDPipe) chatId: string,
+  ) {
+    return this.chatService.remove(user, chatId);
+  }
+
+  /** Asks in a chat, or starts a new one when no chat is given. */
   @Post("messages")
   ask(@GetUser() user: User, @Body() dto: AssistantAskDto) {
     return this.assistantService.ask(user, dto);
-  }
-
-  @Delete("messages")
-  clear(@GetUser() user: User) {
-    return this.assistantService.clear(user);
   }
 
   @Post("transcriptions")

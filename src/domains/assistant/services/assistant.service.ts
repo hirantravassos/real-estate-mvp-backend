@@ -26,6 +26,7 @@ import {
   AssistantToolService,
 } from "./assistant-tool.service";
 import { AssistantDocumentService } from "./assistant-document.service";
+import { AssistantChatService } from "./assistant-chat.service";
 
 /** Rounds of lookups before the assistant must answer with what it has. */
 const MAXIMUM_TOOL_STEPS = 6;
@@ -78,12 +79,15 @@ export class AssistantService {
     private readonly aiService: AiService,
     private readonly toolService: AssistantToolService,
     private readonly documentService: AssistantDocumentService,
+    private readonly chatService: AssistantChatService,
   ) {}
 
-  async history(user: User, dto: AssistantHistoryDto) {
+  async history(user: User, chatId: string, dto: AssistantHistoryDto) {
+    const chat = await this.chatService.findOwned(user, chatId);
     const messages = await this.messageRepository.find({
       where: {
         userId: user.id,
+        chatId: chat.id,
         active: true,
         ...(dto.before ? { sentAt: LessThan(new Date(dto.before)) } : {}),
       },
@@ -94,17 +98,6 @@ export class AssistantService {
     const hasMore = messages.length > HISTORY_PAGE;
     const page = messages.slice(0, HISTORY_PAGE).reverse();
     return { data: await this.withActions(page), hasMore };
-  }
-
-  async clear(user: User) {
-    await this.messageRepository.update(
-      { userId: user.id, active: true },
-      { active: false },
-    );
-    await this.actionRepository.update(
-      { userId: user.id, status: AssistantActionStatus.PENDING },
-      { status: AssistantActionStatus.CANCELLED },
-    );
   }
 
   /** Voice to text. The broker sees the text and it is asked right away. */
@@ -122,11 +115,17 @@ export class AssistantService {
       user,
       dto.attachmentIds ?? [],
     );
-    const pastMessages = await this.messageRepository.find({
-      where: { userId: user.id, active: true },
-      order: { sentAt: "DESC" },
-      take: HISTORY_FOR_MODEL,
-    });
+    // Each chat has its own memory: a new chat starts with a clean context.
+    const existingChat = dto.chatId
+      ? await this.chatService.findOwned(user, dto.chatId)
+      : null;
+    const pastMessages = existingChat
+      ? await this.messageRepository.find({
+          where: { userId: user.id, chatId: existingChat.id, active: true },
+          order: { sentAt: "DESC" },
+          take: HISTORY_FOR_MODEL,
+        })
+      : [];
     const history = await this.historyForModel(pastMessages.reverse());
 
     const context: AssistantToolContext = {
@@ -181,9 +180,15 @@ export class AssistantService {
         ? "Deixei tudo pronto aqui embaixo, é só conferir e confirmar."
         : "Não consegui responder agora, pode perguntar de outro jeito?");
 
+    const answeredAt = new Date(Math.max(Date.now(), askedAt.getTime() + 1));
+    const chat =
+      existingChat ?? (await this.chatService.start(user, question, askedAt));
+    await this.chatService.touch(chat, answeredAt);
+
     const userMessage = await this.messageRepository.save(
       this.messageRepository.create({
         userId: user.id,
+        chatId: chat.id,
         role: AssistantRole.USER,
         content: question,
         fromVoice: dto.fromVoice ?? false,
@@ -194,10 +199,11 @@ export class AssistantService {
     const assistantMessage = await this.messageRepository.save(
       this.messageRepository.create({
         userId: user.id,
+        chatId: chat.id,
         role: AssistantRole.ASSISTANT,
         content: answer,
         creditsCharged: session.creditsCharged,
-        sentAt: new Date(Math.max(Date.now(), askedAt.getTime() + 1)),
+        sentAt: answeredAt,
         references: [...context.references.values()].slice(
           0,
           MAXIMUM_REFERENCES,
@@ -216,6 +222,7 @@ export class AssistantService {
       assistantMessage,
     ]);
     return {
+      chat: AssistantMapper.toChatDto(chat),
       question: userDto,
       answer: assistantDto,
       creditsCharged: session.creditsCharged,

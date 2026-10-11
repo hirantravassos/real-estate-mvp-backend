@@ -21,6 +21,7 @@ export interface AssistantMessageAttachment {
 /** One line of the broker's chat with the assistant. */
 @Entity("assistant_messages")
 @Index(["userId", "sentAt"])
+@Index(["chatId", "sentAt"])
 export class AssistantMessage extends BaseEntity {
   @ManyToOne(() => User, { nullable: false, onDelete: "CASCADE" })
   @JoinColumn({ name: "userId" })
@@ -28,6 +29,10 @@ export class AssistantMessage extends BaseEntity {
 
   @Column({ type: "varchar", nullable: false })
   userId: string;
+
+  /** Empty only on lines from before chats existed, moved on first open. */
+  @Column({ type: "varchar", nullable: true })
+  chatId: string | null;
 
   @Column({ type: "enum", enum: AssistantRole, nullable: false })
   role: AssistantRole;
