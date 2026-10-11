@@ -44,4 +44,11 @@ export class PropertyMedia extends BaseEntity {
 
   @Column({ type: "boolean", nullable: false, default: false })
   isCover: boolean;
+
+  /**
+   * Hidden photos stay with the broker: they never go to the shared page,
+   * the WhatsApp presentations nor the assistant's messages and documents.
+   */
+  @Column({ type: "boolean", nullable: false, default: true })
+  visibleToCustomer: boolean;
 }

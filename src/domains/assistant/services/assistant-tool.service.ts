@@ -728,7 +728,12 @@ export class AssistantToolService {
       const [documents, media] = await Promise.all([
         this.documentsOf(user, DocumentOwnerType.PROPERTY, [property.id]),
         this.mediaRepository.find({
-          where: { propertyId: property.id, userId: user.id, active: true },
+          where: {
+            propertyId: property.id,
+            userId: user.id,
+            active: true,
+            visibleToCustomer: true,
+          },
           order: { isCover: "DESC", sortOrder: "ASC" },
         }),
       ]);
@@ -918,6 +923,11 @@ export class AssistantToolService {
         });
         if (!media) {
           throw new NotFoundException("Foto ou vídeo não encontrado.");
+        }
+        if (!media.visibleToCustomer) {
+          throw new BadRequestException(
+            "Essa foto está escondida do cliente pelo corretor.",
+          );
         }
         // Too big to show inline still goes as a file, up to its limit.
         this.storageService.validateInboxUpload(
