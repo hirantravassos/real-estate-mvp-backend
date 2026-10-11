@@ -13,6 +13,7 @@ import { PropertyService } from "../../properties/services/property.service";
 import { User } from "../../users/entities/user.entity";
 import { PresentationPreviewDto, PresentationSendDto } from "../dtos/inbox.dto";
 import { Conversation } from "../entities/conversation.entity";
+import { MessageStatus } from "../enums/inbox.enum";
 import { formatPropertyPitch } from "../helpers/property-pitch.helper";
 import { ConversationService } from "./conversation.service";
 import { InboxAiService } from "./inbox-ai.service";
@@ -123,11 +124,19 @@ export class PropertyPresentationSenderService {
     media: PropertyMedia[],
   ) {
     try {
-      await this.messageService.sendTextTo(conversation, dto.text, {
-        aiGenerated: dto.aiGenerated,
-        presentationId,
-        propertyId,
-      });
+      const pitch = await this.messageService.sendTextTo(
+        conversation,
+        dto.text,
+        { aiGenerated: dto.aiGenerated, presentationId, propertyId },
+      );
+      // Photos without the pitch make no sense, and a refused pitch usually
+      // means a safety limit that would refuse the photos too.
+      if (pitch.status === MessageStatus.FAILED) {
+        this.logger.warn(
+          `Presentation ${presentationId} stopped, the pitch was not sent`,
+        );
+        return;
+      }
 
       const ordered = [
         ...media.filter((item) => item.type === PropertyMediaType.IMAGE),

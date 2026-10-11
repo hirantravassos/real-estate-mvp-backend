@@ -4,6 +4,8 @@ export type AiFeature =
   | "presentation"
   | "contact_import"
   | "avatar_from_photo"
+  | "assistant"
+  | "assistant_voice"
   | "owner_search";
 
 export interface AiFeatureDefinition {
@@ -12,8 +14,6 @@ export interface AiFeatureDefinition {
   /** A usual call, used to show the broker how many credits it costs. */
   typicalInputTokens: number;
   typicalOutputTokens: number;
-  /** Web searches a usual call runs, for features that search the web. */
-  typicalWebSearchCalls?: number;
   /**
    * Set for features sold at a fixed price instead of the tokens used.
    * The typical tokens are then the most one call can use (the input is
@@ -21,6 +21,10 @@ export interface AiFeatureDefinition {
    * price always covers the real cost.
    */
   fixedPriceSafetyMultiplier?: number;
+  /** For features not billed by chat tokens, like turning audio into text. */
+  typicalCostInUsd?: number;
+  /** Web searches a usual call runs, for features that search the web. */
+  typicalWebSearchCalls?: number;
 }
 
 export const AI_FEATURES: Record<AiFeature, AiFeatureDefinition> = {
@@ -57,6 +61,25 @@ export const AI_FEATURES: Record<AiFeature, AiFeatureDefinition> = {
     typicalInputTokens: 1000,
     typicalOutputTokens: 250,
     fixedPriceSafetyMultiplier: 1.5,
+  },
+  /**
+   * One question to the assistant, billed once for every step it took. The
+   * output limit is per step, the typical tokens are the whole question with
+   * a couple of lookups.
+   */
+  assistant: {
+    label: "Assistente",
+    maximumOutputTokens: 2000,
+    typicalInputTokens: 14000,
+    typicalOutputTokens: 1500,
+  },
+  /** About one minute of voice turned into text. */
+  assistant_voice: {
+    label: "Áudio para o assistente",
+    maximumOutputTokens: 0,
+    typicalInputTokens: 0,
+    typicalOutputTokens: 0,
+    typicalCostInUsd: 0.006,
   },
   /** Searches the listing sites, the pages read count as input tokens. */
   owner_search: {

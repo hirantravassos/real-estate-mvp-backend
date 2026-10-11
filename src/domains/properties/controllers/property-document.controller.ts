@@ -21,6 +21,7 @@ import { DocumentOwnerType } from "../../documents/entities/document.entity";
 import { DocumentMapper } from "../../documents/mappers/document.mapper";
 import { DocumentRenameDto } from "../../documents/dtos/document.dto";
 import { PropertyService } from "../services/property.service";
+import { isPropertySaleDocumentCategory } from "../constants/property-sale-documents.constant";
 
 const ALLOWED_MIME_TYPES = [
   "application/pdf",
@@ -80,9 +81,13 @@ export class PropertyDocumentController {
     @GetUser() user: User,
     @Param("propertyId") propertyId: string,
     @UploadedFile() file: Express.Multer.File,
+    @Body("category") category?: string,
   ) {
     if (!file) {
       throw new BadRequestException("Arquivo é obrigatório.");
+    }
+    if (category && !isPropertySaleDocumentCategory(category)) {
+      throw new BadRequestException("Tipo de documento desconhecido.");
     }
     await this.propertyService.findOne(user, propertyId);
     const document = await this.documentService.upload(
@@ -91,6 +96,7 @@ export class PropertyDocumentController {
       propertyId,
       "properties",
       file,
+      category || null,
     );
     return DocumentMapper.toDto(document);
   }

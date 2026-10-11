@@ -21,6 +21,7 @@ import {
   DealChecklistStatus,
   DealParty,
   DealPaymentMethod,
+  DealSellerType,
   DealSignerRole,
   DealStage,
   DealStatus,
@@ -61,6 +62,10 @@ export class DealCreateDto {
   usesFgts?: boolean;
 
   @IsOptional()
+  @IsEnum(DealSellerType)
+  sellerType?: DealSellerType;
+
+  @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @Max(100)
@@ -85,6 +90,10 @@ export class DealUpdateDto {
   @IsOptional()
   @IsBoolean()
   usesFgts?: boolean;
+
+  @IsOptional()
+  @IsEnum(DealSellerType)
+  sellerType?: DealSellerType;
 
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
@@ -135,6 +144,10 @@ export class DealChecklistItemCreateDto {
   @IsOptional()
   @IsBoolean()
   requestedFromCustomer?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  screening?: boolean;
 }
 
 export class DealChecklistItemUpdateDto {
@@ -154,16 +167,22 @@ export class DealChecklistItemUpdateDto {
   @IsOptional()
   @IsBoolean()
   requestedFromCustomer?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  screening?: boolean;
 }
 
 export class DealChecklistReviewDto {
   @IsIn([
     DealChecklistStatus.APPROVED,
     DealChecklistStatus.REJECTED,
+    DealChecklistStatus.RESTRICTED,
     DealChecklistStatus.PENDING,
   ])
   status: DealChecklistStatus;
 
+  /** Why it is asked again, or which restriction was found. */
   @IsOptional()
   @Transform(trimText)
   @IsString()

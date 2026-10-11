@@ -1,8 +1,15 @@
-import { Injectable, ServiceUnavailableException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  ServiceUnavailableException,
+} from "@nestjs/common";
 import {
   OpenaiCitation,
   OpenaiJsonSchema,
+  OpenaiRespondRequest,
+  OpenaiRespondResult,
   OpenaiService,
+  OpenaiTranscribeRequest,
   OpenaiWebSearch,
 } from "../../../infrastructure/openai/services/openai.service";
 import { CreditPricingService } from "../../credits/services/credit-pricing.service";
@@ -29,8 +36,27 @@ export interface AiResult {
   text: string;
   creditsCharged: number;
   balance: number;
+}
+
+export interface AiGenerateResult extends AiResult {
   /** Pages the answer was taken from, when the web was searched. */
   citations: OpenaiCitation[];
+}
+
+export interface AiSessionOptions {
+  feature: AiFeature;
+  referenceId?: string | null;
+  description?: string;
+}
+
+export type AiSessionRespond = (
+  request: Omit<OpenaiRespondRequest, "maximumOutputTokens">,
+) => Promise<OpenaiRespondResult>;
+
+export interface AiSessionResult<Value> {
+  value: Value;
+  creditsCharged: number;
+  balance: number;
 }
 
 /**
@@ -45,12 +71,11 @@ export class AiService {
     private readonly walletService: CreditWalletService,
   ) {}
 
-  async generate(userId: string, request: AiRequest): Promise<AiResult> {
-    if (!this.openaiService.isConfigured) {
-      throw new ServiceUnavailableException(
-        "Inteligência artificial não configurada.",
-      );
-    }
+  async generate(
+    userId: string,
+    request: AiRequest,
+  ): Promise<AiGenerateResult> {
+    this.requireConfigured();
 
     const feature = AI_FEATURES[request.feature];
     const worstCaseCredits =
@@ -110,5 +135,99 @@ export class AiService {
       balance,
       citations: result.citations,
     };
+  }
+
+  /**
+   * Several calls billed as one, for the assistant that looks things up in
+   * steps before answering. What was used is charged even when a step fails,
+   * since the provider charged us for it.
+   */
+  async session<Value>(
+    userId: string,
+    options: AiSessionOptions,
+    work: (respond: AiSessionRespond) => Promise<Value>,
+  ): Promise<AiSessionResult<Value>> {
+    this.requireConfigured();
+
+    const feature = AI_FEATURES[options.feature];
+    await this.walletService.ensureBalance(
+      userId,
+      this.pricingService.featurePrice(options.feature),
+    );
+
+    const usage = { model: this.openaiService.model, input: 0, output: 0 };
+    const respond: AiSessionRespond = async (request) => {
+      const result = await this.openaiService.respond({
+        ...request,
+        maximumOutputTokens: feature.maximumOutputTokens,
+      });
+      usage.model = result.model;
+      usage.input += result.inputTokens;
+      usage.output += result.outputTokens;
+      return result;
+    };
+
+    const charge = () =>
+      this.walletService.spend(userId, {
+        amount: this.pricingService.creditsForUsage(usage.input, usage.output),
+        description: options.description ?? feature.label,
+        feature: options.feature,
+        model: usage.model,
+        inputTokens: usage.input,
+        outputTokens: usage.output,
+        providerCostUsd: this.openaiService.costInUsd(
+          usage.input,
+          usage.output,
+        ),
+        referenceId: options.referenceId ?? null,
+      });
+
+    let value: Value;
+    try {
+      value = await work(respond);
+    } catch (error) {
+      if (usage.input + usage.output > 0) await charge().catch(() => null);
+      throw error;
+    }
+
+    const { charged, balance } = await charge();
+    return { value, creditsCharged: charged, balance };
+  }
+
+  /** Turns a voice recording into text, charging what the provider billed. */
+  async transcribe(
+    userId: string,
+    request: OpenaiTranscribeRequest,
+  ): Promise<AiResult> {
+    this.requireConfigured();
+    await this.walletService.ensureBalance(
+      userId,
+      this.pricingService.featurePrice("assistant_voice"),
+    );
+
+    const result = await this.openaiService.transcribe(request);
+    const { charged, balance } = await this.walletService.spend(userId, {
+      amount: this.pricingService.creditsForCostInUsd(result.costInUsd),
+      description: AI_FEATURES.assistant_voice.label,
+      feature: "assistant_voice",
+      model: result.model,
+      providerCostUsd: result.costInUsd,
+    });
+
+    if (!result.text) {
+      throw new BadRequestException(
+        "Não consegui ouvir nada nesse áudio, tente de novo.",
+      );
+    }
+
+    return { text: result.text, creditsCharged: charged, balance };
+  }
+
+  private requireConfigured() {
+    if (!this.openaiService.isConfigured) {
+      throw new ServiceUnavailableException(
+        "Inteligência artificial não configurada.",
+      );
+    }
   }
 }
