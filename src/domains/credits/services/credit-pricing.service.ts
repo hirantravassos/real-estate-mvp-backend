@@ -29,9 +29,13 @@ export class CreditPricingService {
     );
   }
 
-  creditsForUsage(inputTokens: number, outputTokens: number) {
+  creditsForUsage(
+    inputTokens: number,
+    outputTokens: number,
+    webSearchCalls = 0,
+  ) {
     return this.creditsForCostInUsd(
-      this.openaiService.costInUsd(inputTokens, outputTokens),
+      this.openaiService.costInUsd(inputTokens, outputTokens, webSearchCalls),
     );
   }
 
@@ -59,6 +63,7 @@ export class CreditPricingService {
         ? this.creditsForUsage(
             definition.typicalInputTokens,
             definition.typicalOutputTokens,
+            definition.typicalWebSearchCalls ?? 0,
           )
         : this.creditsForCostInUsd(definition.typicalCostInUsd);
     return Math.ceil(credits * (definition.fixedPriceSafetyMultiplier ?? 1));

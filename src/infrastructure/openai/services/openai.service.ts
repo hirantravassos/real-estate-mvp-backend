@@ -9,10 +9,21 @@ import type { ConfigType } from "@nestjs/config";
 import { openaiConfig } from "../../../config/openai.config";
 
 const REQUEST_TIMEOUT_MILLISECONDS = 90_000;
+/** Searching the web takes longer than a plain answer. */
+const WEB_SEARCH_TIMEOUT_MILLISECONDS = 180_000;
 
 export interface OpenaiJsonSchema {
   name: string;
   schema: Record<string, unknown>;
+}
+
+export interface OpenaiWebSearch {
+  /** Only pages from these domains are searched, written without https. */
+  allowedDomains?: string[];
+  /** Two letter country code the results are tuned to. */
+  country: string;
+  city?: string;
+  region?: string;
 }
 
 export interface OpenaiGenerateRequest {
@@ -22,6 +33,8 @@ export interface OpenaiGenerateRequest {
   jsonSchema?: OpenaiJsonSchema;
   /** Pictures sent along, as data URLs, read in low detail to keep it cheap. */
   images?: string[];
+  /** Lets the model search the web before answering. */
+  webSearch?: OpenaiWebSearch;
 }
 
 export interface OpenaiUsage {
@@ -30,8 +43,17 @@ export interface OpenaiUsage {
   outputTokens: number;
 }
 
+export interface OpenaiCitation {
+  url: string;
+  title: string;
+}
+
 export interface OpenaiGenerateResult extends OpenaiUsage {
   text: string;
+  /** How many web searches the model ran, each one is billed apart. */
+  webSearchCalls: number;
+  /** Pages the answer was taken from, when the web was searched. */
+  citations: OpenaiCitation[];
 }
 
 /** A function the model may call, described with a strict JSON schema. */
@@ -85,7 +107,11 @@ interface ResponsesApiBody {
   status?: string;
   output?: {
     type: string;
-    content?: { type: string; text?: string }[];
+    content?: {
+      type: string;
+      text?: string;
+      annotations?: { type: string; url?: string; title?: string }[];
+    }[];
     call_id?: string;
     name?: string;
     arguments?: string;
@@ -125,10 +151,11 @@ export class OpenaiService {
   }
 
   /** What one call costs us in US dollars. */
-  costInUsd(inputTokens: number, outputTokens: number) {
+  costInUsd(inputTokens: number, outputTokens: number, webSearchCalls = 0) {
     return (
       (inputTokens / 1_000_000) * this.configuration.inputCostPerMillionUsd +
-      (outputTokens / 1_000_000) * this.configuration.outputCostPerMillionUsd
+      (outputTokens / 1_000_000) * this.configuration.outputCostPerMillionUsd +
+      webSearchCalls * this.configuration.webSearchCostPerCallUsd
     );
   }
 
@@ -165,7 +192,36 @@ export class OpenaiService {
     };
 
     if (this.configuration.reasoningEffort) {
-      body.reasoning = { effort: this.configuration.reasoningEffort };
+      body.reasoning = {
+        effort:
+          request.webSearch && this.configuration.reasoningEffort === "minimal"
+            ? this.configuration.webSearchReasoningEffort
+            : this.configuration.reasoningEffort,
+      };
+    }
+
+    if (request.webSearch) {
+      body.tools = [
+        {
+          type: "web_search",
+          search_context_size: "medium",
+          user_location: {
+            type: "approximate",
+            country: request.webSearch.country,
+            ...(request.webSearch.city ? { city: request.webSearch.city } : {}),
+            ...(request.webSearch.region
+              ? { region: request.webSearch.region }
+              : {}),
+          },
+          ...(request.webSearch.allowedDomains?.length
+            ? {
+                filters: {
+                  allowed_domains: request.webSearch.allowedDomains,
+                },
+              }
+            : {}),
+        },
+      ];
     }
 
     if (request.jsonSchema) {
@@ -179,10 +235,19 @@ export class OpenaiService {
       };
     }
 
-    const result = await this.postResponses(body);
+    const result = await this.postResponses(
+      body,
+      request.webSearch
+        ? WEB_SEARCH_TIMEOUT_MILLISECONDS
+        : REQUEST_TIMEOUT_MILLISECONDS,
+    );
+    const output = result.output ?? [];
 
     return {
       text: textOf(result),
+      citations: citationsOf(result),
+      webSearchCalls: output.filter((item) => item.type === "web_search_call")
+        .length,
       model: result.model ?? this.configuration.model,
       inputTokens: result.usage?.input_tokens ?? 0,
       outputTokens: result.usage?.output_tokens ?? 0,
@@ -313,7 +378,10 @@ export class OpenaiService {
     }
   }
 
-  private async postResponses(body: Record<string, unknown>) {
+  private async postResponses(
+    body: Record<string, unknown>,
+    timeoutMilliseconds = REQUEST_TIMEOUT_MILLISECONDS,
+  ) {
     const response = await fetch(`${this.configuration.baseUrl}/responses`, {
       method: "POST",
       headers: {
@@ -321,7 +389,7 @@ export class OpenaiService {
         Authorization: `Bearer ${this.configuration.apiKey}`,
       },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MILLISECONDS),
+      signal: AbortSignal.timeout(timeoutMilliseconds),
     }).catch((error: unknown) => {
       this.logger.error(`OpenAI unreachable: ${String(error)}`);
       throw new ServiceUnavailableException(
@@ -352,3 +420,20 @@ const textOf = (result: ResponsesApiBody) =>
     .map((content) => content.text ?? "")
     .join("")
     .trim();
+
+/** Pages cited in the answer, once each. */
+const citationsOf = (result: ResponsesApiBody): OpenaiCitation[] => {
+  const citations = new Map<string, OpenaiCitation>();
+  const annotations = (result.output ?? [])
+    .filter((item) => item.type === "message")
+    .flatMap((item) => item.content ?? [])
+    .flatMap((content) => content.annotations ?? []);
+  for (const annotation of annotations) {
+    if (annotation.type !== "url_citation" || !annotation.url) continue;
+    citations.set(annotation.url, {
+      url: annotation.url,
+      title: annotation.title ?? annotation.url,
+    });
+  }
+  return [...citations.values()];
+};

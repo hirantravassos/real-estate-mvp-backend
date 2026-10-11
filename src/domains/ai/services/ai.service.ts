@@ -4,11 +4,13 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import {
+  OpenaiCitation,
   OpenaiJsonSchema,
   OpenaiRespondRequest,
   OpenaiRespondResult,
   OpenaiService,
   OpenaiTranscribeRequest,
+  OpenaiWebSearch,
 } from "../../../infrastructure/openai/services/openai.service";
 import { CreditPricingService } from "../../credits/services/credit-pricing.service";
 import { CreditWalletService } from "../../credits/services/credit-wallet.service";
@@ -26,12 +28,19 @@ export interface AiRequest {
   description?: string;
   /** Pictures for the AI to look at, as data URLs. */
   images?: string[];
+  /** Lets the AI search the web, each search is charged too. */
+  webSearch?: OpenaiWebSearch;
 }
 
 export interface AiResult {
   text: string;
   creditsCharged: number;
   balance: number;
+}
+
+export interface AiGenerateResult extends AiResult {
+  /** Pages the answer was taken from, when the web was searched. */
+  citations: OpenaiCitation[];
 }
 
 export interface AiSessionOptions {
@@ -62,15 +71,24 @@ export class AiService {
     private readonly walletService: CreditWalletService,
   ) {}
 
-  async generate(userId: string, request: AiRequest): Promise<AiResult> {
+  async generate(
+    userId: string,
+    request: AiRequest,
+  ): Promise<AiGenerateResult> {
     this.requireConfigured();
 
     const feature = AI_FEATURES[request.feature];
     const worstCaseCredits =
       request.fixedCredits ??
       this.pricingService.creditsForUsage(
-        this.openaiService.estimateTokens(request.instructions + request.input),
+        Math.max(
+          this.openaiService.estimateTokens(
+            request.instructions + request.input,
+          ),
+          request.webSearch ? feature.typicalInputTokens : 0,
+        ),
         feature.maximumOutputTokens,
+        request.webSearch ? (feature.typicalWebSearchCalls ?? 1) : 0,
       );
     await this.walletService.ensureBalance(userId, worstCaseCredits);
 
@@ -80,11 +98,13 @@ export class AiService {
       maximumOutputTokens: feature.maximumOutputTokens,
       jsonSchema: request.jsonSchema,
       images: request.images,
+      webSearch: request.webSearch,
     });
 
     const usedCredits = this.pricingService.creditsForUsage(
       result.inputTokens,
       result.outputTokens,
+      result.webSearchCalls,
     );
     const credits = Math.max(usedCredits, request.fixedCredits ?? 0);
 
@@ -98,6 +118,7 @@ export class AiService {
       providerCostUsd: this.openaiService.costInUsd(
         result.inputTokens,
         result.outputTokens,
+        result.webSearchCalls,
       ),
       referenceId: request.referenceId ?? null,
     });
@@ -108,7 +129,12 @@ export class AiService {
       );
     }
 
-    return { text: result.text, creditsCharged: charged, balance };
+    return {
+      text: result.text,
+      creditsCharged: charged,
+      balance,
+      citations: result.citations,
+    };
   }
 
   /**

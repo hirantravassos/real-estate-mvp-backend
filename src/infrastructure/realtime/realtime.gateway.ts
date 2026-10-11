@@ -15,7 +15,10 @@ export type RealtimeEvent =
   | "message.removed"
   | "credits.updated"
   | "deal.updated"
-  | "customers.updated";
+  | "customers.updated"
+  | "hunt.updated"
+  | "matches.updated"
+  | "portal-accounts.updated";
 
 const userRoom = (userId: string) => `user:${userId}`;
 
