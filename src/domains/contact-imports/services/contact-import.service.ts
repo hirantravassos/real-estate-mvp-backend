@@ -16,6 +16,7 @@ import {
 import {
   isPersonalJid,
   phoneMatchingKey,
+  toCustomerPhone,
 } from "../../inbox/helpers/whatsapp-phone.helper";
 import { ConversationService } from "../../inbox/services/conversation.service";
 import { MessageService } from "../../inbox/services/message.service";
@@ -23,7 +24,6 @@ import { WhatsappConnectionService } from "../../inbox/services/whatsapp-connect
 import { Kanban } from "../../kanbans/entities/kanban.entity";
 import { User } from "../../users/entities/user.entity";
 import { ContactImportDto, ContactSource } from "../dtos/contact-import.dto";
-import { toCustomerPhone } from "../helpers/contact-phone.helper";
 
 export interface ContactCandidate {
   /** Area code and number, as a customer keeps it. */

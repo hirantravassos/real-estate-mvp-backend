@@ -6,6 +6,7 @@ import { RealtimeModule } from "../../infrastructure/realtime/realtime.module";
 import { StorageModule } from "../../infrastructure/storage/storage.module";
 import { AiModule } from "../ai/ai.module";
 import { CustomerModule } from "../customers/customer.module";
+import { Kanban } from "../kanbans/entities/kanban.entity";
 import { Property } from "../properties/entities/property.entity";
 import { PropertyModule } from "../properties/property.module";
 import { ConversationController } from "./controllers/conversation.controller";
@@ -30,6 +31,7 @@ import { WhatsappConnectionService } from "./services/whatsapp-connection.servic
       Conversation,
       Message,
       Property,
+      Kanban,
     ]),
     EvolutionModule,
     RealtimeModule,

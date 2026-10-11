@@ -6,7 +6,10 @@ import { RealtimeGateway } from "../../../infrastructure/realtime/realtime.gatew
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
 import { CustomerRepository } from "../../customers/repositories/customer.repository";
 import { User } from "../../users/entities/user.entity";
+import { CustomerMapper } from "../../customers/mappers/customer.mapper";
+import { Kanban } from "../../kanbans/entities/kanban.entity";
 import {
+  ConversationCustomerCreateDto,
   ConversationFilterDto,
   ConversationUpdateDto,
 } from "../dtos/inbox.dto";
@@ -15,7 +18,9 @@ import { Message } from "../entities/message.entity";
 import { MessageDirection, MessageStatus } from "../enums/inbox.enum";
 import {
   numberFromJid,
+  onlyDigits,
   phoneMatchingKey,
+  toCustomerPhone,
   toWhatsappNumber,
 } from "../helpers/whatsapp-phone.helper";
 import { previewOf } from "../helpers/evolution-message.parser";
@@ -31,6 +36,8 @@ export class ConversationService {
     private readonly conversationRepository: Repository<Conversation>,
     @InjectRepository(Message)
     private readonly messageRepository: Repository<Message>,
+    @InjectRepository(Kanban)
+    private readonly kanbanRepository: Repository<Kanban>,
     private readonly customerRepository: CustomerRepository,
     private readonly connectionService: WhatsappConnectionService,
     private readonly evolutionApiService: EvolutionApiService,
@@ -239,6 +246,81 @@ export class ConversationService {
 
     await this.conversationRepository.save(conversation);
     return this.emitUpdated(conversation);
+  }
+
+  /**
+   * Turns the contact of a chat into a customer and links them. When the
+   * number is already a customer, the chat is just linked, never duplicated.
+   */
+  async saveAsCustomer(
+    user: User,
+    id: string,
+    dto: ConversationCustomerCreateDto,
+  ) {
+    const conversation = await this.findEntity(user.id, id);
+    const phone =
+      toCustomerPhone(conversation.phone) ?? onlyDigits(conversation.phone);
+    const key = phoneMatchingKey(phone);
+    const lastDigits = phone.substring(phone.length - 8);
+
+    const sameNumber = await this.customerRepository.find({
+      where: { userId: user.id, phone: Like(`%${lastDigits}`) },
+    });
+    const existing = sameNumber.find(
+      (customer) => customer.active && phoneMatchingKey(customer.phone) === key,
+    );
+
+    let customer = existing ?? null;
+    let created = false;
+
+    if (!customer) {
+      const kanban = dto.kanbanId
+        ? await this.kanbanRepository.findOneBy({
+            id: dto.kanbanId,
+            userId: user.id,
+            active: true,
+          })
+        : null;
+      const removed = sameNumber.find(
+        (candidate) => !candidate.active && candidate.phone === phone,
+      );
+
+      if (removed) {
+        await this.customerRepository.update(removed.id, {
+          active: true,
+          lost: false,
+          name: dto.name.trim(),
+          kanban: kanban ?? null,
+          budget: dto.budget ? Number(dto.budget).toFixed(2) : removed.budget,
+        });
+        customer = await this.customerRepository.findOneByOrFail({
+          id: removed.id,
+        });
+      } else {
+        const entity = CustomerMapper.toEntity({
+          name: dto.name.trim(),
+          phone,
+          kanbanId: kanban?.id ?? null,
+          budget: dto.budget ? Number(dto.budget).toFixed(2) : null,
+          comment: dto.note?.trim() || null,
+        });
+        entity.user = user;
+        customer = await this.customerRepository.save(entity);
+      }
+      created = true;
+    }
+
+    conversation.customerId = customer.id;
+    conversation.customer = customer;
+    await this.conversationRepository.update(conversation.id, {
+      customerId: customer.id,
+    });
+
+    return {
+      conversation: this.emitUpdated(conversation),
+      customer: { id: customer.id, name: customer.name },
+      created,
+    };
   }
 
   async markAsRead(user: User, id: string) {

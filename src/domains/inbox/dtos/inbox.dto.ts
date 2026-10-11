@@ -1,6 +1,7 @@
 import { Type } from "class-transformer";
 import {
   ArrayMaxSize,
+  IsNumberString,
   IsArray,
   IsBoolean,
   IsIn,
@@ -47,6 +48,28 @@ export class ConversationUpdateDto {
   @IsOptional()
   @IsUUID()
   customerId?: string | null;
+}
+
+/** Saves the contact of a chat as a customer, from the inbox. */
+export class ConversationCustomerCreateDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  name: string;
+
+  @IsOptional()
+  @IsUUID()
+  kanbanId?: string | null;
+
+  @IsOptional()
+  @IsNumberString()
+  @MaxLength(16)
+  budget?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  note?: string | null;
 }
 
 export class MessageListDto {

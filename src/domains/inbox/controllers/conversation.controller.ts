@@ -18,6 +18,7 @@ import { User } from "../../users/entities/user.entity";
 import {
   AiRewriteDto,
   AiSuggestionsDto,
+  ConversationCustomerCreateDto,
   ConversationFilterDto,
   ConversationUpdateDto,
   PresentationPreviewDto,
@@ -66,6 +67,15 @@ export class ConversationController {
     @Body() dto: ConversationUpdateDto,
   ) {
     return this.conversationService.update(user, id, dto);
+  }
+
+  @Post(":id/customer")
+  saveAsCustomer(
+    @GetUser() user: User,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: ConversationCustomerCreateDto,
+  ) {
+    return this.conversationService.saveAsCustomer(user, id, dto);
   }
 
   @Post(":id/read")
