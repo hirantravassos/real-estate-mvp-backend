@@ -107,13 +107,9 @@ export class CreditPurchaseService {
     return CreditMapper.toPurchaseDto(purchase);
   }
 
-  async handleNotification(paymentId: string) {
-    const payment = await this.mercadoPagoService.findPayment(paymentId);
-    await this.settle(payment);
-  }
-
   /** Credits the wallet once, inside the same lock as the purchase row. */
-  private async settle(payment: MercadoPagoPayment) {
+  /** Called by the Mercado Pago webhook with the payment read back from the API. */
+  async settle(payment: MercadoPagoPayment) {
     const purchaseId = payment.external_reference;
     if (!purchaseId) return;
 

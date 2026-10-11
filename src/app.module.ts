@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
+import { ThrottlerModule } from "@nestjs/throttler";
 import { databaseConfig } from "./config/database.config.js";
 import { authConfig } from "./config/auth.config.js";
 import { mailConfig } from "./config/mail.config.js";
@@ -29,9 +30,12 @@ import { OwnerFinderModule } from "./domains/owner-finder/owner-finder.module";
 import { infosimplesConfig } from "./config/infosimples.config";
 import { DocumentLookupModule } from "./domains/document-lookups/document-lookup.module";
 import { BrokerPageModule } from "./domains/broker-pages/broker-page.module";
+import { subscriptionsConfig } from "./config/subscriptions.config";
+import { SubscriptionModule } from "./domains/subscriptions/subscription.module";
 
-// const THROTTLE_TTL_MS = 60_000;
-// const THROTTLE_LIMIT = 30;
+/** Loose default, only the routes with UserThrottlerGuard are counted. */
+const THROTTLE_TTL_MS = 60_000;
+const THROTTLE_LIMIT = 120;
 
 @Module({
   imports: [
@@ -50,6 +54,7 @@ import { BrokerPageModule } from "./domains/broker-pages/broker-page.module";
         creditsConfig,
         portalsConfig,
         infosimplesConfig,
+        subscriptionsConfig,
       ],
       envFilePath: ".env",
     }),
@@ -68,12 +73,12 @@ import { BrokerPageModule } from "./domains/broker-pages/broker-page.module";
         logging: false,
       }),
     }),
-    // ThrottlerModule.forRoot([
-    //   {
-    //     ttl: THROTTLE_TTL_MS,
-    //     limit: THROTTLE_LIMIT,
-    //   },
-    // ]),
+    ThrottlerModule.forRoot([
+      {
+        ttl: THROTTLE_TTL_MS,
+        limit: THROTTLE_LIMIT,
+      },
+    ]),
     MailModule,
     UserModule,
     AuthModule,
@@ -90,6 +95,7 @@ import { BrokerPageModule } from "./domains/broker-pages/broker-page.module";
     OwnerFinderModule,
     DocumentLookupModule,
     BrokerPageModule,
+    SubscriptionModule,
   ],
   // providers: [
   //   {

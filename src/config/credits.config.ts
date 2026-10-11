@@ -10,9 +10,12 @@ export const creditsConfig = registerAs("credits", () => ({
   ),
   /** Keep it a bit above the real rate, it protects the margin from the dollar. */
   usdToBrlRate: parseFloat(process.env.CREDITS_USD_TO_BRL_RATE || "6"),
-  welcomeCredits: parseInt(process.env.CREDITS_WELCOME_BONUS || "0", 10),
   adminKey: process.env.CREDITS_ADMIN_KEY ?? "",
   mercadoPagoAccessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN ?? "",
+  /** Public key of the same account, loads the secure card form in the browser. */
+  mercadoPagoPublicKey: process.env.MERCADO_PAGO_PUBLIC_KEY ?? "",
+  /** Secret signature of the webhooks, from Your integrations > Webhooks. */
+  mercadoPagoWebhookSecret: process.env.MERCADO_PAGO_WEBHOOK_SECRET ?? "",
   mercadoPagoApiUrl: (
     process.env.MERCADO_PAGO_API_URL || "https://api.mercadopago.com"
   ).replace(/\/+$/, ""),

@@ -1,8 +1,6 @@
-import { HttpException, HttpStatus, Inject, Injectable } from "@nestjs/common";
-import type { ConfigType } from "@nestjs/config";
+import { HttpException, HttpStatus, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, EntityManager, Repository } from "typeorm";
-import { creditsConfig } from "../../../config/credits.config";
 import { RealtimeGateway } from "../../../infrastructure/realtime/realtime.gateway";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
@@ -28,8 +26,6 @@ export interface CreditChange {
 @Injectable()
 export class CreditWalletService {
   constructor(
-    @Inject(creditsConfig.KEY)
-    private readonly configuration: ConfigType<typeof creditsConfig>,
     @InjectRepository(CreditWallet)
     private readonly walletRepository: Repository<CreditWallet>,
     @InjectRepository(CreditTransaction)
@@ -141,23 +137,17 @@ export class CreditWalletService {
     );
   }
 
-  private async findOrCreate(userId: string) {
+  /** Makes sure the wallet row exists before a transaction locks it. */
+  async findOrCreate(userId: string) {
     const existing = await this.walletRepository.findOneBy({ userId });
     if (existing) return existing;
 
+    // No welcome credits: the free trial runs without them, credits come
+    // with each paid month of the plan.
     try {
-      const wallet = await this.walletRepository.save(
+      return await this.walletRepository.save(
         this.walletRepository.create({ userId, balance: 0 }),
       );
-      if (this.configuration.welcomeCredits > 0) {
-        await this.add(userId, {
-          kind: CreditTransactionKind.BONUS,
-          amount: this.configuration.welcomeCredits,
-          description: "Créditos de boas vindas",
-        });
-        return this.walletRepository.findOneByOrFail({ userId });
-      }
-      return wallet;
     } catch {
       // Another request created it at the same time.
       return this.walletRepository.findOneByOrFail({ userId });

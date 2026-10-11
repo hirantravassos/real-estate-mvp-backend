@@ -19,6 +19,8 @@ import { JwtGuard } from "../../auth/guards/jwt.guard";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { User } from "../../users/entities/user.entity";
 import { PropertyMapper } from "../mappers/property.mapper";
+import { PlanLimit } from "../../subscriptions/decorators/subscription.decorator";
+import { PlanLimitResource } from "../../subscriptions/enums/subscription.enum";
 
 @Controller("properties")
 @UseGuards(JwtGuard)
@@ -36,6 +38,7 @@ export class PropertyController {
   }
 
   @Post()
+  @PlanLimit(PlanLimitResource.PROPERTIES)
   async create(@GetUser() user: User, @Body() dto: PropertyCreateDto) {
     return PropertyMapper.toDto(await this.propertyService.save(user, dto));
   }
