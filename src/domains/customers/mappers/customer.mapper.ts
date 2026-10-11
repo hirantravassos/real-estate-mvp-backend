@@ -3,6 +3,8 @@ import { Kanban } from "../../kanbans/entities/kanban.entity";
 import { CustomerComment } from "../entities/customer-comments.entity";
 import { CustomerCreateDto } from "../services/customer.service";
 import { Visit } from "../../visits/entities/visit.entity";
+import { Property } from "../../properties/entities/property.entity";
+import { CustomerRole } from "../enums/customer-role.enum";
 
 export class CustomerMapper {
   static toEntity(dto: CustomerCreateDto, id?: string) {
@@ -25,11 +27,26 @@ export class CustomerMapper {
     if (dto?.avatar !== undefined) {
       entity.avatar = dto.avatar ?? null;
     }
+    if (dto?.roles) {
+      entity.isBuyer = dto.roles.includes(CustomerRole.BUYER);
+      entity.isOwner = dto.roles.includes(CustomerRole.OWNER);
+      entity.isPartner = dto.roles.includes(CustomerRole.PARTNER);
+      // Only buyers walk through the funnel.
+      if (!entity.isBuyer) entity.kanban = null;
+    }
     if (id) entity.id = id;
     return entity;
   }
 
-  static toDto(entity: Customer) {
+  static toRoles(entity: Customer): CustomerRole[] {
+    const roles: CustomerRole[] = [];
+    if (entity.isBuyer) roles.push(CustomerRole.BUYER);
+    if (entity.isOwner) roles.push(CustomerRole.OWNER);
+    if (entity.isPartner) roles.push(CustomerRole.PARTNER);
+    return roles;
+  }
+
+  static toDto(entity: Customer, ownedProperties: Property[] = []) {
     return {
       id: entity.id,
       name: entity.name,
@@ -37,7 +54,16 @@ export class CustomerMapper {
       kanban: entity.kanban,
       budget: entity.budget,
       lost: entity.lost,
+      roles: this.toRoles(entity),
       avatar: entity.avatar ?? null,
+      ownedProperties: ownedProperties.map((property) => ({
+        id: property.id,
+        kind: property.kind ?? null,
+        alias: property.alias,
+        address: property.address,
+        address2: property.address2,
+        price: property.price,
+      })),
       comments: this.toComments(entity.comments),
       visits: this.toVisit(entity.visits),
       createdAt: entity.createdAt,
@@ -54,6 +80,7 @@ export class CustomerMapper {
         phone: entity.phone,
         lost: entity.lost,
         budget: entity.budget,
+        roles: this.toRoles(entity),
         avatar: entity.avatar ?? null,
         kanban: this.toKanban(entity.kanban),
         comments: this.toComments(entity.comments),

@@ -16,7 +16,7 @@ export class KanbanService {
   ) {}
 
   async findAll(user: User, pagination: PaginationRequestDto) {
-    const data = await this.kanbanRepository.findAndCount({
+    const [kanbans, total] = await this.kanbanRepository.findAndCount({
       where: {
         user: { id: user.id },
         active: true,
@@ -34,11 +34,14 @@ export class KanbanService {
       take: pagination.limit,
     });
 
-    return PaginationMapper.toDto(data, pagination);
+    return PaginationMapper.toDto(
+      [kanbans.map((kanban) => this.withBuyersOnly(kanban)), total],
+      pagination,
+    );
   }
 
   async findOne(user: User, id: string) {
-    return this.kanbanRepository
+    const kanban = await this.kanbanRepository
       .findOneOrFail({
         where: { id, user: { id: user.id } },
         relations: {
@@ -48,6 +51,7 @@ export class KanbanService {
       .catch(() => {
         throw new NotFoundException("Kanban not found");
       });
+    return this.withBuyersOnly(kanban);
   }
 
   async save(user: User, dto: KanbanCreateDto, id?: string) {
@@ -74,6 +78,14 @@ export class KanbanService {
     );
 
     await Promise.all(updates);
+  }
+
+  /** Owners and partners stay out of the funnel unless they are buying too. */
+  private withBuyersOnly(kanban: Kanban) {
+    kanban.customers = (kanban.customers ?? []).filter(
+      (customer) => customer.isBuyer,
+    );
+    return kanban;
   }
 
   async remove(user: User, id: string) {

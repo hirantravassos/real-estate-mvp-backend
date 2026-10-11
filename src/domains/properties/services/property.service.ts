@@ -1,10 +1,16 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnApplicationBootstrap,
+} from "@nestjs/common";
 import { User } from "../../users/entities/user.entity";
 import { Property } from "../entities/property.entity";
 import {
   Between,
   FindOptionsWhere,
   ILike,
+  IsNull,
   LessThanOrEqual,
   MoreThanOrEqual,
   Repository,
@@ -32,6 +38,8 @@ import {
   PropertyLiftEnum,
   PropertyMapper,
 } from "../mappers/property.mapper";
+import { PropertyContact } from "../entities/property-contact.entity";
+import { CustomerService } from "../../customers/services/customer.service";
 
 export class PropertyContactCreateDto {
   @ValidateBrazilianPhoneNumber()
@@ -211,11 +219,22 @@ export class PropertyFilterDto extends PaginationRequestDto {
 }
 
 @Injectable()
-export class PropertyService {
+export class PropertyService implements OnApplicationBootstrap {
+  private readonly logger = new Logger(PropertyService.name);
+
   constructor(
     @InjectRepository(Property)
     private readonly propertyRepository: Repository<Property>,
+    @InjectRepository(PropertyContact)
+    private readonly propertyContactRepository: Repository<PropertyContact>,
+    private readonly customerService: CustomerService,
   ) {}
+
+  onApplicationBootstrap() {
+    void this.linkOwnersWithoutContact().catch((error: unknown) =>
+      this.logger.error("Could not link the property owners", error),
+    );
+  }
 
   async findAll(user: User, dto: PropertyFilterDto) {
     const baseWhere: FindOptionsWhere<Property> = {
@@ -358,6 +377,15 @@ export class PropertyService {
     );
   }
 
+  async findOwners(user: User, id: string) {
+    const contacts = await this.propertyContactRepository.find({
+      where: { propertyId: id, userId: user.id, active: true },
+      relations: { customer: true },
+      order: { createdAt: "ASC" },
+    });
+    return PropertyMapper.toOwners(contacts);
+  }
+
   async save(user: User, dto: PropertyCreateDto, id?: string) {
     const entity = PropertyMapper.toEntity(dto, id);
     entity.user = user;
@@ -365,10 +393,38 @@ export class PropertyService {
     if (entity.contacts?.length) {
       for (const contact of entity.contacts) {
         contact.user = user;
+        const owner = await this.customerService.findOrCreateOwner(
+          user.id,
+          contact.phone,
+          contact.name,
+        );
+        contact.customerId = owner.id;
       }
     }
 
     return await this.propertyRepository.save(entity);
+  }
+
+  /** Owners saved before they became contacts get one, once. */
+  private async linkOwnersWithoutContact() {
+    const contacts = await this.propertyContactRepository.find({
+      where: { customerId: IsNull(), active: true, property: { active: true } },
+    });
+
+    for (const contact of contacts) {
+      const owner = await this.customerService.findOrCreateOwner(
+        contact.userId,
+        contact.phone,
+        contact.name,
+      );
+      await this.propertyContactRepository.update(contact.id, {
+        customerId: owner.id,
+      });
+    }
+
+    if (contacts.length) {
+      this.logger.log(`Linked ${contacts.length} property owners to contacts`);
+    }
   }
 
   async remove(user: User, id: string) {

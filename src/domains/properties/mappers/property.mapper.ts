@@ -1,6 +1,7 @@
 import { Property } from "../entities/property.entity";
 import { PropertyCreateDto } from "../services/property.service";
 import { PropertyContact } from "../entities/property-contact.entity";
+import { CustomerMapper } from "../../customers/mappers/customer.mapper";
 
 export enum PropertyKindEnum {
   HOUSE = "house",
@@ -30,6 +31,7 @@ export interface PropertyContactDto {
   id: string;
   name: string | null;
   phone: string;
+  customerId: string | null;
 }
 
 export interface PropertyDto {
@@ -181,6 +183,23 @@ export class PropertyMapper {
     });
   }
 
+  /** Owners with their contact, only for the broker who has the property. */
+  static toOwners(contacts: PropertyContact[]) {
+    return contacts.map((contact) => ({
+      id: contact.id,
+      name: contact.customer?.name ?? contact.name,
+      phone: contact.phone,
+      customer: contact.customer
+        ? {
+            id: contact.customer.id,
+            name: contact.customer.name,
+            avatar: contact.customer.avatar ?? null,
+            roles: CustomerMapper.toRoles(contact.customer),
+          }
+        : null,
+    }));
+  }
+
   private static toContacts(contacts: PropertyContact[] | undefined) {
     if (!contacts) return [];
     return contacts.map((contact) => {
@@ -188,6 +207,7 @@ export class PropertyMapper {
         id: contact.id,
         name: contact.name,
         phone: contact.phone,
+        customerId: contact.customerId ?? null,
       };
     });
   }

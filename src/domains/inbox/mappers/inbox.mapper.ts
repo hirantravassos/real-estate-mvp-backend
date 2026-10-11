@@ -1,3 +1,4 @@
+import { CustomerMapper } from "../../customers/mappers/customer.mapper";
 import { Conversation } from "../entities/conversation.entity";
 import { Message } from "../entities/message.entity";
 import { WhatsappConnection } from "../entities/whatsapp-connection.entity";
@@ -38,6 +39,7 @@ export class InboxMapper {
             phone: entity.customer.phone,
             budget: entity.customer.budget,
             avatar: entity.customer.avatar ?? null,
+            roles: CustomerMapper.toRoles(entity.customer),
           }
         : null,
       createdAt: entity.createdAt,

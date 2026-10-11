@@ -5,6 +5,7 @@ import { EvolutionApiService } from "../../../infrastructure/evolution/services/
 import { RealtimeGateway } from "../../../infrastructure/realtime/realtime.gateway";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
 import { CustomerRepository } from "../../customers/repositories/customer.repository";
+import { CUSTOMER_ROLE_COLUMNS } from "../../customers/enums/customer-role.enum";
 import { User } from "../../users/entities/user.entity";
 import {
   ConversationFilterDto,
@@ -49,6 +50,13 @@ export class ConversationService {
 
     if (filter.unreadOnly) {
       query.andWhere("conversation.unreadCount > 0");
+    }
+
+    if (filter.role) {
+      query.andWhere(
+        `customer.${CUSTOMER_ROLE_COLUMNS[filter.role]} = :hasRole`,
+        { hasRole: true },
+      );
     }
 
     if (filter.search?.trim()) {
@@ -113,7 +121,7 @@ export class ConversationService {
       userId: user.id,
       active: true,
     });
-    if (!customer) throw new NotFoundException("Cliente não encontrado.");
+    if (!customer) throw new NotFoundException("Contato não encontrado.");
 
     const existing = await this.conversationRepository.findOne({
       where: { userId: user.id, customerId, active: true },

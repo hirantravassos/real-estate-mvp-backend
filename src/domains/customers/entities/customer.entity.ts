@@ -58,6 +58,15 @@ export class Customer extends BaseEntity {
   @ColumnBoolean({ default: false })
   lost: boolean;
 
+  @ColumnBoolean({ default: true })
+  isBuyer: boolean;
+
+  @ColumnBoolean({ default: false })
+  isOwner: boolean;
+
+  @ColumnBoolean({ default: false })
+  isPartner: boolean;
+
   @Column({ type: "json", nullable: true })
   avatar: CustomerAvatar | null;
 }

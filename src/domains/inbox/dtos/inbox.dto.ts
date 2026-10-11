@@ -3,6 +3,7 @@ import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
+  IsEnum,
   IsIn,
   IsInt,
   IsISO8601,
@@ -16,6 +17,7 @@ import {
 } from "class-validator";
 import { ValidateBoolean } from "../../../shared/decorators/validation/boolean.decorator";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
+import { CustomerRole } from "../../customers/enums/customer-role.enum";
 
 export class ConversationFilterDto extends PaginationRequestDto {
   @IsOptional()
@@ -29,6 +31,11 @@ export class ConversationFilterDto extends PaginationRequestDto {
   @IsOptional()
   @ValidateBoolean()
   unreadOnly?: boolean | null;
+
+  /** Only the chats with contacts of this kind. */
+  @IsOptional()
+  @IsEnum(CustomerRole)
+  role?: CustomerRole | null;
 }
 
 export class ConversationUpdateDto {

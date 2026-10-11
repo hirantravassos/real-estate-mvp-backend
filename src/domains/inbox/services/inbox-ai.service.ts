@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import { Repository } from "typeorm";
 import { AiService } from "../../ai/services/ai.service";
 import { CustomerRepository } from "../../customers/repositories/customer.repository";
+import { Customer } from "../../customers/entities/customer.entity";
 import { PropertyDto } from "../../properties/mappers/property.mapper";
 import { Property } from "../../properties/entities/property.entity";
 import { User } from "../../users/entities/user.entity";
@@ -209,7 +210,7 @@ export class InboxAiService {
     });
     if (!customer) return `Cliente: ${conversation.contactName ?? "contato"}`;
 
-    const lines = [`Cliente: ${customer.name}`];
+    const lines = [`Cliente: ${customer.name}`, describeRoles(customer)];
     const budget = formatBrl(customer.budget);
     if (budget) lines.push(`Orçamento: até ${budget}`);
     if (customer.kanban) lines.push(`Etapa no funil: ${customer.kanban.name}`);
@@ -265,6 +266,16 @@ export class InboxAiService {
     return `Carteira de imóveis do corretor:\n${lines.join("\n")}`;
   }
 }
+
+/** Tells the AI who it is talking to, so it does not pitch flats to a seller. */
+const describeRoles = (customer: Customer) => {
+  const roles = [
+    customer.isBuyer ? "comprador procurando imóvel" : null,
+    customer.isOwner ? "proprietário vendendo imóvel com o corretor" : null,
+    customer.isPartner ? "corretor parceiro em um negócio" : null,
+  ].filter(Boolean);
+  return `Tipo de contato: ${roles.join(", ") || "não informado"}`;
+};
 
 const parseSuggestions = (text: string) => {
   try {

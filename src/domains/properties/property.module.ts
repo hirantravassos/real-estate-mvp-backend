@@ -12,12 +12,14 @@ import { PropertyMediaService } from "./services/property-media.service";
 import { PropertyMediaController } from "./controllers/property-media.controller";
 import { PropertyPresentationController } from "./controllers/property-presentation.controller";
 import { StorageModule } from "../../infrastructure/storage/storage.module";
+import { CustomerModule } from "../customers/customer.module";
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Property, PropertyContact, PropertyMedia]),
     DocumentModule,
     StorageModule,
+    CustomerModule,
   ],
   controllers: [
     PropertyController,

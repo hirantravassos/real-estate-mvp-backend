@@ -34,6 +34,11 @@ export class PropertyController {
     return await this.propertyService.findOne(user, id);
   }
 
+  @Get(":id/owners")
+  async findOwners(@GetUser() user: User, @Param("id") id: string) {
+    return await this.propertyService.findOwners(user, id);
+  }
+
   @Post()
   async create(@GetUser() user: User, @Body() dto: PropertyCreateDto) {
     return PropertyMapper.toDto(await this.propertyService.save(user, dto));

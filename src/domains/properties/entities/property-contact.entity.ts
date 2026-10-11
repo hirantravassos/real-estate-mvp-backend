@@ -3,6 +3,7 @@ import { BaseEntity } from "../../../shared/entities/base.entity";
 import { ColumnPhone } from "../../../shared/decorators/columns/column-phone.decorator";
 import { User } from "../../users/entities/user.entity";
 import { Property } from "./property.entity";
+import { Customer } from "../../customers/entities/customer.entity";
 
 @Entity("property_contacts")
 export class PropertyContact extends BaseEntity {
@@ -31,4 +32,12 @@ export class PropertyContact extends BaseEntity {
 
   @ColumnPhone()
   phone: string;
+
+  /** The owner as a contact, so the broker can chat with them in the inbox. */
+  @ManyToOne(() => Customer, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "customerId" })
+  customer: Customer | null;
+
+  @Column({ type: "varchar", nullable: true })
+  customerId: string | null;
 }
