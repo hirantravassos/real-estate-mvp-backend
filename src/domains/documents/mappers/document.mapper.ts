@@ -7,6 +7,7 @@ export class DocumentMapper {
       displayName: document.displayName,
       mimeType: document.mimeType,
       sizeBytes: Number(document.sizeBytes),
+      category: document.category ?? null,
       createdAt: document.createdAt,
       updatedAt: document.updatedAt,
     };
