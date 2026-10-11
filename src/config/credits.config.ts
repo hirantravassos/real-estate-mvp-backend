@@ -13,6 +13,8 @@ export const creditsConfig = registerAs("credits", () => ({
   welcomeCredits: parseInt(process.env.CREDITS_WELCOME_BONUS || "0", 10),
   adminKey: process.env.CREDITS_ADMIN_KEY ?? "",
   mercadoPagoAccessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN ?? "",
+  /** Test credentials only accept a test buyer as payer, leave empty in production. */
+  mercadoPagoTestPayerEmail: process.env.MERCADO_PAGO_TEST_PAYER_EMAIL ?? "",
   mercadoPagoApiUrl: (
     process.env.MERCADO_PAGO_API_URL || "https://api.mercadopago.com"
   ).replace(/\/+$/, ""),

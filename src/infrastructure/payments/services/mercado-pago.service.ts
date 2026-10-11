@@ -73,7 +73,10 @@ export class MercadoPagoService {
         external_reference: request.reference,
         notification_url: notificationUrl,
         date_of_expiration: request.expiresAt.toISOString(),
-        payer: { email: request.payerEmail },
+        payer: {
+          email:
+            this.configuration.mercadoPagoTestPayerEmail || request.payerEmail,
+        },
       },
     });
   }
