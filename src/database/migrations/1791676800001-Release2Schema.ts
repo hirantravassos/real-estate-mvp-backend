@@ -1,8 +1,9 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
 /**
- * Everything release 2.0.0 adds on top of 1.0.4, only new tables, nullable
- * columns, foreign keys and a wider enum, nothing is dropped or rewritten.
+ * Everything release 2.0.0 adds on top of 1.0.4: new tables, new columns
+ * (nullable or with a default), indexes, foreign keys and a wider enum.
+ * Nothing is dropped or rewritten.
  * Every step checks first, so a database that already has part of it (a run
  * that stopped halfway, MySQL does not roll back DDL) can run it again.
  */
@@ -98,7 +99,12 @@ export class Release2Schema1791676800001 implements MigrationInterface {
     await this.createTableIfMissing(
       queryRunner,
       "assistant_messages",
-      "CREATE TABLE `assistant_messages` (`id` varchar(36) NOT NULL, `created_at` timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), `updated_at` timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6), `active` tinyint NOT NULL DEFAULT 1, `userId` varchar(255) NOT NULL, `role` enum ('user', 'assistant') NOT NULL, `content` text NOT NULL, `fromVoice` tinyint NOT NULL DEFAULT 0, `creditsCharged` int NOT NULL DEFAULT '0', `references` json NULL, `attachments` json NULL, `sentAt` datetime(3) NOT NULL, INDEX `IDX_0fb0429e2a66af18eaa706b0b1` (`userId`, `sentAt`), PRIMARY KEY (`id`)) ENGINE=InnoDB",
+      "CREATE TABLE `assistant_messages` (`id` varchar(36) NOT NULL, `created_at` timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), `updated_at` timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6), `active` tinyint NOT NULL DEFAULT 1, `userId` varchar(255) NOT NULL, `chatId` varchar(255) NULL, `role` enum ('user', 'assistant') NOT NULL, `content` text NOT NULL, `fromVoice` tinyint NOT NULL DEFAULT 0, `creditsCharged` int NOT NULL DEFAULT '0', `references` json NULL, `attachments` json NULL, `sentAt` datetime(3) NOT NULL, INDEX `IDX_7aa3765d60addef66927b5816d` (`chatId`, `sentAt`), INDEX `IDX_0fb0429e2a66af18eaa706b0b1` (`userId`, `sentAt`), PRIMARY KEY (`id`)) ENGINE=InnoDB",
+    );
+    await this.createTableIfMissing(
+      queryRunner,
+      "assistant_chats",
+      "CREATE TABLE `assistant_chats` (`id` varchar(36) NOT NULL, `created_at` timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), `updated_at` timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6), `active` tinyint NOT NULL DEFAULT 1, `userId` varchar(255) NOT NULL, `title` varchar(120) NOT NULL, `lastMessageAt` datetime(3) NOT NULL, INDEX `IDX_882a69b2b074ef6c5ea4468f6a` (`userId`, `lastMessageAt`), PRIMARY KEY (`id`)) ENGINE=InnoDB",
     );
     await this.createTableIfMissing(
       queryRunner,
@@ -106,24 +112,6 @@ export class Release2Schema1791676800001 implements MigrationInterface {
       "CREATE TABLE `assistant_actions` (`id` varchar(36) NOT NULL, `created_at` timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), `updated_at` timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6), `active` tinyint NOT NULL DEFAULT 1, `userId` varchar(255) NOT NULL, `messageId` varchar(255) NULL, `kind` enum ('send_message', 'schedule_visit', 'add_note', 'move_stage', 'mark_lost') NOT NULL, `status` enum ('pending', 'running', 'done', 'failed', 'cancelled') NOT NULL DEFAULT 'pending', `title` varchar(255) NOT NULL, `payload` json NOT NULL, `errorMessage` varchar(255) NULL, `executedAt` datetime NULL, INDEX `IDX_6849ec2c362049583731e600ff` (`userId`, `messageId`), PRIMARY KEY (`id`)) ENGINE=InnoDB",
     );
 
-    await this.addColumnIfMissing(
-      queryRunner,
-      "properties",
-      "kind",
-      "ALTER TABLE `properties` ADD `kind` enum ('house', 'apartment', 'commercial', 'land') NULL",
-    );
-    await this.addColumnIfMissing(
-      queryRunner,
-      "properties",
-      "sourcePortal",
-      "ALTER TABLE `properties` ADD `sourcePortal` varchar(40) NULL",
-    );
-    await this.addColumnIfMissing(
-      queryRunner,
-      "properties",
-      "sourceUrl",
-      "ALTER TABLE `properties` ADD `sourceUrl` varchar(1024) NULL",
-    );
     await this.addColumnIfMissing(
       queryRunner,
       "customers",
@@ -162,9 +150,106 @@ export class Release2Schema1791676800001 implements MigrationInterface {
     );
     await this.addColumnIfMissing(
       queryRunner,
+      "users",
+      "slug",
+      "ALTER TABLE `users` ADD `slug` varchar(60) NULL",
+    );
+    await this.addColumnIfMissing(
+      queryRunner,
+      "users",
+      "city",
+      "ALTER TABLE `users` ADD `city` varchar(120) NULL",
+    );
+    await this.addColumnIfMissing(
+      queryRunner,
+      "users",
+      "phone",
+      "ALTER TABLE `users` ADD `phone` varchar(20) NULL",
+    );
+    await this.addColumnIfMissing(
+      queryRunner,
+      "users",
+      "creci",
+      "ALTER TABLE `users` ADD `creci` varchar(30) NULL",
+    );
+    await this.addColumnIfMissing(
+      queryRunner,
+      "users",
+      "bio",
+      "ALTER TABLE `users` ADD `bio` varchar(500) NULL",
+    );
+    await this.addColumnIfMissing(
+      queryRunner,
+      "users",
+      "workingCities",
+      "ALTER TABLE `users` ADD `workingCities` json NULL",
+    );
+    await this.addColumnIfMissing(
+      queryRunner,
+      "users",
+      "salesNiches",
+      "ALTER TABLE `users` ADD `salesNiches` json NULL",
+    );
+    await this.addColumnIfMissing(
+      queryRunner,
+      "users",
+      "targetClienteles",
+      "ALTER TABLE `users` ADD `targetClienteles` json NULL",
+    );
+    await this.addColumnIfMissing(
+      queryRunner,
+      "users",
+      "aiMemory",
+      "ALTER TABLE `users` ADD `aiMemory` text NULL",
+    );
+    await this.addColumnIfMissing(
+      queryRunner,
+      "properties",
+      "kind",
+      "ALTER TABLE `properties` ADD `kind` enum ('house', 'apartment', 'commercial', 'land') NULL",
+    );
+    await this.addColumnIfMissing(
+      queryRunner,
+      "properties",
+      "sourcePortal",
+      "ALTER TABLE `properties` ADD `sourcePortal` varchar(40) NULL",
+    );
+    await this.addColumnIfMissing(
+      queryRunner,
+      "properties",
+      "sourceUrl",
+      "ALTER TABLE `properties` ADD `sourceUrl` varchar(1024) NULL",
+    );
+    await this.addColumnIfMissing(
+      queryRunner,
+      "properties",
+      "showOnLanding",
+      "ALTER TABLE `properties` ADD `showOnLanding` tinyint NOT NULL DEFAULT 0",
+    );
+    await this.addColumnIfMissing(
+      queryRunner,
+      "properties",
+      "sourceDetails",
+      "ALTER TABLE `properties` ADD `sourceDetails` json NULL",
+    );
+    await this.addColumnIfMissing(
+      queryRunner,
+      "property_media",
+      "visibleToCustomer",
+      "ALTER TABLE `property_media` ADD `visibleToCustomer` tinyint NOT NULL DEFAULT 1",
+    );
+    await this.addColumnIfMissing(
+      queryRunner,
       "documents",
       "category",
       "ALTER TABLE `documents` ADD `category` varchar(64) NULL",
+    );
+
+    await this.addIndexIfMissing(
+      queryRunner,
+      "users",
+      "IDX_bc0c27d77ee64f0a097a5c269b",
+      "ALTER TABLE `users` ADD UNIQUE INDEX `IDX_bc0c27d77ee64f0a097a5c269b` (`slug`)",
     );
 
     /** Only appends values, so the rows already there keep theirs. */
@@ -342,6 +427,12 @@ export class Release2Schema1791676800001 implements MigrationInterface {
     );
     await this.addForeignKeyIfMissing(
       queryRunner,
+      "assistant_chats",
+      "FK_756c2fb9f1196674442bf0911c7",
+      "ALTER TABLE `assistant_chats` ADD CONSTRAINT `FK_756c2fb9f1196674442bf0911c7` FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON DELETE CASCADE ON UPDATE NO ACTION",
+    );
+    await this.addForeignKeyIfMissing(
+      queryRunner,
       "assistant_actions",
       "FK_c5b95c13018c09f21305a6e9ea7",
       "ALTER TABLE `assistant_actions` ADD CONSTRAINT `FK_c5b95c13018c09f21305a6e9ea7` FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON DELETE CASCADE ON UPDATE NO ACTION",
@@ -353,6 +444,11 @@ export class Release2Schema1791676800001 implements MigrationInterface {
       queryRunner,
       "assistant_actions",
       "FK_c5b95c13018c09f21305a6e9ea7",
+    );
+    await this.dropForeignKeyIfPresent(
+      queryRunner,
+      "assistant_chats",
+      "FK_756c2fb9f1196674442bf0911c7",
     );
     await this.dropForeignKeyIfPresent(
       queryRunner,
@@ -500,7 +596,32 @@ export class Release2Schema1791676800001 implements MigrationInterface {
       "ALTER TABLE `documents` CHANGE `ownerType` `ownerType` enum ('customer', 'property') NOT NULL",
     );
 
+    await this.dropIndexIfPresent(
+      queryRunner,
+      "users",
+      "IDX_bc0c27d77ee64f0a097a5c269b",
+    );
+
     await this.dropColumnIfPresent(queryRunner, "documents", "category");
+    await this.dropColumnIfPresent(
+      queryRunner,
+      "property_media",
+      "visibleToCustomer",
+    );
+    await this.dropColumnIfPresent(queryRunner, "properties", "sourceDetails");
+    await this.dropColumnIfPresent(queryRunner, "properties", "showOnLanding");
+    await this.dropColumnIfPresent(queryRunner, "properties", "sourceUrl");
+    await this.dropColumnIfPresent(queryRunner, "properties", "sourcePortal");
+    await this.dropColumnIfPresent(queryRunner, "properties", "kind");
+    await this.dropColumnIfPresent(queryRunner, "users", "aiMemory");
+    await this.dropColumnIfPresent(queryRunner, "users", "targetClienteles");
+    await this.dropColumnIfPresent(queryRunner, "users", "salesNiches");
+    await this.dropColumnIfPresent(queryRunner, "users", "workingCities");
+    await this.dropColumnIfPresent(queryRunner, "users", "bio");
+    await this.dropColumnIfPresent(queryRunner, "users", "creci");
+    await this.dropColumnIfPresent(queryRunner, "users", "phone");
+    await this.dropColumnIfPresent(queryRunner, "users", "city");
+    await this.dropColumnIfPresent(queryRunner, "users", "slug");
     await this.dropColumnIfPresent(
       queryRunner,
       "users",
@@ -511,11 +632,9 @@ export class Release2Schema1791676800001 implements MigrationInterface {
     await this.dropColumnIfPresent(queryRunner, "users", "termsVersion");
     await this.dropColumnIfPresent(queryRunner, "users", "avatar");
     await this.dropColumnIfPresent(queryRunner, "customers", "avatar");
-    await this.dropColumnIfPresent(queryRunner, "properties", "sourceUrl");
-    await this.dropColumnIfPresent(queryRunner, "properties", "sourcePortal");
-    await this.dropColumnIfPresent(queryRunner, "properties", "kind");
 
     await this.dropTableIfPresent(queryRunner, "assistant_actions");
+    await this.dropTableIfPresent(queryRunner, "assistant_chats");
     await this.dropTableIfPresent(queryRunner, "assistant_messages");
     await this.dropTableIfPresent(queryRunner, "credit_purchases");
     await this.dropTableIfPresent(queryRunner, "credit_transactions");
@@ -553,6 +672,37 @@ export class Release2Schema1791676800001 implements MigrationInterface {
   ) {
     if (await queryRunner.hasColumn(table, column)) return;
     await queryRunner.query(sql);
+  }
+
+  private async addIndexIfMissing(
+    queryRunner: QueryRunner,
+    table: string,
+    name: string,
+    sql: string,
+  ) {
+    if (await this.hasIndex(queryRunner, table, name)) return;
+    await queryRunner.query(sql);
+  }
+
+  private async dropIndexIfPresent(
+    queryRunner: QueryRunner,
+    table: string,
+    name: string,
+  ) {
+    if (!(await this.hasIndex(queryRunner, table, name))) return;
+    await queryRunner.query(`ALTER TABLE \`${table}\` DROP INDEX \`${name}\``);
+  }
+
+  private async hasIndex(
+    queryRunner: QueryRunner,
+    table: string,
+    name: string,
+  ) {
+    const rows = (await queryRunner.query(
+      "SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1",
+      [table, name],
+    )) as unknown[];
+    return rows.length > 0;
   }
 
   private async addForeignKeyIfMissing(
