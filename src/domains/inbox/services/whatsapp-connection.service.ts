@@ -3,6 +3,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { randomBytes } from "crypto";
 import { Repository } from "typeorm";
 import { EvolutionApiService } from "../../../infrastructure/evolution/services/evolution-api.service";
+import { EvolutionThrottleService } from "../../../infrastructure/evolution/services/evolution-throttle.service";
 import {
   EvolutionConnectionUpdate,
   EvolutionQrCode,
@@ -18,6 +19,9 @@ import { InboxMapper } from "../mappers/inbox.mapper";
 /** WhatsApp answers 401 when the phone removed the linked device. */
 const LOGGED_OUT_STATUS_REASON = 401;
 
+/** WhatsApp answers 403 when it restricted or banned the number. */
+const FORBIDDEN_STATUS_REASON = 403;
+
 @Injectable()
 export class WhatsappConnectionService {
   private readonly logger = new Logger(WhatsappConnectionService.name);
@@ -26,6 +30,7 @@ export class WhatsappConnectionService {
     @InjectRepository(WhatsappConnection)
     private readonly connectionRepository: Repository<WhatsappConnection>,
     private readonly evolutionApiService: EvolutionApiService,
+    private readonly throttleService: EvolutionThrottleService,
     private readonly realtimeGateway: RealtimeGateway,
   ) {}
 
@@ -47,6 +52,7 @@ export class WhatsappConnectionService {
   /** Creates the Evolution instance when needed and returns a fresh QR code. */
   async connect(user: User) {
     const connection = await this.findOrCreate(user.id);
+    this.throttleService.assertConnectAttempt(connection.instanceName);
     const token = await this.webhookTokenOf(connection.id);
     const webhookUrl = this.evolutionApiService.webhookUrlFor(token);
 
@@ -134,6 +140,7 @@ export class WhatsappConnectionService {
     update: EvolutionConnectionUpdate,
   ) {
     if (update.state === "open") {
+      this.throttleService.resume(connection.instanceName);
       connection.status = WhatsappConnectionStatus.CONNECTED;
       connection.qrCode = null;
       connection.pairingCode = null;
@@ -144,9 +151,16 @@ export class WhatsappConnectionService {
         connection.profilePictureUrl = update.profilePictureUrl;
       }
     } else if (update.state === "connecting") {
+      this.throttleService.suspend(connection.instanceName);
       connection.status = WhatsappConnectionStatus.CONNECTING;
       connection.connectedAt = null;
     } else if (update.state === "close") {
+      this.throttleService.suspend(connection.instanceName);
+      if (update.statusReason === FORBIDDEN_STATUS_REASON) {
+        this.logger.error(
+          `WhatsApp refused ${connection.instanceName} (403), the number may be restricted or banned`,
+        );
+      }
       connection.status = WhatsappConnectionStatus.DISCONNECTED;
       connection.connectedAt = null;
       if (update.statusReason === LOGGED_OUT_STATUS_REASON) {

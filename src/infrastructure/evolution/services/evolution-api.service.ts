@@ -16,10 +16,13 @@ import {
   EvolutionMessage,
   EvolutionMessageKey,
   EvolutionMessagePage,
-  EvolutionPresence,
   EvolutionQrCode,
   EvolutionSendMediaType,
 } from "../types/evolution.type";
+import {
+  EvolutionThrottleService,
+  SendContext,
+} from "./evolution-throttle.service";
 
 /** The events this app listens to. */
 export const EVOLUTION_WEBHOOK_EVENTS = [
@@ -38,7 +41,10 @@ interface RequestOptions {
   allowNotFound?: boolean;
 }
 
-/** Thin HTTP client for the Evolution API v2. */
+/**
+ * HTTP client for the Evolution API v2. Everything that reaches WhatsApp
+ * goes through the throttle, so no caller can flood a number by mistake.
+ */
 @Injectable()
 export class EvolutionApiService {
   private readonly logger = new Logger(EvolutionApiService.name);
@@ -46,6 +52,7 @@ export class EvolutionApiService {
   constructor(
     @Inject(evolutionConfig.KEY)
     private readonly configuration: ConfigType<typeof evolutionConfig>,
+    private readonly throttleService: EvolutionThrottleService,
   ) {}
 
   get isConfigured() {
@@ -133,11 +140,21 @@ export class EvolutionApiService {
     });
   }
 
-  async sendText(instanceName: string, number: string, text: string) {
-    return this.request<EvolutionMessage>(`/message/sendText/${instanceName}`, {
-      method: "POST",
-      body: { number, text, linkPreview: true },
-    });
+  async sendText(
+    instanceName: string,
+    number: string,
+    text: string,
+    context: SendContext = {},
+  ) {
+    return this.throttleService.scheduleSend(
+      instanceName,
+      { ...context, chat: number, text },
+      (typingMilliseconds) =>
+        this.request<EvolutionMessage>(`/message/sendText/${instanceName}`, {
+          method: "POST",
+          body: { number, text, linkPreview: true, delay: typingMilliseconds },
+        }),
+    );
   }
 
   async sendMedia(
@@ -151,59 +168,66 @@ export class EvolutionApiService {
       caption?: string | null;
       fileName?: string | null;
     },
+    context: SendContext = {},
   ) {
-    return this.request<EvolutionMessage>(
-      `/message/sendMedia/${instanceName}`,
-      {
-        method: "POST",
-        body: {
-          number,
-          mediatype: media.mediatype,
-          mimetype: media.mimetype,
-          media: media.media,
-          caption: media.caption ?? undefined,
-          fileName: media.fileName ?? undefined,
-        },
-      },
+    return this.throttleService.scheduleSend(
+      instanceName,
+      { ...context, chat: number, text: media.caption },
+      (typingMilliseconds) =>
+        this.request<EvolutionMessage>(`/message/sendMedia/${instanceName}`, {
+          method: "POST",
+          body: {
+            number,
+            mediatype: media.mediatype,
+            mimetype: media.mimetype,
+            media: media.media,
+            caption: media.caption ?? undefined,
+            fileName: media.fileName ?? undefined,
+            delay: typingMilliseconds,
+          },
+        }),
     );
   }
 
   /** Sends audio, a link or base64, as a voice note (Evolution converts it to opus). */
-  async sendVoiceNote(instanceName: string, number: string, audio: string) {
-    return this.request<EvolutionMessage>(
-      `/message/sendWhatsAppAudio/${instanceName}`,
-      {
-        method: "POST",
-        body: { number, audio, encoding: true },
-      },
-    );
-  }
-
-  async sendPresence(
+  async sendVoiceNote(
     instanceName: string,
     number: string,
-    presence: EvolutionPresence,
+    audio: string,
+    context: SendContext = {},
   ) {
-    await this.request(`/chat/sendPresence/${instanceName}`, {
-      method: "POST",
-      body: { number, presence, delay: 3000 },
-    }).catch(() => undefined);
+    return this.throttleService.scheduleSend(
+      instanceName,
+      { ...context, chat: number },
+      (typingMilliseconds) =>
+        this.request<EvolutionMessage>(
+          `/message/sendWhatsAppAudio/${instanceName}`,
+          {
+            method: "POST",
+            body: { number, audio, encoding: true, delay: typingMilliseconds },
+          },
+        ),
+    );
   }
 
   async markAsRead(instanceName: string, keys: EvolutionMessageKey[]) {
     if (!keys.length) return;
-    await this.request(`/chat/markMessageAsRead/${instanceName}`, {
-      method: "POST",
-      body: {
-        readMessages: keys.map((key) => ({
-          remoteJid: key.remoteJid,
-          fromMe: key.fromMe,
-          id: key.id,
-        })),
-      },
-    }).catch((error: unknown) => {
-      this.logger.warn(`Mark as read failed: ${String(error)}`);
-    });
+    await this.throttleService
+      .scheduleLookup(instanceName, () =>
+        this.request(`/chat/markMessageAsRead/${instanceName}`, {
+          method: "POST",
+          body: {
+            readMessages: keys.map((key) => ({
+              remoteJid: key.remoteJid,
+              fromMe: key.fromMe,
+              id: key.id,
+            })),
+          },
+        }),
+      )
+      .catch((error: unknown) => {
+        this.logger.warn(`Mark as read failed: ${String(error)}`);
+      });
   }
 
   async downloadMedia(
@@ -211,50 +235,61 @@ export class EvolutionApiService {
     messageId: string,
     convertToMp4: boolean,
   ) {
-    return this.request<EvolutionMediaDownload>(
-      `/chat/getBase64FromMediaMessage/${instanceName}`,
-      {
-        method: "POST",
-        body: { message: { key: { id: messageId } }, convertToMp4 },
-      },
+    return this.throttleService.scheduleMedia(instanceName, () =>
+      this.request<EvolutionMediaDownload>(
+        `/chat/getBase64FromMediaMessage/${instanceName}`,
+        {
+          method: "POST",
+          body: { message: { key: { id: messageId } }, convertToMp4 },
+        },
+      ),
     );
   }
 
   async fetchProfilePicture(instanceName: string, number: string) {
-    const response = await this.request<{ profilePictureUrl?: string | null }>(
-      `/chat/fetchProfilePictureUrl/${instanceName}`,
-      { method: "POST", body: { number }, allowNotFound: true },
-    ).catch(() => null);
+    const response = await this.throttleService
+      .scheduleLookup(instanceName, () =>
+        this.request<{ profilePictureUrl?: string | null }>(
+          `/chat/fetchProfilePictureUrl/${instanceName}`,
+          { method: "POST", body: { number }, allowNotFound: true },
+        ),
+      )
+      .catch(() => null);
     return response?.profilePictureUrl ?? null;
   }
 
   /** Every contact the linked phone knows. */
   async findContacts(instanceName: string) {
-    const contacts = await this.request<EvolutionContact[]>(
-      `/chat/findContacts/${instanceName}`,
-      { method: "POST", body: { where: {} }, allowNotFound: true },
+    const contacts = await this.throttleService.scheduleRead(instanceName, () =>
+      this.request<EvolutionContact[]>(`/chat/findContacts/${instanceName}`, {
+        method: "POST",
+        body: { where: {} },
+        allowNotFound: true,
+      }),
     );
     return Array.isArray(contacts) ? contacts : [];
   }
 
   /** Every chat with history on the linked phone, with its newest message. */
   async findChats(instanceName: string) {
-    const chats = await this.request<EvolutionChat[]>(
-      `/chat/findChats/${instanceName}`,
-      { method: "POST", body: {}, allowNotFound: true },
+    const chats = await this.throttleService.scheduleRead(instanceName, () =>
+      this.request<EvolutionChat[]>(`/chat/findChats/${instanceName}`, {
+        method: "POST",
+        body: {},
+        allowNotFound: true,
+      }),
     );
     return Array.isArray(chats) ? chats : [];
   }
 
   /** The newest messages of one chat, in any order. */
   async findMessages(instanceName: string, remoteJid: string, limit: number) {
-    const response = await this.request<EvolutionMessagePage>(
-      `/chat/findMessages/${instanceName}`,
-      {
+    const response = await this.throttleService.scheduleRead(instanceName, () =>
+      this.request<EvolutionMessagePage>(`/chat/findMessages/${instanceName}`, {
         method: "POST",
         body: { where: { key: { remoteJid } }, page: 1, offset: limit },
         allowNotFound: true,
-      },
+      }),
     );
     return response?.messages?.records ?? [];
   }

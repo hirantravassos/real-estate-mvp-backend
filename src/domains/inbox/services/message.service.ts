@@ -10,6 +10,7 @@ import * as path from "path";
 import sharp from "sharp";
 import { Not, Repository } from "typeorm";
 import { EvolutionApiService } from "../../../infrastructure/evolution/services/evolution-api.service";
+import type { SendContext } from "../../../infrastructure/evolution/services/evolution-throttle.service";
 import {
   EvolutionMessage,
   EvolutionMessageStatus,
@@ -89,6 +90,8 @@ export interface OutboundOptions {
 @Injectable()
 export class MessageService {
   private readonly logger = new Logger(MessageService.name);
+  /** Deliveries of each chat, kept in the order they were asked. */
+  private readonly deliveryChains = new Map<string, Promise<unknown>>();
 
   constructor(
     @InjectRepository(Message)
@@ -179,7 +182,8 @@ export class MessageService {
       user.id,
       conversationId,
     );
-    return this.sendTextTo(conversation, text, options);
+    const message = await this.createText(conversation, text, options);
+    return this.startDelivery(conversation, message, {});
   }
 
   async sendMedia(
@@ -212,7 +216,12 @@ export class MessageService {
       dto.s3Key,
     );
 
-    return this.sendMediaTo(conversation, { ...dto, sizeBytes }, {});
+    const message = await this.createMedia(
+      conversation,
+      { ...dto, sizeBytes },
+      {},
+    );
+    return this.startDelivery(conversation, message, {});
   }
 
   async retry(user: User, messageId: string) {
@@ -238,23 +247,43 @@ export class MessageService {
     await this.messageRepository.save(message);
     await this.emitMessage("message.updated", message);
 
-    return this.deliver(conversation, message, {});
+    return this.startDelivery(conversation, message, {});
   }
 
+  /** Sends and waits for WhatsApp, for flows that go one message after the other. */
   async sendTextTo(
     conversation: Conversation,
     text: string,
     options: OutboundOptions,
   ) {
-    const message = await this.createOutbound(conversation, {
+    const message = await this.createText(conversation, text, options);
+    return this.enqueueDelivery(conversation, message, {});
+  }
+
+  async sendMediaTo(
+    conversation: Conversation,
+    media: OutboundMediaRequest,
+    options: OutboundOptions,
+  ) {
+    const message = await this.createMedia(conversation, media, options);
+    return this.enqueueDelivery(conversation, message, {
+      forceDocument: media.forceDocument,
+    });
+  }
+
+  private createText(
+    conversation: Conversation,
+    text: string,
+    options: OutboundOptions,
+  ) {
+    return this.createOutbound(conversation, {
       type: MessageType.TEXT,
       body: text.trim(),
       ...options,
     });
-    return this.deliver(conversation, message, {});
   }
 
-  async sendMediaTo(
+  private createMedia(
     conversation: Conversation,
     media: OutboundMediaRequest,
     options: OutboundOptions,
@@ -267,7 +296,7 @@ export class MessageService {
       document: MessageType.DOCUMENT,
     };
 
-    const message = await this.createOutbound(conversation, {
+    return this.createOutbound(conversation, {
       type: media.forceDocument ? MessageType.DOCUMENT : typeByKind[kind],
       body: media.caption?.trim() || null,
       s3Key: media.s3Key,
@@ -277,10 +306,6 @@ export class MessageService {
       durationSeconds: media.durationSeconds ?? null,
       mediaStatus: MessageMediaStatus.READY,
       ...options,
-    });
-
-    return this.deliver(conversation, message, {
-      forceDocument: media.forceDocument,
     });
   }
 
@@ -463,6 +488,44 @@ export class MessageService {
     return message;
   }
 
+  /**
+   * Answers right away with the message waiting in the queue, the outcome
+   * reaches the screen through the realtime events.
+   */
+  private async startDelivery(
+    conversation: Conversation,
+    message: Message,
+    options: { forceDocument?: boolean },
+  ) {
+    void this.enqueueDelivery(conversation, message, options).catch(
+      (error: unknown) => {
+        this.logger.warn(`Delivery of ${message.id} failed: ${String(error)}`);
+      },
+    );
+    return this.toDto(message);
+  }
+
+  /** Delivers after the messages asked before in the same chat, never out of order. */
+  private enqueueDelivery(
+    conversation: Conversation,
+    message: Message,
+    options: { forceDocument?: boolean },
+  ) {
+    const previous =
+      this.deliveryChains.get(conversation.id) ?? Promise.resolve();
+    const delivery = previous.then(() =>
+      this.deliver(conversation, message, options),
+    );
+    const tail = delivery.catch(() => undefined);
+    this.deliveryChains.set(conversation.id, tail);
+    void tail.then(() => {
+      if (this.deliveryChains.get(conversation.id) === tail) {
+        this.deliveryChains.delete(conversation.id);
+      }
+    });
+    return delivery;
+  }
+
   /** Hands the message to Evolution and records how it went. */
   private async deliver(
     conversation: Conversation,
@@ -474,6 +537,13 @@ export class MessageService {
         conversation.userId,
       );
       const number = conversation.phone;
+      const context: SendContext = {
+        firstContact: !(await this.messageRepository.existsBy({
+          conversationId: conversation.id,
+          direction: MessageDirection.INBOUND,
+        })),
+        connectedAt: connection.connectedAt,
+      };
       let sent: EvolutionMessage;
 
       if (message.type === MessageType.TEXT) {
@@ -481,6 +551,7 @@ export class MessageService {
           connection.instanceName,
           number,
           message.body ?? "",
+          context,
         );
       } else {
         if (!message.s3Key) throw new Error("Mídia sem arquivo.");
@@ -493,6 +564,7 @@ export class MessageService {
             connection.instanceName,
             number,
             audio.toString("base64"),
+            context,
           );
         } else if (
           message.type === MessageType.IMAGE &&
@@ -517,6 +589,7 @@ export class MessageService {
               caption: message.body,
               fileName: `${path.parse(message.fileName ?? "foto").name}.jpg`,
             },
+            context,
           );
         } else {
           const url = await this.storageService.getPresignedUrl(message.s3Key, {
@@ -544,6 +617,7 @@ export class MessageService {
               fileName:
                 message.fileName ?? withExtension("arquivo", message.mimeType),
             },
+            context,
           );
         }
       }
