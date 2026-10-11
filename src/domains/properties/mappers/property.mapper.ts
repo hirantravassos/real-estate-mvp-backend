@@ -1,6 +1,7 @@
 import { Property } from "../entities/property.entity";
 import { PropertyCreateDto } from "../services/property.service";
 import { PropertyContact } from "../entities/property-contact.entity";
+import type { PropertySourceDetails } from "../helpers/customer-safe.helper";
 
 export enum PropertyKindEnum {
   HOUSE = "house",
@@ -64,6 +65,7 @@ export interface PropertyDto {
   infoHasGym: boolean | null;
   sourcePortal: string | null;
   sourceUrl: string | null;
+  sourceDetails: PropertySourceDetails | null;
   createdAt: Date;
   updatedAt: Date;
   active: boolean;
@@ -162,6 +164,7 @@ export class PropertyMapper {
       infoHasGym: entity.infoHasGym,
       sourcePortal: entity.sourcePortal ?? null,
       sourceUrl: entity.sourceUrl ?? null,
+      sourceDetails: entity.sourceDetails ?? null,
       contacts: [], // Must be ALWAYS empty!!!
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,

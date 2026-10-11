@@ -1,4 +1,8 @@
 import {
+  customerAddressOf,
+  isFromPortal,
+} from "../../properties/helpers/customer-safe.helper";
+import {
   BadRequestException,
   HttpException,
   Inject,
@@ -585,9 +589,13 @@ export class AssistantToolService {
         id: property.id,
         title: this.propertyTitle(property),
         kind: property.kind ? KIND_LABEL[property.kind] : null,
-        address: [property.address, property.address2]
-          .filter(Boolean)
-          .join(", "),
+        address: customerAddressOf(property),
+        ...(isFromPortal(property)
+          ? {
+              privacy:
+                "Garimpado em portal: endereço completo, link do anúncio e contato do anunciante são só do corretor. Nunca envie ao cliente.",
+            }
+          : {}),
         price: formatBrl(property.price),
         bedrooms: property.infoBedrooms,
         suites: property.infoSuiteBedrooms,

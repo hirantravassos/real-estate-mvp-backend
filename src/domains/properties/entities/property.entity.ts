@@ -4,6 +4,7 @@ import { User } from "../../users/entities/user.entity";
 import { PropertyContact } from "./property-contact.entity";
 import { ColumnBoolean } from "../../../shared/decorators/columns/column-boolean.decorator";
 import { ColumnCurrency } from "../../../shared/decorators/columns/column-currency.decorator";
+import type { PropertySourceDetails } from "../helpers/customer-safe.helper";
 import {
   PropertyConciergeServiceEnum,
   PropertyFurnitureEnum,
@@ -114,6 +115,11 @@ export class Property extends BaseEntity {
   @Column({ type: "varchar", length: 40, nullable: true })
   sourcePortal: string | null;
 
+  /** Never shown to customers: it leads to the original listing. */
   @Column({ type: "varchar", length: 1024, nullable: true })
   sourceUrl: string | null;
+
+  /** The original advertiser and text, for the broker only. */
+  @Column({ type: "json", nullable: true })
+  sourceDetails: PropertySourceDetails | null;
 }
