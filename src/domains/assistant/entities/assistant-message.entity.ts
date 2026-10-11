@@ -10,6 +10,14 @@ export interface AssistantReference {
   label: string;
 }
 
+/** A file the broker attached to a question. */
+export interface AssistantMessageAttachment {
+  id: string;
+  displayName: string;
+  mimeType: string;
+  sizeBytes: number;
+}
+
 /** One line of the broker's chat with the assistant. */
 @Entity("assistant_messages")
 @Index(["userId", "sentAt"])
@@ -36,6 +44,9 @@ export class AssistantMessage extends BaseEntity {
 
   @Column({ type: "json", nullable: true })
   references: AssistantReference[] | null;
+
+  @Column({ type: "json", nullable: true })
+  attachments: AssistantMessageAttachment[] | null;
 
   /** With milliseconds, so a question always comes before its answer. */
   @Column({ type: "datetime", precision: 3, nullable: false })

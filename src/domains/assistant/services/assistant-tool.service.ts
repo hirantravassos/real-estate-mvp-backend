@@ -20,6 +20,12 @@ import {
 import { appConfig } from "../../../config/app.config";
 import { CustomerComment } from "../../customers/entities/customer-comments.entity";
 import { Customer } from "../../customers/entities/customer.entity";
+import { DealChecklistItem } from "../../deals/entities/deal-checklist-item.entity";
+import { Deal } from "../../deals/entities/deal.entity";
+import {
+  Document,
+  DocumentOwnerType,
+} from "../../documents/entities/document.entity";
 import { Conversation } from "../../inbox/entities/conversation.entity";
 import { Message } from "../../inbox/entities/message.entity";
 import { MessageDirection } from "../../inbox/enums/inbox.enum";
@@ -28,14 +34,21 @@ import {
   KIND_LABEL,
 } from "../../inbox/helpers/property-pitch.helper";
 import { Kanban } from "../../kanbans/entities/kanban.entity";
+import {
+  PropertyMedia,
+  PropertyMediaType,
+} from "../../properties/entities/property-media.entity";
 import { Property } from "../../properties/entities/property.entity";
 import { PropertyKindEnum } from "../../properties/mappers/property.mapper";
 import { User } from "../../users/entities/user.entity";
 import { Visit } from "../../visits/entities/visit.entity";
 import { AssistantToolName } from "../constants/assistant-tools.constant";
+import { StorageService } from "../../../infrastructure/storage/services/storage.service";
+import { AssistantDocumentService } from "./assistant-document.service";
 import {
   AssistantAction,
   AssistantActionPayload,
+  AssistantAttachment,
 } from "../entities/assistant-action.entity";
 import { AssistantReference } from "../entities/assistant-message.entity";
 import {
@@ -79,6 +92,11 @@ const WARMTH_VALUES = new Set<CustomerWarmth>([
   "cooling",
   "cold",
 ]);
+
+const describeSize = (bytes: number) =>
+  bytes >= 1024 * 1024
+    ? `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} MB`
+    : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
 const textOf = (value: unknown) =>
   typeof value === "string" && value.trim() ? value.trim() : null;
@@ -128,6 +146,16 @@ export class AssistantToolService {
     private readonly messageRepository: Repository<Message>,
     @InjectRepository(AssistantAction)
     private readonly actionRepository: Repository<AssistantAction>,
+    @InjectRepository(Document)
+    private readonly documentRepository: Repository<Document>,
+    @InjectRepository(PropertyMedia)
+    private readonly mediaRepository: Repository<PropertyMedia>,
+    @InjectRepository(Deal)
+    private readonly dealRepository: Repository<Deal>,
+    @InjectRepository(DealChecklistItem)
+    private readonly checklistRepository: Repository<DealChecklistItem>,
+    private readonly documentService: AssistantDocumentService,
+    private readonly storageService: StorageService,
   ) {}
 
   get timezone() {
@@ -183,6 +211,10 @@ export class AssistantToolService {
         return this.searchConversations(user, parameters, context);
       case "get_conversation":
         return this.getConversation(user, parameters, context);
+      case "list_files":
+        return this.listFiles(user, parameters);
+      case "generate_document":
+        return this.generateDocument(user, parameters, context);
       case "propose_whatsapp_message":
         return this.proposeWhatsappMessage(user, parameters, context);
       case "propose_visit":
@@ -674,17 +706,156 @@ export class AssistantToolService {
     };
   }
 
+  private async listFiles(user: User, parameters: ToolArguments) {
+    const customerId = textOf(parameters.customerId);
+    const propertyId = textOf(parameters.propertyId);
+
+    if (propertyId) {
+      const property = await this.propertyRepository.findOneBy({
+        id: requireId(propertyId, "imóvel"),
+        userId: user.id,
+        active: true,
+      });
+      if (!property) throw new NotFoundException("Imóvel não encontrado.");
+      const [documents, media] = await Promise.all([
+        this.documentsOf(user, DocumentOwnerType.PROPERTY, [property.id]),
+        this.mediaRepository.find({
+          where: { propertyId: property.id, userId: user.id, active: true },
+          order: { isCover: "DESC", sortOrder: "ASC" },
+        }),
+      ]);
+      return {
+        property: this.propertyTitle(property),
+        documents: documents.map((document) => this.describeFile(document)),
+        photosAndVideos: media.map((item) => ({
+          type: "property_media",
+          id: item.id,
+          name: item.displayName,
+          kind: item.type === PropertyMediaType.VIDEO ? "vídeo" : "foto",
+          cover: item.isCover,
+          size: describeSize(Number(item.sizeBytes)),
+        })),
+      };
+    }
+
+    if (customerId) {
+      const customer = await this.findCustomer(
+        user,
+        requireId(customerId, "cliente"),
+      );
+      const deals = await this.dealRepository.find({
+        where: { customerId: customer.id, userId: user.id, active: true },
+      });
+      const dealIds = deals.map((deal) => deal.id);
+      const items = dealIds.length
+        ? await this.checklistRepository.find({
+            where: { dealId: In(dealIds), active: true },
+          })
+        : [];
+      const itemTitles = new Map(items.map((item) => [item.id, item.title]));
+      const [own, dealFiles, itemFiles] = await Promise.all([
+        this.documentsOf(user, DocumentOwnerType.CUSTOMER, [customer.id]),
+        this.documentsOf(user, DocumentOwnerType.DEAL, dealIds),
+        this.documentsOf(user, DocumentOwnerType.DEAL_ITEM, [
+          ...itemTitles.keys(),
+        ]),
+      ]);
+      return {
+        customer: customer.name,
+        documents: own.map((document) => this.describeFile(document)),
+        saleDocuments: [
+          ...dealFiles.map((document) => ({
+            ...this.describeFile(document),
+            about: "contrato e papéis da venda",
+          })),
+          ...itemFiles.map((document) => ({
+            ...this.describeFile(document),
+            about: itemTitles.get(document.ownerId) ?? "documento da venda",
+          })),
+        ],
+      };
+    }
+
+    const recent = await this.documentRepository.find({
+      where: {
+        userId: user.id,
+        ownerType: DocumentOwnerType.ASSISTANT,
+        active: true,
+      },
+      order: { createdAt: "DESC" },
+      take: 20,
+    });
+    return {
+      recentFiles: recent.map((document) => this.describeFile(document)),
+    };
+  }
+
+  private async generateDocument(
+    user: User,
+    parameters: ToolArguments,
+    context: AssistantToolContext,
+  ) {
+    const customerId = textOf(parameters.customerId);
+    const propertyId = textOf(parameters.propertyId);
+    const { document, savedTo } = await this.documentService.generate(
+      user,
+      {
+        title: textOf(parameters.title) ?? "",
+        subtitle: textOf(parameters.subtitle),
+        fileName: textOf(parameters.fileName),
+        format: parameters.format === "docx" ? "docx" : "pdf",
+        customerId: customerId ? requireId(customerId, "cliente") : null,
+        propertyId: propertyId ? requireId(propertyId, "imóvel") : null,
+        blocks: Array.isArray(parameters.blocks) ? parameters.blocks : [],
+      },
+      this.timezone,
+    );
+
+    this.remember(context, {
+      type: AssistantReferenceType.DOCUMENT,
+      id: document.id,
+      label: document.displayName,
+    });
+    return {
+      attachment: { type: "document", id: document.id },
+      fileName: document.displayName,
+      size: describeSize(Number(document.sizeBytes)),
+      savedTo: savedTo ?? "arquivos do assistente",
+      note: "O corretor já pode baixar o arquivo pelo chat.",
+    };
+  }
+
   private async proposeWhatsappMessage(
     user: User,
     parameters: ToolArguments,
     context: AssistantToolContext,
   ) {
-    const text = textOf(parameters.text);
-    if (!text) throw new BadRequestException("A mensagem está vazia.");
+    const text = textOf(parameters.text) ?? "";
     if (text.length > 4000) {
       throw new BadRequestException("Mensagem longa demais.");
     }
+    const attachments = await this.resolveAttachments(
+      user,
+      parameters.attachments,
+    );
+    if (!text && !attachments.length) {
+      throw new BadRequestException("A mensagem está vazia.");
+    }
 
+    const recipient = await this.recipientOf(user, parameters);
+    const withFiles = attachments.length
+      ? ` com ${attachments.length === 1 ? "1 anexo" : `${attachments.length} anexos`}`
+      : "";
+    return this.propose(
+      user,
+      context,
+      AssistantActionKind.SEND_MESSAGE,
+      `Enviar WhatsApp para ${recipient.recipientName}${withFiles}`,
+      { ...recipient, text, attachments },
+    );
+  }
+
+  private async recipientOf(user: User, parameters: ToolArguments) {
     const conversationId = textOf(parameters.conversationId);
     const customerId = textOf(parameters.customerId);
 
@@ -693,19 +864,11 @@ export class AssistantToolService {
         user,
         requireId(conversationId, "conversa"),
       );
-      const recipientName = this.conversationName(conversation);
-      return this.propose(
-        user,
-        context,
-        AssistantActionKind.SEND_MESSAGE,
-        `Enviar WhatsApp para ${recipientName}`,
-        {
-          conversationId: conversation.id,
-          customerId: conversation.customerId,
-          recipientName,
-          text,
-        },
-      );
+      return {
+        conversationId: conversation.id,
+        customerId: conversation.customerId,
+        recipientName: this.conversationName(conversation),
+      };
     }
 
     if (customerId) {
@@ -713,21 +876,103 @@ export class AssistantToolService {
         user,
         requireId(customerId, "cliente"),
       );
-      return this.propose(
-        user,
-        context,
-        AssistantActionKind.SEND_MESSAGE,
-        `Enviar WhatsApp para ${customer.name}`,
-        {
-          conversationId: null,
-          customerId: customer.id,
-          recipientName: customer.name,
-          text,
-        },
-      );
+      return {
+        conversationId: null,
+        customerId: customer.id,
+        recipientName: customer.name,
+      };
     }
 
     throw new BadRequestException("Informe o cliente ou a conversa.");
+  }
+
+  /** Checks every file belongs to the broker and fits on WhatsApp. */
+  private async resolveAttachments(
+    user: User,
+    value: unknown,
+  ): Promise<AssistantAttachment[]> {
+    const requested = (Array.isArray(value) ? value : []) as {
+      type?: unknown;
+      id?: unknown;
+    }[];
+    if (requested.length > 10) {
+      throw new BadRequestException("Envie no máximo 10 anexos por vez.");
+    }
+
+    const attachments: AssistantAttachment[] = [];
+    for (const item of requested) {
+      const id = requireId(item?.id, "anexo");
+      if (item?.type === "property_media") {
+        const media = await this.mediaRepository.findOneBy({
+          id,
+          userId: user.id,
+          active: true,
+        });
+        if (!media) {
+          throw new NotFoundException("Foto ou vídeo não encontrado.");
+        }
+        // Too big to show inline still goes as a file, up to its limit.
+        this.storageService.validateInboxUpload(
+          "application/octet-stream",
+          Number(media.sizeBytes),
+        );
+        attachments.push({
+          source: "property_media",
+          id: media.id,
+          fileName: media.displayName,
+          mimeType: media.mimeType,
+          sizeBytes: Number(media.sizeBytes),
+        });
+        continue;
+      }
+
+      const document = await this.documentRepository.findOneBy({
+        id,
+        userId: user.id,
+        active: true,
+      });
+      if (!document) throw new NotFoundException("Arquivo não encontrado.");
+      this.storageService.validateInboxUpload(
+        document.mimeType,
+        Number(document.sizeBytes),
+      );
+      attachments.push({
+        source: "document",
+        id: document.id,
+        fileName: document.displayName,
+        mimeType: document.mimeType,
+        sizeBytes: Number(document.sizeBytes),
+      });
+    }
+    return attachments;
+  }
+
+  private documentsOf(
+    user: User,
+    ownerType: DocumentOwnerType,
+    ownerIds: string[],
+  ) {
+    if (!ownerIds.length) return Promise.resolve([]);
+    return this.documentRepository.find({
+      where: {
+        userId: user.id,
+        ownerType,
+        ownerId: In(ownerIds),
+        active: true,
+      },
+      order: { createdAt: "DESC" },
+    });
+  }
+
+  private describeFile(document: Document) {
+    return {
+      type: "document",
+      id: document.id,
+      name: document.displayName,
+      mimeType: document.mimeType,
+      size: describeSize(Number(document.sizeBytes)),
+      date: formatDay(document.createdAt, this.timezone),
+    };
   }
 
   private async proposeVisit(

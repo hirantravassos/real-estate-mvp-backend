@@ -9,6 +9,8 @@ export enum DocumentOwnerType {
   DEAL = "deal",
   /** Files sent for one item of a sale checklist. */
   DEAL_ITEM = "deal_item",
+  /** Made by the assistant or attached in its chat, the owner id is the broker. */
+  ASSISTANT = "assistant",
 }
 
 @Entity("documents")

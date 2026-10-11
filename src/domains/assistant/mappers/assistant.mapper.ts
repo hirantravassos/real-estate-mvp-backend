@@ -23,6 +23,7 @@ export class AssistantMapper {
       fromVoice: entity.fromVoice,
       creditsCharged: entity.creditsCharged,
       references: entity.references ?? [],
+      attachments: entity.attachments ?? [],
       actions: actions.map((action) => AssistantMapper.toActionDto(action)),
       sentAt: entity.sentAt,
     };
