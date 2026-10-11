@@ -18,9 +18,12 @@ import { CustomerAvatarDto } from "../../customers/dtos/customer-avatar.dto";
 import { readRequestEvidence } from "../../../shared/utils/request-evidence.util";
 import { UserTermsAcceptDto } from "../dtos/user-terms-accept.dto";
 import { UserProfileUpdateDto } from "../dtos/user-profile-update.dto";
+import { SkipSubscriptionCheck } from "../../subscriptions/decorators/subscription.decorator";
 
+/** The profile and the terms open even with the subscription expired. */
 @Controller("users")
 @UseGuards(JwtGuard)
+@SkipSubscriptionCheck()
 export class UserController {
   constructor(private readonly userService: UserService) {}
 

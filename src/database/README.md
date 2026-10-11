@@ -4,10 +4,11 @@ The schema only changes through the migrations in `migrations/`. `synchronize`
 is off everywhere, and the app runs pending migrations on boot, before it
 starts listening.
 
-| Migration        | What it does                                                                                                                                                                                                              |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Baseline`       | Schema of release 1.0.4. Skipped on databases that already have it (production), creates everything on an empty one. Cannot be reverted.                                                                                  |
+| Migration        | What it does                                                                                                                                                                                                                                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Baseline`       | Schema of release 1.0.4. Skipped on databases that already have it (production), creates everything on an empty one. Cannot be reverted.                                                                                                                                                                     |
 | `Release2Schema` | Everything 2.0.0 adds: 20 tables, 22 columns (nullable or with a default), 1 index, 30 foreign keys and new values on `documents.ownerType`. Nothing is dropped or rewritten, and every step checks first, so it runs on a 1.0.4 database, on one already built by `synchronize` and after stopping halfway. |
+| `Subscriptions`  | Paid plans: `subscriptions` and `subscription_payments` tables, their foreign keys and the `subscription` value on `credit_transactions.kind`. Every step checks first.                                                                                                                                      |
 
 ## Commands
 

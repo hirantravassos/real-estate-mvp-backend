@@ -26,6 +26,7 @@ import { CreditGrantDto, CreditPurchaseCreateDto } from "../dtos/credit.dto";
 import { CreditTransactionKind } from "../entities/credit-transaction.entity";
 import { CreditPricingService } from "../services/credit-pricing.service";
 import { CreditPurchaseService } from "../services/credit-purchase.service";
+import { SkipSubscriptionCheck } from "../../subscriptions/decorators/subscription.decorator";
 import { CreditWalletService } from "../services/credit-wallet.service";
 
 @Controller("credits")
@@ -42,6 +43,7 @@ export class CreditController {
 
   @Get("wallet")
   @UseGuards(JwtGuard)
+  @SkipSubscriptionCheck()
   async wallet(@GetUser() user: User) {
     return {
       balance: await this.walletService.balanceOf(user.id),

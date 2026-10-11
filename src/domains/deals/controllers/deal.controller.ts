@@ -42,6 +42,8 @@ import {
   dealDocumentUploadOptions,
   requireFile,
 } from "../helpers/deal-upload.helper";
+import { PlanLimit } from "../../subscriptions/decorators/subscription.decorator";
+import { PlanLimitResource } from "../../subscriptions/enums/subscription.enum";
 
 /** The broker's side of the closing room. */
 @Controller("deals")
@@ -67,6 +69,7 @@ export class DealController {
   }
 
   @Post()
+  @PlanLimit(PlanLimitResource.OPEN_DEALS)
   create(@GetUser() user: User, @Body() dto: DealCreateDto) {
     return this.dealService.create(user, dto);
   }

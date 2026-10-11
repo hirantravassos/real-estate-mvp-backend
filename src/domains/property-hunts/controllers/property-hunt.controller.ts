@@ -20,6 +20,8 @@ import {
   PropertyHuntFilterDto,
 } from "../dtos/property-hunt.dto";
 import { PropertyHuntService } from "../services/property-hunt.service";
+import { PlanLimit } from "../../subscriptions/decorators/subscription.decorator";
+import { PlanLimitResource } from "../../subscriptions/enums/subscription.enum";
 
 /** The AI property hunt: reads what the broker wants and scans the portals. */
 @Controller("property-hunts")
@@ -51,6 +53,7 @@ export class PropertyHuntController {
   }
 
   @Post()
+  @PlanLimit(PlanLimitResource.PROPERTY_HUNTS_PER_MONTH)
   create(@GetUser() user: User, @Body() dto: PropertyHuntCreateDto) {
     return this.huntService.create(user, dto);
   }
