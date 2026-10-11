@@ -294,7 +294,8 @@ export class DocumentLookupService {
     }
   }
 
-  private estimatedPriceInCredits() {
+  /** Credits one automatic certificate usually costs. */
+  estimatedPriceInCredits() {
     return this.pricingService.creditsForCostInBrl(
       this.infosimplesService.estimatedCostInBrl,
     );

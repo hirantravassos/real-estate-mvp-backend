@@ -8,6 +8,7 @@ starts listening.
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Baseline`       | Schema of release 1.0.4. Skipped on databases that already have it (production), creates everything on an empty one. Cannot be reverted.                                                                                  |
 | `Release2Schema` | Everything 2.0.0 adds: 20 tables, 22 columns (nullable or with a default), 1 index, 30 foreign keys and new values on `documents.ownerType`. Nothing is dropped or rewritten, and every step checks first, so it runs on a 1.0.4 database, on one already built by `synchronize` and after stopping halfway. |
+| `AssistantPaidActions` | The assistant runs the paid features (hunts, owner contact, contact import, certificates) after the broker confirms the price: new values on `assistant_actions.kind` and the nullable `assistant_actions.result` column. |
 
 ## Commands
 

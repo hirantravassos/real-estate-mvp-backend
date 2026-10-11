@@ -1,5 +1,6 @@
 import { Column, Entity, Index, JoinColumn, ManyToOne } from "typeorm";
 import { BaseEntity } from "../../../shared/entities/base.entity";
+import { PortalKey } from "../../property-hunts/enums/property-hunt.enum";
 import { User } from "../../users/entities/user.entity";
 import {
   AssistantActionKind,
@@ -56,12 +57,79 @@ export interface MarkLostPayload {
   lost: boolean;
 }
 
+/** Every paid action carries the price the broker sees before confirming. */
+interface PaidActionPayload {
+  estimatedCredits: number;
+}
+
+export interface PropertyHuntPayload extends PaidActionPayload {
+  request: string;
+  customerId: string | null;
+  customerName: string | null;
+  portals: PortalKey[];
+  portalNames: string[];
+  includeCatalog: boolean;
+  pricePerListing: number;
+  listingsPerPortal: number;
+}
+
+export interface OwnerSearchPayload extends PaidActionPayload {
+  propertyId: string | null;
+  propertyTitle: string;
+  address: string | null;
+  details: string | null;
+}
+
+export interface ContactImportItem {
+  phone: string;
+  name: string | null;
+  hasHistory: boolean;
+}
+
+export interface ContactImportPayload extends PaidActionPayload {
+  contacts: ContactImportItem[];
+  /** The AI reads each chat, imports only work contacts and fills their file. */
+  useAi: boolean;
+  avatarFromPhoto: boolean;
+  kanbanId: string | null;
+  kanbanName: string | null;
+}
+
+export interface CertificateLookupPayload extends PaidActionPayload {
+  propertyId: string;
+  propertyTitle: string;
+  lookupKey: string;
+  certificateTitle: string;
+  ownerName: string | null;
+  ownerDocumentNumber: string | null;
+}
+
 export interface AssistantActionPayloads {
   [AssistantActionKind.SEND_MESSAGE]: SendMessagePayload;
   [AssistantActionKind.SCHEDULE_VISIT]: ScheduleVisitPayload;
   [AssistantActionKind.ADD_NOTE]: AddNotePayload;
   [AssistantActionKind.MOVE_STAGE]: MoveStagePayload;
   [AssistantActionKind.MARK_LOST]: MarkLostPayload;
+  [AssistantActionKind.PROPERTY_HUNT]: PropertyHuntPayload;
+  [AssistantActionKind.OWNER_SEARCH]: OwnerSearchPayload;
+  [AssistantActionKind.CONTACT_IMPORT]: ContactImportPayload;
+  [AssistantActionKind.CERTIFICATE_LOOKUP]: CertificateLookupPayload;
+}
+
+export interface AssistantActionResultItem {
+  label: string;
+  detail: string | null;
+  /** An outside page, like the listing where an owner was found. */
+  url: string | null;
+}
+
+/** What a paid action brought back, shown on its card and read by the model. */
+export interface AssistantActionResult {
+  summary: string;
+  creditsCharged: number;
+  items: AssistantActionResultItem[];
+  /** A screen of the app to follow up, like the hunt running. */
+  link: { label: string; path: string } | null;
 }
 
 export type AssistantActionPayload =
@@ -102,6 +170,9 @@ export class AssistantAction extends BaseEntity {
 
   @Column({ type: "json", nullable: false })
   payload: AssistantActionPayload;
+
+  @Column({ type: "json", nullable: true })
+  result: AssistantActionResult | null;
 
   @Column({ type: "varchar", length: 255, nullable: true })
   errorMessage: string | null;

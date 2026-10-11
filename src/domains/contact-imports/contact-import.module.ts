@@ -26,5 +26,6 @@ import { ContactImportService } from "./services/contact-import.service";
   ],
   controllers: [ContactImportController],
   providers: [ContactImportService, ContactAiAnalysisService],
+  exports: [ContactImportService, ContactAiAnalysisService],
 })
 export class ContactImportModule {}

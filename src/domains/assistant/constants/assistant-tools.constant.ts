@@ -1,4 +1,5 @@
 import { OpenaiTool } from "../../../infrastructure/openai/services/openai.service";
+import { PortalKey } from "../../property-hunts/enums/property-hunt.enum";
 
 /** Strict mode wants every field listed, so optional ones accept null. */
 const nullable = (type: string, description: string) => ({
@@ -27,7 +28,13 @@ export type AssistantToolName =
   | "propose_visit"
   | "propose_customer_note"
   | "propose_stage_change"
-  | "propose_lost_status";
+  | "propose_lost_status"
+  | "list_whatsapp_contacts"
+  | "list_certificates"
+  | "propose_property_hunt"
+  | "propose_owner_search"
+  | "propose_contact_import"
+  | "propose_certificate_lookup";
 
 export const ASSISTANT_TOOLS: (OpenaiTool & { name: AssistantToolName })[] = [
   {
@@ -275,6 +282,105 @@ export const ASSISTANT_TOOLS: (OpenaiTool & { name: AssistantToolName })[] = [
     parameters: objectOf({
       customerId: { type: "string", description: "Id do cliente." },
       lost: { type: "boolean", description: "true para perdido." },
+    }),
+  },
+  {
+    name: "list_whatsapp_contacts",
+    description:
+      "Lista contatos do WhatsApp do corretor que ainda não são clientes, os de conversa mais recente primeiro, com o preço de importar com IA. Use antes de propose_contact_import.",
+    parameters: objectOf({
+      search: nullable("string", "Parte do nome ou do telefone."),
+      onlyWithHistory: nullable(
+        "boolean",
+        "true traz só quem tem conversa, que a IA consegue ler. Padrão: true.",
+      ),
+      limit: nullable("integer", "Quantos trazer, até 40. Padrão: 20."),
+    }),
+  },
+  {
+    name: "list_certificates",
+    description:
+      "Lista as certidões públicas de um imóvel e dos proprietários: quais saem sozinhas (automatic), o preço em créditos, o que falta preencher e a última busca. Use antes de propose_certificate_lookup.",
+    parameters: objectOf({
+      propertyId: { type: "string", description: "Id do imóvel." },
+    }),
+  },
+  {
+    name: "propose_property_hunt",
+    description:
+      "PAGO. Prepara uma caça de imóveis com IA nos portais (ZAP, Viva Real, OLX...) e na carteira do corretor, para um cliente ou não. A IA entende o pedido e lê cada anúncio, cobrando por anúncio lido. Só começa depois que o corretor confirmar o custo.",
+    parameters: objectOf({
+      request: {
+        type: "string",
+        description:
+          "O pedido em uma frase, como o corretor digitaria. Ex.: apartamento 3 quartos com suíte no Embaré em Santos até 800 mil. Monte a partir da conversa ou da ficha do cliente quando for para um cliente.",
+      },
+      customerId: nullable("string", "Cliente para quem é a caça."),
+      portals: {
+        type: ["array", "null"],
+        description: "Portais onde buscar. Padrão: todos.",
+        items: { type: "string", enum: Object.values(PortalKey) },
+      },
+      includeCatalog: nullable(
+        "boolean",
+        "Busca também na carteira do corretor. Padrão: true.",
+      ),
+    }),
+  },
+  {
+    name: "propose_owner_search",
+    description:
+      "PAGO. Prepara a busca do contato do proprietário de um imóvel em anúncios do próprio dono na internet. Só busca depois que o corretor confirmar o custo.",
+    parameters: objectOf({
+      propertyId: nullable("string", "Id do imóvel cadastrado."),
+      address: nullable(
+        "string",
+        "Endereço completo, quando o imóvel não está cadastrado.",
+      ),
+      details: nullable(
+        "string",
+        "Algo que diferencie o imóvel: prédio, andar, metragem, link do anúncio.",
+      ),
+    }),
+  },
+  {
+    name: "propose_contact_import",
+    description:
+      "PAGO quando usa IA ou bonequinhos. Prepara a importação de contatos do WhatsApp como clientes, com a conversa. Com useAi a IA lê cada conversa, importa só os contatos de trabalho e preenche etapa, orçamento e anotação, cobrando por contato com conversa. Só importa depois que o corretor confirmar o custo.",
+    parameters: objectOf({
+      phones: {
+        type: "array",
+        items: { type: "string" },
+        description: "Telefones de list_whatsapp_contacts, até 40.",
+      },
+      useAi: nullable(
+        "boolean",
+        "Usar a IA para ler as conversas. Padrão: true.",
+      ),
+      avatarFromPhoto: nullable(
+        "boolean",
+        "Criar o bonequinho de cada cliente pela foto do WhatsApp, cobrado por foto. Padrão: false.",
+      ),
+      kanbanId: nullable(
+        "string",
+        "Etapa do funil para quem a IA não indicar outra.",
+      ),
+    }),
+  },
+  {
+    name: "propose_certificate_lookup",
+    description:
+      "PAGO. Prepara a emissão automática de uma certidão pública do imóvel ou de um proprietário. O arquivo fica nos documentos do imóvel. Só busca depois que o corretor confirmar o custo.",
+    parameters: objectOf({
+      propertyId: { type: "string", description: "Id do imóvel." },
+      lookupKey: {
+        type: "string",
+        description: "lookupKey de list_certificates.",
+      },
+      ownerDocumentNumber: nullable(
+        "string",
+        "CPF ou CNPJ do proprietário, nas certidões por proprietário.",
+      ),
     }),
   },
 ];

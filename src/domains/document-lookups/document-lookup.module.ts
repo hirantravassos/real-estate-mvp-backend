@@ -19,5 +19,6 @@ import { DocumentLookupService } from "./services/document-lookup.service";
   ],
   controllers: [DocumentLookupController],
   providers: [DocumentLookupService],
+  exports: [DocumentLookupService],
 })
 export class DocumentLookupModule {}

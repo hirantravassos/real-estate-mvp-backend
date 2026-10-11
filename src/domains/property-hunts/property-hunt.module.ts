@@ -68,6 +68,6 @@ import { PropertyMatchService } from "./services/property-match.service";
     PropertyMatchService,
     ListingPageReaderService,
   ],
-  exports: [ListingPageReaderService],
+  exports: [ListingPageReaderService, PropertyHuntService],
 })
 export class PropertyHuntModule {}
