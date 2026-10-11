@@ -13,6 +13,7 @@ import {
   PropertyService,
   PropertyCreateDto,
   PropertyFilterDto,
+  PropertyLandingVisibilityDto,
 } from "../services/property.service";
 import { JwtGuard } from "../../auth/guards/jwt.guard";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
@@ -46,6 +47,15 @@ export class PropertyController {
     @Body() dto: PropertyCreateDto,
   ) {
     return PropertyMapper.toDto(await this.propertyService.save(user, dto, id));
+  }
+
+  @Patch(":id/landing")
+  async updateLandingVisibility(
+    @GetUser() user: User,
+    @Param("id") id: string,
+    @Body() dto: PropertyLandingVisibilityDto,
+  ) {
+    return this.propertyService.setLandingVisibility(user, id, dto.visible);
   }
 
   @Delete(":id")

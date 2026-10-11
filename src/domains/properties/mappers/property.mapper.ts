@@ -64,6 +64,7 @@ export interface PropertyDto {
   infoHasGym: boolean | null;
   sourcePortal: string | null;
   sourceUrl: string | null;
+  showOnLanding: boolean;
   createdAt: Date;
   updatedAt: Date;
   active: boolean;
@@ -80,6 +81,7 @@ export interface PropertyListDto {
   infoBathrooms: number | null;
   infoSquareMeters: number | null;
   sourcePortal: string | null;
+  showOnLanding: boolean;
   createdAt: Date;
   contacts: PropertyContactDto[];
 }
@@ -162,6 +164,7 @@ export class PropertyMapper {
       infoHasGym: entity.infoHasGym,
       sourcePortal: entity.sourcePortal ?? null,
       sourceUrl: entity.sourceUrl ?? null,
+      showOnLanding: entity.showOnLanding ?? false,
       contacts: [], // Must be ALWAYS empty!!!
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
@@ -182,6 +185,7 @@ export class PropertyMapper {
         infoBathrooms: entity.infoBathrooms,
         infoSquareMeters: entity.infoSquareMeters,
         sourcePortal: entity.sourcePortal ?? null,
+        showOnLanding: entity.showOnLanding ?? false,
         createdAt: entity.createdAt,
         contacts: this.toContacts(entity.contacts),
       };

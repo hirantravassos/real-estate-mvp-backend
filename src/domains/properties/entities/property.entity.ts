@@ -116,4 +116,8 @@ export class Property extends BaseEntity {
 
   @Column({ type: "varchar", length: 1024, nullable: true })
   sourceUrl: string | null;
+
+  /** Listed on the broker's public page; hidden until the broker says so. */
+  @ColumnBoolean({ default: false })
+  showOnLanding: boolean;
 }

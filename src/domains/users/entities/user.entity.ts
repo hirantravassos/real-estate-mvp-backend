@@ -43,4 +43,38 @@ export class User extends BaseEntity {
 
   @Column({ type: "varchar", length: 500, nullable: true })
   termsAcceptedUserAgent: string | null;
+
+  /** Address of the broker's public page, like /corretor/maria-souza. */
+  @Column({ type: "varchar", length: 60, nullable: true, unique: true })
+  slug: string | null;
+
+  /** Where the broker is based. Required by the app, null for old accounts. */
+  @Column({ type: "varchar", length: 120, nullable: true })
+  city: string | null;
+
+  /** WhatsApp shown on the public page, digits only. */
+  @Column({ type: "varchar", length: 20, nullable: true })
+  phone: string | null;
+
+  @Column({ type: "varchar", length: 30, nullable: true })
+  creci: string | null;
+
+  /** A short presentation shown on the public page. */
+  @Column({ type: "varchar", length: 500, nullable: true })
+  bio: string | null;
+
+  @Column({ type: "json", nullable: true })
+  workingCities: string[] | null;
+
+  /** What the broker sells: high end, launches, rentals, rural… */
+  @Column({ type: "json", nullable: true })
+  salesNiches: string[] | null;
+
+  /** The customers the broker likes to serve. Private, only the AI reads it. */
+  @Column({ type: "json", nullable: true })
+  targetClienteles: string[] | null;
+
+  /** Free notes the AI always reads, written and edited by the broker. */
+  @Column({ type: "text", nullable: true })
+  aiMemory: string | null;
 }

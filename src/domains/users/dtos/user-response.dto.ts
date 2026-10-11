@@ -11,6 +11,18 @@ export class UserResponseDto {
     acceptedAt: string | null;
     currentVersion: string;
   };
+  /** Address of the public page, /corretor/{slug}. */
+  slug!: string | null;
+  profile!: {
+    city: string | null;
+    phone: string | null;
+    creci: string | null;
+    bio: string | null;
+    workingCities: string[];
+    salesNiches: string[];
+    targetClienteles: string[];
+    aiMemory: string | null;
+  };
   createdAt!: string;
   updatedAt!: string;
 }
