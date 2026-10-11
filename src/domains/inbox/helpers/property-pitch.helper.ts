@@ -8,6 +8,7 @@ export const KIND_LABEL: Record<PropertyKindEnum, string> = {
   [PropertyKindEnum.HOUSE]: "Casa",
   [PropertyKindEnum.APARTMENT]: "Apartamento",
   [PropertyKindEnum.COMMERCIAL]: "Ponto comercial",
+  [PropertyKindEnum.LAND]: "Terreno",
 };
 
 export const formatBrl = (value: string | number | null | undefined) => {

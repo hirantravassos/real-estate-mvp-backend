@@ -52,6 +52,7 @@ const KIND_LABELS: Record<PropertyKindEnum, string> = {
   [PropertyKindEnum.APARTMENT]: "apartamento",
   [PropertyKindEnum.HOUSE]: "casa",
   [PropertyKindEnum.COMMERCIAL]: "imóvel comercial",
+  [PropertyKindEnum.LAND]: "terreno",
 };
 
 /** Below this the listing is not worth the broker's time. */
