@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from "@nestjs/typeorm";
 import { randomUUID } from "crypto";
 import * as path from "path";
+import sharp from "sharp";
 import { Not, Repository } from "typeorm";
 import { EvolutionApiService } from "../../../infrastructure/evolution/services/evolution-api.service";
 import {
@@ -421,6 +422,30 @@ export class MessageService {
             number,
             audio.toString("base64"),
           );
+        } else if (
+          message.type === MessageType.IMAGE &&
+          IMAGES_SENT_AS_JPEG.has(baseMimeType(message.mimeType))
+        ) {
+          // WhatsApp refuses these formats, so they go as a JPEG.
+          const original = await this.storageService.downloadObject(
+            message.s3Key,
+          );
+          const jpeg = await sharp(original)
+            .rotate()
+            .flatten({ background: "#ffffff" })
+            .jpeg({ quality: 90 })
+            .toBuffer();
+          sent = await this.evolutionApiService.sendMedia(
+            connection.instanceName,
+            number,
+            {
+              mediatype: "image",
+              mimetype: "image/jpeg",
+              media: jpeg.toString("base64"),
+              caption: message.body,
+              fileName: `${path.parse(message.fileName ?? "foto").name}.jpg`,
+            },
+          );
         } else {
           const url = await this.storageService.getPresignedUrl(message.s3Key, {
             expiresInSeconds: 60 * 60,
@@ -441,10 +466,8 @@ export class MessageService {
             number,
             {
               mediatype,
-              mimetype: (message.mimeType ?? "application/octet-stream").split(
-                ";",
-              )[0],
-              url,
+              mimetype: baseMimeType(message.mimeType),
+              media: url,
               caption: message.body,
               fileName:
                 message.fileName ?? withExtension("arquivo", message.mimeType),
@@ -582,6 +605,12 @@ const toDate = (timestamp: number | string | undefined) => {
     ? new Date(seconds * 1000)
     : new Date();
 };
+
+/** Image formats WhatsApp does not take, converted to JPEG on the way out. */
+const IMAGES_SENT_AS_JPEG = new Set(["image/webp"]);
+
+const baseMimeType = (mimeType: string | null) =>
+  (mimeType ?? "application/octet-stream").split(";")[0].trim().toLowerCase();
 
 const EXTENSION_BY_MIME_TYPE: Record<string, string> = {
   "image/jpeg": ".jpg",

@@ -143,7 +143,8 @@ export class EvolutionApiService {
     media: {
       mediatype: EvolutionSendMediaType;
       mimetype: string;
-      url: string;
+      /** A link or base64. */
+      media: string;
       caption?: string | null;
       fileName?: string | null;
     },
@@ -156,7 +157,7 @@ export class EvolutionApiService {
           number,
           mediatype: media.mediatype,
           mimetype: media.mimetype,
-          media: media.url,
+          media: media.media,
           caption: media.caption ?? undefined,
           fileName: media.fileName ?? undefined,
         },
