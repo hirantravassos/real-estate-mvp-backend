@@ -37,4 +37,8 @@ export class Document extends BaseEntity {
 
   @Column({ type: "bigint", nullable: false })
   sizeBytes: number;
+
+  /** Which suggested document this file is, like the property registration. */
+  @Column({ type: "varchar", length: 64, nullable: true })
+  category: string | null;
 }

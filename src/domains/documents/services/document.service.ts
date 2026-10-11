@@ -43,6 +43,7 @@ export class DocumentService {
     ownerId: string,
     ownerDomain: DocumentOwnerDomain,
     file: Express.Multer.File,
+    category: string | null = null,
   ): Promise<Document> {
     const { s3Key, mimeType, sizeBytes } =
       await this.storageService.uploadDocument(
@@ -62,6 +63,7 @@ export class DocumentService {
     document.s3Key = s3Key;
     document.mimeType = mimeType;
     document.sizeBytes = sizeBytes;
+    document.category = category;
 
     return this.documentRepository.save(document);
   }
