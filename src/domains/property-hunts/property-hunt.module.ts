@@ -9,6 +9,7 @@ import { Customer } from "../customers/entities/customer.entity";
 import { CustomerModule } from "../customers/customer.module";
 import { Conversation } from "../inbox/entities/conversation.entity";
 import { Message } from "../inbox/entities/message.entity";
+import { WhatsappConnection } from "../inbox/entities/whatsapp-connection.entity";
 import { InboxModule } from "../inbox/inbox.module";
 import { PropertyMedia } from "../properties/entities/property-media.entity";
 import { Property } from "../properties/entities/property.entity";
@@ -41,6 +42,7 @@ import { PropertyMatchService } from "./services/property-match.service";
       Customer,
       Conversation,
       Message,
+      WhatsappConnection,
     ]),
     RealtimeModule,
     StorageModule,

@@ -1,58 +1,85 @@
 import sharp from "sharp";
-import { applyWatermark } from "./watermark.helper";
+import { brokerMarkLines, stampBrokerMark } from "./watermark.helper";
 
-const solid = (
-  width: number,
-  height: number,
-  color: { r: number; g: number; b: number; alpha: number },
-) =>
-  sharp({ create: { width, height, channels: 4, background: color } })
-    .png()
+const solidPhoto = (width: number, height: number) =>
+  sharp({
+    create: {
+      width,
+      height,
+      channels: 3,
+      background: { r: 240, g: 240, b: 240 },
+    },
+  })
+    .jpeg()
     .toBuffer();
 
-describe("applyWatermark", () => {
-  it("stamps the mark in the chosen corner and leaves the rest alone", async () => {
-    const photo = await solid(1000, 600, { r: 0, g: 0, b: 255, alpha: 1 });
-    const mark = await solid(200, 100, { r: 255, g: 0, b: 0, alpha: 1 });
+/** How many pixels in the area look like the dark tag or its white text. */
+const markedPixels = async (
+  photo: Buffer,
+  area: { left: number; top: number; width: number; height: number },
+) => {
+  const { data, info } = await sharp(photo)
+    .extract(area)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  let count = 0;
+  for (let index = 0; index < data.length; index += info.channels) {
+    if (data[index] < 150) count += 1;
+  }
+  return count;
+};
 
-    const stamped = await applyWatermark(photo, mark, {
-      position: "bottom-right",
-      opacity: 1,
-      widthRatio: 0.2,
-    });
-    const { data, info } = await sharp(stamped)
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-    const pixel = (x: number, y: number) => {
-      const index = (y * info.width + x) * info.channels;
-      return [data[index], data[index + 1], data[index + 2]];
-    };
-
-    expect(info.width).toBe(1000);
-    expect(info.height).toBe(600);
-    const [red, , blue] = pixel(880, 540);
-    expect(red).toBeGreaterThan(200);
-    expect(blue).toBeLessThan(60);
-    const [cornerRed, , cornerBlue] = pixel(20, 20);
-    expect(cornerRed).toBeLessThan(60);
-    expect(cornerBlue).toBeGreaterThan(200);
+describe("brokerMarkLines", () => {
+  it("writes the name, CRECI and phone of the broker", () => {
+    expect(
+      brokerMarkLines({
+        name: "Hiran Travassos",
+        creci: "123456-F",
+        phone: "5513991234567",
+        email: "hiran@x.com",
+      }),
+    ).toEqual(["Hiran Travassos · CRECI 123456-F", "(13) 99123-4567"]);
   });
 
-  it("fades the mark with the opacity", async () => {
-    const photo = await solid(1000, 600, { r: 0, g: 0, b: 255, alpha: 1 });
-    const mark = await solid(200, 100, { r: 255, g: 0, b: 0, alpha: 1 });
+  it("falls back to the email without a phone", () => {
+    expect(
+      brokerMarkLines({ name: "Hiran", phone: null, email: "hiran@x.com" }),
+    ).toEqual(["Hiran", "hiran@x.com"]);
+  });
+});
 
-    const stamped = await applyWatermark(photo, mark, {
-      position: "bottom-right",
-      opacity: 0.5,
-      widthRatio: 0.2,
+describe("stampBrokerMark", () => {
+  it("stamps the tag in the bottom right corner only", async () => {
+    const photo = await solidPhoto(1200, 800);
+    const stamped = await stampBrokerMark(photo, [
+      "Hiran Travassos · CRECI 123456-F",
+      "(13) 99123-4567",
+    ]);
+    const { width, height } = await sharp(stamped).metadata();
+    expect(width).toBe(1200);
+    expect(height).toBe(800);
+
+    const corner = await markedPixels(stamped, {
+      left: 700,
+      top: 650,
+      width: 450,
+      height: 120,
     });
-    const { data, info } = await sharp(stamped)
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-    const index = (540 * info.width + 880) * info.channels;
-    expect(data[index]).toBeGreaterThan(90);
-    expect(data[index]).toBeLessThan(170);
-    expect(data[index + 2]).toBeGreaterThan(90);
+    const topLeft = await markedPixels(stamped, {
+      left: 0,
+      top: 0,
+      width: 450,
+      height: 300,
+    });
+    expect(corner).toBeGreaterThan(5000);
+    expect(topLeft).toBe(0);
+  });
+
+  it("keeps the photo when there is nothing to write", async () => {
+    const photo = await solidPhoto(600, 400);
+    const stamped = await stampBrokerMark(photo, []);
+    expect(
+      await markedPixels(stamped, { left: 0, top: 0, width: 600, height: 400 }),
+    ).toBe(0);
   });
 });
