@@ -1,9 +1,16 @@
-import { BadRequestException, Inject, Injectable } from "@nestjs/common";
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  OnApplicationBootstrap,
+} from "@nestjs/common";
 import type { ConfigType } from "@nestjs/config";
 import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  PutBucketCorsCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -69,7 +76,8 @@ export interface PresignedUploadResult {
 }
 
 @Injectable()
-export class StorageService {
+export class StorageService implements OnApplicationBootstrap {
+  private readonly logger = new Logger(StorageService.name);
   private readonly s3Client: S3Client;
 
   constructor(
@@ -87,6 +95,43 @@ export class StorageService {
         secretAccessKey: this.bucketConfiguration.secret,
       },
     });
+  }
+
+  async onApplicationBootstrap() {
+    await this.allowBrowserUploads();
+  }
+
+  /**
+   * The app uploads photos, videos and chat files straight from the browser
+   * with presigned URLs, which the bucket only accepts from allowed sites.
+   */
+  private async allowBrowserUploads() {
+    const origins = this.bucketConfiguration.corsOrigins;
+    if (!this.bucketConfiguration.name || origins.length === 0) return;
+
+    try {
+      await this.s3Client.send(
+        new PutBucketCorsCommand({
+          Bucket: this.bucketConfiguration.name,
+          CORSConfiguration: {
+            CORSRules: [
+              {
+                AllowedOrigins: origins,
+                AllowedMethods: ["GET", "PUT", "HEAD"],
+                AllowedHeaders: ["*"],
+                ExposeHeaders: ["ETag"],
+                MaxAgeSeconds: 3600,
+              },
+            ],
+          },
+        }),
+      );
+      this.logger.log(`Bucket accepts uploads from ${origins.join(", ")}`);
+    } catch (error) {
+      this.logger.error(
+        `Could not set the bucket CORS, browser uploads may fail: ${String(error)}`,
+      );
+    }
   }
 
   async uploadDocument(
