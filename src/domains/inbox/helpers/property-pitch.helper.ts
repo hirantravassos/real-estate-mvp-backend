@@ -4,7 +4,7 @@ import {
   PropertyKindEnum,
 } from "../../properties/mappers/property.mapper";
 
-const KIND_LABEL: Record<PropertyKindEnum, string> = {
+export const KIND_LABEL: Record<PropertyKindEnum, string> = {
   [PropertyKindEnum.HOUSE]: "Casa",
   [PropertyKindEnum.APARTMENT]: "Apartamento",
   [PropertyKindEnum.COMMERCIAL]: "Ponto comercial",
