@@ -1,8 +1,8 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, OnApplicationBootstrap } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import dayjs from "dayjs";
 import sharp from "sharp";
-import { Repository } from "typeorm";
+import { IsNull, Not, Repository } from "typeorm";
 import {
   ALLOWED_MEDIA_IMAGE_TYPES,
   StorageService,
@@ -13,6 +13,10 @@ import {
   PropertyMediaType,
 } from "../../properties/entities/property-media.entity";
 import { Property } from "../../properties/entities/property.entity";
+import {
+  PropertySourceDetails,
+  scrubThirdPartyData,
+} from "../../properties/helpers/customer-safe.helper";
 import {
   PropertyConciergeServiceEnum,
   PropertyFurnitureEnum,
@@ -47,7 +51,7 @@ const ADVERTISER_KIND_LABELS = {
  * listing leaves the portal.
  */
 @Injectable()
-export class ListingImportService {
+export class ListingImportService implements OnApplicationBootstrap {
   private readonly logger = new Logger(ListingImportService.name);
 
   constructor(
@@ -55,6 +59,8 @@ export class ListingImportService {
     private readonly propertyRepository: Repository<Property>,
     @InjectRepository(PropertyMedia)
     private readonly mediaRepository: Repository<PropertyMedia>,
+    @InjectRepository(PropertyMatch)
+    private readonly matchRepository: Repository<PropertyMatch>,
     private readonly storageService: StorageService,
   ) {}
 
@@ -76,7 +82,7 @@ export class ListingImportService {
     const property = new Property();
     property.user = user;
     property.kind = listing.kind;
-    property.alias = truncate(match.title, 255);
+    property.alias = truncate(this.cleanTitle(match, listing), 255);
     property.address =
       [listing.address, listing.neighborhood, listing.city, listing.state]
         .filter(Boolean)
@@ -86,6 +92,7 @@ export class ListingImportService {
     property.comment = this.describe(match, listing);
     property.sourcePortal = match.portal;
     property.sourceUrl = match.externalUrl;
+    property.sourceDetails = this.sourceDetailsOf(listing);
 
     property.infoBedrooms = listing.bedrooms;
     property.infoSuiteBedrooms = listing.suites;
@@ -140,44 +147,86 @@ export class ListingImportService {
     return property;
   }
 
-  /** The private notes: where it came from, the full text and the advertiser. */
+  /**
+   * The notes keep only what describes the property itself. Everything that
+   * leads to the original listing (link, advertiser, phones, codes) goes to
+   * the source details, seen only by the broker.
+   */
   private describe(match: PropertyMatch, listing: ListingSnapshot) {
-    const portal = match.portal ? PORTALS[match.portal].label : "portal";
-    const advertiser = listing.advertiser;
-    const advertiserLines = [
-      advertiser.name
-        ? `${advertiser.name} (${ADVERTISER_KIND_LABELS[advertiser.kind]})`
-        : `Anunciante: ${ADVERTISER_KIND_LABELS[advertiser.kind]}`,
-      advertiser.company ? `Empresa: ${advertiser.company}` : null,
-      advertiser.creci ? `CRECI: ${advertiser.creci}` : null,
-      advertiser.phones.length
-        ? `Telefones: ${advertiser.phones.join(", ")}`
-        : null,
-      advertiser.emails.length
-        ? `E-mails: ${advertiser.emails.join(", ")}`
-        : null,
-    ].filter(Boolean);
-    const videos = listing.videos.filter(
-      (video) => !/\.mp4(\?|$)/i.test(video),
-    );
-
+    const description = scrubThirdPartyData(listing.description, [
+      listing.advertiser.name,
+      listing.advertiser.company,
+    ]);
     return [
-      `🔎 Garimpado no ${portal} pela caça com IA em ${dayjs().format("DD/MM/YYYY")}.`,
-      match.externalUrl ? `Anúncio: ${match.externalUrl}` : null,
+      "🔒 Garimpado pela caça com IA. Link, anunciante e contatos do anúncio ficam no painel Origem do anúncio, só para você.",
       listing.amenities.length
         ? `Diferenciais: ${listing.amenities.map((amenity) => AMENITY_LABELS[amenity]).join(", ")}`
         : null,
       listing.beachDistanceMeters !== null && listing.beachDistanceEstimated
         ? "Distância da praia estimada pela IA, confirme na visita."
         : null,
-      listing.description
-        ? `\nDescrição do anúncio:\n${listing.description}`
-        : null,
-      `\n📇 Contato do anúncio:\n${advertiserLines.join("\n")}`,
-      videos.length ? `\n🎬 Vídeos e tours:\n${videos.join("\n")}` : null,
+      description ? `\nSobre o imóvel:\n${description}` : null,
     ]
       .filter(Boolean)
       .join("\n");
+  }
+
+  private sourceDetailsOf(listing: ListingSnapshot): PropertySourceDetails {
+    return {
+      importedAt: dayjs().toISOString(),
+      neighborhood: listing.neighborhood,
+      city: listing.city,
+      state: listing.state,
+      advertiser: listing.advertiser,
+      description: listing.description,
+      videos: listing.videos,
+    };
+  }
+
+  /**
+   * Properties imported before the source details existed had the listing
+   * link and the advertiser in their notes. Moves them out, once.
+   */
+  async onApplicationBootstrap() {
+    const properties = await this.propertyRepository
+      .find({
+        where: { sourcePortal: Not(IsNull()), sourceDetails: IsNull() },
+        take: 500,
+      })
+      .catch(() => [] as Property[]);
+    for (const property of properties) {
+      const match = await this.matchRepository.findOne({
+        where: { propertyId: property.id, userId: property.userId },
+        order: { createdAt: "ASC" },
+      });
+      if (!match?.listing) continue;
+      await this.propertyRepository.update(
+        { id: property.id },
+        {
+          alias: truncate(this.cleanTitle(match, match.listing), 255),
+          comment: this.describe(match, match.listing),
+          sourceDetails: this.sourceDetailsOf(match.listing),
+        },
+      );
+      await this.mediaRepository
+        .createQueryBuilder()
+        .update()
+        .set({ displayName: () => "REPLACE(displayName, ' do anúncio', '')" })
+        .where("propertyId = :propertyId", { propertyId: property.id })
+        .execute();
+    }
+    if (properties.length) {
+      this.logger.log(`Cleaned the notes of ${properties.length} properties`);
+    }
+  }
+
+  private cleanTitle(match: PropertyMatch, listing: ListingSnapshot) {
+    return (
+      scrubThirdPartyData(match.title, [
+        listing.advertiser.name,
+        listing.advertiser.company,
+      ]) || "Imóvel garimpado"
+    );
   }
 
   private async copyMedia(
@@ -275,8 +324,8 @@ export class ListingImportService {
           type: source.type,
           displayName:
             source.type === PropertyMediaType.IMAGE
-              ? `Foto ${order + 1} do anúncio`
-              : "Vídeo do anúncio",
+              ? `Foto ${order + 1}`
+              : "Vídeo",
           s3Key,
           mimeType,
           sizeBytes: buffer.length,

@@ -176,8 +176,12 @@ export class InboxAiService {
         `Corretor: ${user.name}`,
         customerContext,
         `Imóvel:\n${describePropertyFacts(property).join("\n")}`,
-        property.comment
+        // Portal properties never send their notes: they describe the original listing.
+        property.comment && !property.sourcePortal
           ? `Observações internas do corretor (use só se ajudar e nunca revele dados sensíveis):\n${property.comment}`
+          : "",
+        property.sourcePortal
+          ? "Este imóvel veio de um portal: cite só o bairro e a cidade, nunca rua, número, portal, imobiliária ou anunciante."
           : "",
         transcript ? `Conversa recente:\n${transcript}` : "",
         instruction ? `Pedido do corretor: ${instruction}` : "",

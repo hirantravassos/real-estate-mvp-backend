@@ -3,6 +3,10 @@ import { UserService } from "../../users/services/user.service";
 import { PropertyService } from "../../properties/services/property.service";
 import { PropertyMediaService } from "../../properties/services/property-media.service";
 import { publicRegion } from "../helpers/public-region.helper";
+import {
+  customerAddressOf,
+  isFromPortal,
+} from "../../properties/helpers/customer-safe.helper";
 
 const MAXIMUM_LISTED_PROPERTIES = 60;
 
@@ -44,7 +48,10 @@ export class BrokerPageService {
         id: property.id,
         kind: property.kind ?? null,
         alias: property.alias,
-        region: publicRegion(property.address),
+        // Portal finds keep the area the hunt read, never the listing's street.
+        region: isFromPortal(property)
+          ? customerAddressOf(property)
+          : publicRegion(property.address),
         price: property.price,
         infoBedrooms: property.infoBedrooms,
         infoBathrooms: property.infoBathrooms,

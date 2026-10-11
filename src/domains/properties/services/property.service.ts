@@ -26,6 +26,10 @@ import { ValidateCurrency } from "../../../shared/decorators/validation/currency
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 import { InjectRepository } from "@nestjs/typeorm";
 import {
+  customerAddressOf,
+  isFromPortal,
+} from "../helpers/customer-safe.helper";
+import {
   PropertyConciergeServiceEnum,
   PropertyFurnitureEnum,
   PropertyKindEnum,
@@ -419,10 +423,15 @@ export class PropertyService {
       sourcePortal: _sourcePortal, // eslint-disable-line @typescript-eslint/no-unused-vars
       sourceUrl: _sourceUrl, // eslint-disable-line @typescript-eslint/no-unused-vars
       showOnLanding: _showOnLanding, // eslint-disable-line @typescript-eslint/no-unused-vars
+      sourceDetails: _sourceDetails, // eslint-disable-line @typescript-eslint/no-unused-vars
       ...presentation
     } = dto;
     return {
       ...presentation,
+      // A property found on a portal shows only its neighborhood and city.
+      ...(isFromPortal(dto)
+        ? { address: customerAddressOf(dto), address2: "" }
+        : {}),
       agent: {
         name: entity.user.name,
         profileImage: entity.user.profileImage,
