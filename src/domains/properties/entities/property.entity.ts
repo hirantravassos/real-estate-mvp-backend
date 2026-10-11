@@ -109,4 +109,11 @@ export class Property extends BaseEntity {
 
   @ColumnBoolean({ nullable: true })
   infoHasGym: boolean | null;
+
+  /** The portal it was found on by a hunt, null for properties made by hand. */
+  @Column({ type: "varchar", length: 40, nullable: true })
+  sourcePortal: string | null;
+
+  @Column({ type: "varchar", length: 1024, nullable: true })
+  sourceUrl: string | null;
 }

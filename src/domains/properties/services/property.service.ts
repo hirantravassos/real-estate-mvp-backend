@@ -389,8 +389,13 @@ export class PropertyService {
       });
 
     const dto = PropertyMapper.toDto(entity);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { comment: _, ...presentation } = dto;
+    // The customer never sees the private notes nor the portal it came from.
+    const {
+      comment: _comment, // eslint-disable-line @typescript-eslint/no-unused-vars
+      sourcePortal: _sourcePortal, // eslint-disable-line @typescript-eslint/no-unused-vars
+      sourceUrl: _sourceUrl, // eslint-disable-line @typescript-eslint/no-unused-vars
+      ...presentation
+    } = dto;
     return {
       ...presentation,
       agent: {

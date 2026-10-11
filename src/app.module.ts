@@ -22,6 +22,8 @@ import { CreditModule } from "./domains/credits/credit.module";
 import { InboxModule } from "./domains/inbox/inbox.module";
 import { DealModule } from "./domains/deals/deal.module";
 import { ContactImportModule } from "./domains/contact-imports/contact-import.module";
+import { PropertyHuntModule } from "./domains/property-hunts/property-hunt.module";
+import { portalsConfig } from "./config/portals.config";
 
 // const THROTTLE_TTL_MS = 60_000;
 // const THROTTLE_LIMIT = 30;
@@ -41,6 +43,7 @@ import { ContactImportModule } from "./domains/contact-imports/contact-import.mo
         evolutionConfig,
         openaiConfig,
         creditsConfig,
+        portalsConfig,
       ],
       envFilePath: ".env",
     }),
@@ -76,6 +79,7 @@ import { ContactImportModule } from "./domains/contact-imports/contact-import.mo
     InboxModule,
     DealModule,
     ContactImportModule,
+    PropertyHuntModule,
   ],
   // providers: [
   //   {

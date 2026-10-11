@@ -3,7 +3,10 @@ export type AiFeature =
   | "rewrite"
   | "presentation"
   | "contact_import"
-  | "avatar_from_photo";
+  | "avatar_from_photo"
+  | "hunt_criteria"
+  | "hunt_conversation"
+  | "hunt_listing";
 
 export interface AiFeatureDefinition {
   label: string;
@@ -53,6 +56,26 @@ export const AI_FEATURES: Record<AiFeature, AiFeatureDefinition> = {
     maximumOutputTokens: 600,
     typicalInputTokens: 1000,
     typicalOutputTokens: 250,
+    fixedPriceSafetyMultiplier: 1.5,
+  },
+  hunt_criteria: {
+    label: "Caça imóveis: entender o pedido",
+    maximumOutputTokens: 1400,
+    typicalInputTokens: 1200,
+    typicalOutputTokens: 500,
+  },
+  hunt_conversation: {
+    label: "Caça imóveis: perfil pela conversa",
+    maximumOutputTokens: 2000,
+    typicalInputTokens: 4000,
+    typicalOutputTokens: 800,
+  },
+  /** Priced per listing read: one listing's share of a batch call. */
+  hunt_listing: {
+    label: "Caça imóveis com IA",
+    maximumOutputTokens: 6000,
+    typicalInputTokens: 3800,
+    typicalOutputTokens: 900,
     fixedPriceSafetyMultiplier: 1.5,
   },
 };
