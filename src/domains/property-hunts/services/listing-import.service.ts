@@ -1,4 +1,10 @@
-import { Injectable, Logger, OnApplicationBootstrap } from "@nestjs/common";
+import {
+  Inject,
+  Injectable,
+  Logger,
+  OnApplicationBootstrap,
+} from "@nestjs/common";
+import type { ConfigType } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
 import dayjs from "dayjs";
 import sharp from "sharp";
@@ -23,7 +29,9 @@ import {
   PropertyLiftEnum,
 } from "../../properties/mappers/property.mapper";
 import { User } from "../../users/entities/user.entity";
+import { portalsConfig } from "../../../config/portals.config";
 import { PORTALS } from "../constants/portals.constant";
+import { applyWatermark } from "../helpers/watermark.helper";
 import { PropertyMatch } from "../entities/property-match.entity";
 import { AMENITY_LABELS } from "../helpers/match-score.helper";
 import { truncate } from "../helpers/text.helper";
@@ -62,7 +70,12 @@ export class ListingImportService implements OnApplicationBootstrap {
     @InjectRepository(PropertyMatch)
     private readonly matchRepository: Repository<PropertyMatch>,
     private readonly storageService: StorageService,
+    @Inject(portalsConfig.KEY)
+    private readonly configuration: ConfigType<typeof portalsConfig>,
   ) {}
+
+  /** The platform's mark, downloaded once and kept while the server runs. */
+  private watermark: Promise<Buffer | null> | null = null;
 
   async importMatch(user: User, match: PropertyMatch) {
     const listing = match.listing as ListingSnapshot;
@@ -266,6 +279,27 @@ export class ListingImportService implements OnApplicationBootstrap {
     return saved.length;
   }
 
+  private platformWatermark() {
+    const url = this.configuration.importWatermarkUrl;
+    if (!url) return Promise.resolve(null);
+    this.watermark ??= fetch(url, { signal: AbortSignal.timeout(20_000) })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const mark = Buffer.from(await response.arrayBuffer());
+        await sharp(mark).metadata();
+        return mark;
+      })
+      .catch((error: unknown) => {
+        this.logger.error(
+          `The import watermark could not be loaded: ${String(error)}`,
+        );
+        // Tries again on the next import instead of giving up for good.
+        this.watermark = null;
+        return null;
+      });
+    return this.watermark;
+  }
+
   private async copyOne(
     userId: string,
     propertyId: string,
@@ -305,6 +339,16 @@ export class ListingImportService implements OnApplicationBootstrap {
         }
         const { width } = await sharp(buffer).metadata();
         if (!width || width < 300) return null;
+
+        const mark = await this.platformWatermark();
+        if (mark) {
+          buffer = await applyWatermark(buffer, mark, {
+            position: this.configuration.importWatermarkPosition,
+            opacity: this.configuration.importWatermarkOpacity,
+            widthRatio: this.configuration.importWatermarkWidthRatio,
+          });
+          mimeType = "image/jpeg";
+        }
       } else if (!mimeType.startsWith("video/")) {
         return null;
       }

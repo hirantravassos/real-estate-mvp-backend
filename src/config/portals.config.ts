@@ -26,4 +26,27 @@ export const portalsConfig = registerAs("portals", () => ({
   ),
   /** Manages the platform accounts, shared by every broker. */
   adminKey: process.env.CREDITS_ADMIN_KEY ?? "",
+  /**
+   * The platform's own mark, a PNG with transparency, stamped on every photo
+   * a hunt brings into the neighborhood. Left empty, photos stay as they are.
+   */
+  importWatermarkUrl: process.env.IMPORT_PHOTO_WATERMARK_URL ?? "",
+  /** bottom-right, bottom-left, top-right, top-left or center. */
+  importWatermarkPosition:
+    process.env.IMPORT_PHOTO_WATERMARK_POSITION || "bottom-right",
+  importWatermarkOpacity: Math.min(
+    1,
+    Math.max(
+      0.1,
+      parseFloat(process.env.IMPORT_PHOTO_WATERMARK_OPACITY || "0.7"),
+    ),
+  ),
+  /** Width of the mark against the photo width, from 0.05 to 0.6. */
+  importWatermarkWidthRatio: Math.min(
+    0.6,
+    Math.max(
+      0.05,
+      parseFloat(process.env.IMPORT_PHOTO_WATERMARK_WIDTH_RATIO || "0.22"),
+    ),
+  ),
 }));
