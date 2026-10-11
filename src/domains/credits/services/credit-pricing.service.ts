@@ -30,9 +30,13 @@ export class CreditPricingService {
   }
 
   creditsForUsage(inputTokens: number, outputTokens: number) {
-    const costInBrl =
-      this.openaiService.costInUsd(inputTokens, outputTokens) *
-      this.configuration.usdToBrlRate;
+    return this.creditsForCostInUsd(
+      this.openaiService.costInUsd(inputTokens, outputTokens),
+    );
+  }
+
+  creditsForCostInUsd(costInUsd: number) {
+    const costInBrl = costInUsd * this.configuration.usdToBrlRate;
     const priceInBrl = costInBrl * this.configuration.profitMultiplier;
     return Math.max(1, Math.ceil(priceInBrl / this.cheapestCreditPriceInBrl));
   }
@@ -50,10 +54,13 @@ export class CreditPricingService {
   /** Credits a usual call costs, or the fixed price of fixed price features. */
   featurePrice(feature: AiFeature) {
     const definition = AI_FEATURES[feature];
-    const credits = this.creditsForUsage(
-      definition.typicalInputTokens,
-      definition.typicalOutputTokens,
-    );
+    const credits =
+      definition.typicalCostInUsd === undefined
+        ? this.creditsForUsage(
+            definition.typicalInputTokens,
+            definition.typicalOutputTokens,
+          )
+        : this.creditsForCostInUsd(definition.typicalCostInUsd);
     return Math.ceil(credits * (definition.fixedPriceSafetyMultiplier ?? 1));
   }
 }

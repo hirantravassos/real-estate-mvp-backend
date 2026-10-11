@@ -22,6 +22,7 @@ import { CreditModule } from "./domains/credits/credit.module";
 import { InboxModule } from "./domains/inbox/inbox.module";
 import { DealModule } from "./domains/deals/deal.module";
 import { ContactImportModule } from "./domains/contact-imports/contact-import.module";
+import { AssistantModule } from "./domains/assistant/assistant.module";
 
 // const THROTTLE_TTL_MS = 60_000;
 // const THROTTLE_LIMIT = 30;
@@ -76,6 +77,7 @@ import { ContactImportModule } from "./domains/contact-imports/contact-import.mo
     InboxModule,
     DealModule,
     ContactImportModule,
+    AssistantModule,
   ],
   // providers: [
   //   {
