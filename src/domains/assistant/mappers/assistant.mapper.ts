@@ -1,4 +1,5 @@
 import { AssistantAction } from "../entities/assistant-action.entity";
+import { AssistantChat } from "../entities/assistant-chat.entity";
 import { AssistantMessage } from "../entities/assistant-message.entity";
 
 export class AssistantMapper {
@@ -11,6 +12,15 @@ export class AssistantMapper {
       payload: entity.payload,
       errorMessage: entity.errorMessage,
       executedAt: entity.executedAt,
+      createdAt: entity.createdAt,
+    };
+  }
+
+  static toChatDto(entity: AssistantChat) {
+    return {
+      id: entity.id,
+      title: entity.title,
+      lastMessageAt: entity.lastMessageAt,
       createdAt: entity.createdAt,
     };
   }
@@ -31,6 +41,7 @@ export class AssistantMapper {
 }
 
 export type AssistantActionDto = ReturnType<typeof AssistantMapper.toActionDto>;
+export type AssistantChatDto = ReturnType<typeof AssistantMapper.toChatDto>;
 export type AssistantMessageDto = ReturnType<
   typeof AssistantMapper.toMessageDto
 >;

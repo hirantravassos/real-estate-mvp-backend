@@ -271,21 +271,6 @@ export class MessageService {
     });
   }
 
-  /**
-   * Queues a file and answers right away, for senders that should not wait
-   * for the safety delays between messages.
-   */
-  async queueMediaTo(
-    conversation: Conversation,
-    media: OutboundMediaRequest,
-    options: OutboundOptions,
-  ) {
-    const message = await this.createMedia(conversation, media, options);
-    return this.startDelivery(conversation, message, {
-      forceDocument: media.forceDocument,
-    });
-  }
-
   private createText(
     conversation: Conversation,
     text: string,
@@ -607,9 +592,17 @@ export class MessageService {
             context,
           );
         } else {
-          const url = await this.storageService.getPresignedUrl(message.s3Key, {
-            expiresInSeconds: 60 * 60,
-          });
+          // Small files go as base64: Evolution does not have to fetch the
+          // bucket, the step that already broke voice notes. Big videos keep
+          // the link, base64 would not fit in one request.
+          const media =
+            Number(message.sizeBytes ?? Infinity) <= MAXIMUM_INLINE_MEDIA_BYTES
+              ? (
+                  await this.storageService.downloadObject(message.s3Key)
+                ).toString("base64")
+              : await this.storageService.getPresignedUrl(message.s3Key, {
+                  expiresInSeconds: 60 * 60,
+                });
           const mediaTypeByMessage: Partial<
             Record<MessageType, EvolutionSendMediaType>
           > = {
@@ -627,7 +620,7 @@ export class MessageService {
             {
               mediatype,
               mimetype: baseMimeType(message.mimeType),
-              media: url,
+              media,
               caption: message.body,
               fileName:
                 message.fileName ?? withExtension("arquivo", message.mimeType),
@@ -769,6 +762,9 @@ const toDate = (timestamp: number | string | undefined) => {
 
 /** Image formats WhatsApp does not take, converted to JPEG on the way out. */
 const IMAGES_SENT_AS_JPEG = new Set(["image/webp"]);
+
+/** Largest file handed to Evolution inside the request, it takes up to 136 MB. */
+const MAXIMUM_INLINE_MEDIA_BYTES = 50 * 1024 * 1024;
 
 const baseMimeType = (mimeType: string | null) =>
   (mimeType ?? "application/octet-stream").split(";")[0].trim().toLowerCase();

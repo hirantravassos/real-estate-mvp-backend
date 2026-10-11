@@ -21,8 +21,10 @@ import { Visit } from "../visits/entities/visit.entity";
 import { VisitModule } from "../visits/visit.module";
 import { AssistantController } from "./controllers/assistant.controller";
 import { AssistantAction } from "./entities/assistant-action.entity";
+import { AssistantChat } from "./entities/assistant-chat.entity";
 import { AssistantMessage } from "./entities/assistant-message.entity";
 import { AssistantActionService } from "./services/assistant-action.service";
+import { AssistantChatService } from "./services/assistant-chat.service";
 import { AssistantDocumentService } from "./services/assistant-document.service";
 import { AssistantToolService } from "./services/assistant-tool.service";
 import { AssistantService } from "./services/assistant.service";
@@ -33,6 +35,7 @@ import { AssistantService } from "./services/assistant.service";
     TypeOrmModule.forFeature([
       AssistantMessage,
       AssistantAction,
+      AssistantChat,
       Customer,
       CustomerComment,
       Kanban,
@@ -59,6 +62,7 @@ import { AssistantService } from "./services/assistant.service";
     AssistantToolService,
     AssistantActionService,
     AssistantDocumentService,
+    AssistantChatService,
   ],
 })
 export class AssistantModule {}

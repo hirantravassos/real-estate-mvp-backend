@@ -27,6 +27,11 @@ export class AssistantAskDto {
   @IsBoolean()
   fromVoice?: boolean;
 
+  /** Leave empty to start a new chat with this question. */
+  @IsOptional()
+  @IsUUID()
+  chatId?: string;
+
   /** Files the broker attached to this question, uploaded before. */
   @IsOptional()
   @IsArray()
@@ -69,6 +74,19 @@ export class AssistantUploadDto {
 }
 
 export class AssistantHistoryDto {
+  @IsOptional()
+  @IsISO8601()
+  before?: string;
+}
+
+export class AssistantChatRenameDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  title: string;
+}
+
+export class AssistantChatListDto {
   @IsOptional()
   @IsISO8601()
   before?: string;

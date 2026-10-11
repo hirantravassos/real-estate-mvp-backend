@@ -13,6 +13,7 @@ import { RealtimeGateway } from "../../../infrastructure/realtime/realtime.gatew
 import { Customer } from "../../customers/entities/customer.entity";
 import { CustomerCommentService } from "../../customers/services/customer-comment.service";
 import { CustomerService } from "../../customers/services/customer.service";
+import { Conversation } from "../../inbox/entities/conversation.entity";
 import { MessageStatus } from "../../inbox/enums/inbox.enum";
 import { ConversationService } from "../../inbox/services/conversation.service";
 import {
@@ -73,6 +74,12 @@ const fileNameWithExtension = (fileName: string, s3Key: string) => {
     ? fileName
     : `${fileName}${extension}`;
 };
+
+/** How long a confirm waits for WhatsApp before answering "on its way". */
+const DELIVERY_WAIT_MILLISECONDS = 90_000;
+
+const sleep = (milliseconds: number) =>
+  new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 /** Carries out what the assistant prepared, once the broker confirms it. */
 @Injectable()
@@ -222,25 +229,69 @@ export class AssistantActionService {
       conversationId,
     );
 
-    if (text) {
-      const message = await this.messageService.sendText(
-        user,
-        conversation.id,
-        text,
-        { aiGenerated: true },
+    // Waits for WhatsApp to take each message, so "done" means it really
+    // went. A long queue of files keeps going after the wait.
+    const deliveries = this.deliverInOrder(conversation, text, files);
+    deliveries.catch(() => undefined);
+    const outcome = await Promise.race([
+      deliveries,
+      sleep(DELIVERY_WAIT_MILLISECONDS).then(() => null),
+    ]);
+    if (!outcome) return;
+
+    const failed = outcome.filter(
+      (result) => result.status === MessageStatus.FAILED,
+    );
+    if (failed.length) {
+      throw new ConflictException(
+        `O WhatsApp não aceitou ${failed
+          .map(
+            (result) =>
+              `${result.name} (${result.errorMessage ?? "sem motivo informado"})`,
+          )
+          .join("; ")}`.substring(0, 255),
       );
-      if (message.status === MessageStatus.FAILED) {
-        throw new ConflictException(
-          message.errorMessage ?? "O WhatsApp não aceitou a mensagem.",
-        );
-      }
+    }
+  }
+
+  /** Text first, then the files, one after the other in the chat queue. */
+  private async deliverInOrder(
+    conversation: Conversation,
+    text: string,
+    files: OutboundMediaRequest[],
+  ) {
+    const results: {
+      name: string;
+      status: MessageStatus;
+      errorMessage: string | null;
+    }[] = [];
+
+    if (text) {
+      const message = await this.messageService.sendTextTo(conversation, text, {
+        aiGenerated: true,
+      });
+      results.push({
+        name: "o texto",
+        status: message.status,
+        errorMessage: message.errorMessage,
+      });
+      // Files without the text that explains them make no sense.
+      if (message.status === MessageStatus.FAILED) return results;
     }
 
-    // Same chat, same queue: the files follow the text in order, paced by
-    // the WhatsApp safety delays, and the screen follows them live.
     for (const file of files) {
-      await this.messageService.queueMediaTo(conversation, file, {});
+      const message = await this.messageService.sendMediaTo(
+        conversation,
+        file,
+        {},
+      );
+      results.push({
+        name: file.fileName,
+        status: message.status,
+        errorMessage: message.errorMessage,
+      });
     }
+    return results;
   }
 
   private async filesToSend(
