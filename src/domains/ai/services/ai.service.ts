@@ -13,6 +13,10 @@ export interface AiRequest {
   input: string;
   jsonSchema?: OpenaiJsonSchema;
   referenceId?: string | null;
+  /** Charges this instead of the tokens used, when the tokens cost less. */
+  fixedCredits?: number;
+  /** Shown in the credit history instead of the feature name. */
+  description?: string;
 }
 
 export interface AiResult {
@@ -41,10 +45,12 @@ export class AiService {
     }
 
     const feature = AI_FEATURES[request.feature];
-    const worstCaseCredits = this.pricingService.creditsForUsage(
-      this.openaiService.estimateTokens(request.instructions + request.input),
-      feature.maximumOutputTokens,
-    );
+    const worstCaseCredits =
+      request.fixedCredits ??
+      this.pricingService.creditsForUsage(
+        this.openaiService.estimateTokens(request.instructions + request.input),
+        feature.maximumOutputTokens,
+      );
     await this.walletService.ensureBalance(userId, worstCaseCredits);
 
     const result = await this.openaiService.generate({
@@ -54,14 +60,15 @@ export class AiService {
       jsonSchema: request.jsonSchema,
     });
 
-    const credits = this.pricingService.creditsForUsage(
+    const usedCredits = this.pricingService.creditsForUsage(
       result.inputTokens,
       result.outputTokens,
     );
+    const credits = Math.max(usedCredits, request.fixedCredits ?? 0);
 
     const { charged, balance } = await this.walletService.spend(userId, {
       amount: credits,
-      description: feature.label,
+      description: request.description ?? feature.label,
       feature: request.feature,
       model: result.model,
       inputTokens: result.inputTokens,

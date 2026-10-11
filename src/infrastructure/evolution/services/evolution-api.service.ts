@@ -8,11 +8,14 @@ import {
 import type { ConfigType } from "@nestjs/config";
 import { evolutionConfig } from "../../../config/evolution.config";
 import {
+  EvolutionChat,
   EvolutionConnectionState,
+  EvolutionContact,
   EvolutionInstanceInformation,
   EvolutionMediaDownload,
   EvolutionMessage,
   EvolutionMessageKey,
+  EvolutionMessagePage,
   EvolutionPresence,
   EvolutionQrCode,
   EvolutionSendMediaType,
@@ -223,6 +226,37 @@ export class EvolutionApiService {
       { method: "POST", body: { number }, allowNotFound: true },
     ).catch(() => null);
     return response?.profilePictureUrl ?? null;
+  }
+
+  /** Every contact the linked phone knows. */
+  async findContacts(instanceName: string) {
+    const contacts = await this.request<EvolutionContact[]>(
+      `/chat/findContacts/${instanceName}`,
+      { method: "POST", body: { where: {} }, allowNotFound: true },
+    );
+    return Array.isArray(contacts) ? contacts : [];
+  }
+
+  /** Every chat with history on the linked phone, with its newest message. */
+  async findChats(instanceName: string) {
+    const chats = await this.request<EvolutionChat[]>(
+      `/chat/findChats/${instanceName}`,
+      { method: "POST", body: {}, allowNotFound: true },
+    );
+    return Array.isArray(chats) ? chats : [];
+  }
+
+  /** The newest messages of one chat, in any order. */
+  async findMessages(instanceName: string, remoteJid: string, limit: number) {
+    const response = await this.request<EvolutionMessagePage>(
+      `/chat/findMessages/${instanceName}`,
+      {
+        method: "POST",
+        body: { where: { key: { remoteJid } }, page: 1, offset: limit },
+        allowNotFound: true,
+      },
+    );
+    return response?.messages?.records ?? [];
   }
 
   private webhookSettings(url: string) {

@@ -21,6 +21,7 @@ import { creditsConfig } from "./config/credits.config";
 import { CreditModule } from "./domains/credits/credit.module";
 import { InboxModule } from "./domains/inbox/inbox.module";
 import { DealModule } from "./domains/deals/deal.module";
+import { ContactImportModule } from "./domains/contact-imports/contact-import.module";
 
 // const THROTTLE_TTL_MS = 60_000;
 // const THROTTLE_LIMIT = 30;
@@ -74,6 +75,7 @@ import { DealModule } from "./domains/deals/deal.module";
     CreditModule,
     InboxModule,
     DealModule,
+    ContactImportModule,
   ],
   // providers: [
   //   {

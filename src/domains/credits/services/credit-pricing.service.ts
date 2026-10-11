@@ -42,11 +42,18 @@ export class CreditPricingService {
     return Object.fromEntries(
       (Object.keys(AI_FEATURES) as AiFeature[]).map((feature) => [
         feature,
-        this.creditsForUsage(
-          AI_FEATURES[feature].typicalInputTokens,
-          AI_FEATURES[feature].typicalOutputTokens,
-        ),
+        this.featurePrice(feature),
       ]),
     ) as Record<AiFeature, number>;
+  }
+
+  /** Credits a usual call costs, or the fixed price of fixed price features. */
+  featurePrice(feature: AiFeature) {
+    const definition = AI_FEATURES[feature];
+    const credits = this.creditsForUsage(
+      definition.typicalInputTokens,
+      definition.typicalOutputTokens,
+    );
+    return Math.ceil(credits * (definition.fixedPriceSafetyMultiplier ?? 1));
   }
 }

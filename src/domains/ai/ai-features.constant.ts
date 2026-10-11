@@ -1,4 +1,8 @@
-export type AiFeature = "reply_suggestions" | "rewrite" | "presentation";
+export type AiFeature =
+  | "reply_suggestions"
+  | "rewrite"
+  | "presentation"
+  | "contact_import";
 
 export interface AiFeatureDefinition {
   label: string;
@@ -6,6 +10,13 @@ export interface AiFeatureDefinition {
   /** A usual call, used to show the broker how many credits it costs. */
   typicalInputTokens: number;
   typicalOutputTokens: number;
+  /**
+   * Set for features sold at a fixed price instead of the tokens used.
+   * The typical tokens are then the most one call can use (the input is
+   * trimmed to fit) and the price is raised by this factor, so the fixed
+   * price always covers the real cost.
+   */
+  fixedPriceSafetyMultiplier?: number;
 }
 
 export const AI_FEATURES: Record<AiFeature, AiFeatureDefinition> = {
@@ -26,5 +37,13 @@ export const AI_FEATURES: Record<AiFeature, AiFeatureDefinition> = {
     maximumOutputTokens: 2400,
     typicalInputTokens: 2500,
     typicalOutputTokens: 1200,
+  },
+  /** Priced per contact: one contact's share of a batch call. */
+  contact_import: {
+    label: "Importar contatos com IA",
+    maximumOutputTokens: 4000,
+    typicalInputTokens: 1600,
+    typicalOutputTokens: 350,
+    fixedPriceSafetyMultiplier: 1.5,
   },
 };

@@ -28,6 +28,10 @@ export class ConversationFilterDto extends PaginationRequestDto {
 
   @IsOptional()
   @ValidateBoolean()
+  hidden?: boolean | null;
+
+  @IsOptional()
+  @ValidateBoolean()
   unreadOnly?: boolean | null;
 }
 
@@ -35,6 +39,10 @@ export class ConversationUpdateDto {
   @IsOptional()
   @IsBoolean()
   archived?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  hidden?: boolean;
 
   @IsOptional()
   @IsUUID()

@@ -52,5 +52,6 @@ import { WhatsappConnectionService } from "./services/whatsapp-connection.servic
     PropertyPresentationSenderService,
     EvolutionWebhookService,
   ],
+  exports: [WhatsappConnectionService, ConversationService, MessageService],
 })
 export class InboxModule {}

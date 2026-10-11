@@ -50,4 +50,12 @@ export class Conversation extends BaseEntity {
 
   @Column({ type: "boolean", nullable: false, default: false })
   archived: boolean;
+
+  /**
+   * Hidden from the inbox for good, for chats that are not about work.
+   * Unlike archived, a new message does not bring it back. Nothing changes
+   * on WhatsApp itself.
+   */
+  @Column({ type: "boolean", nullable: false, default: false })
+  hidden: boolean;
 }

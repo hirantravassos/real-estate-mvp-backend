@@ -42,10 +42,17 @@ export class ConversationService {
       .createQueryBuilder("conversation")
       .leftJoinAndSelect("conversation.customer", "customer")
       .where("conversation.userId = :userId", { userId: user.id })
-      .andWhere("conversation.active = :active", { active: true })
-      .andWhere("conversation.archived = :archived", {
-        archived: filter.archived ?? false,
-      });
+      .andWhere("conversation.active = :active", { active: true });
+
+    if (filter.hidden) {
+      query.andWhere("conversation.hidden = :hidden", { hidden: true });
+    } else {
+      query
+        .andWhere("conversation.hidden = :hidden", { hidden: false })
+        .andWhere("conversation.archived = :archived", {
+          archived: filter.archived ?? false,
+        });
+    }
 
     if (filter.unreadOnly) {
       query.andWhere("conversation.unreadCount > 0");
@@ -84,6 +91,7 @@ export class ConversationService {
       .where("conversation.userId = :userId", { userId: user.id })
       .andWhere("conversation.active = :active", { active: true })
       .andWhere("conversation.archived = :archived", { archived: false })
+      .andWhere("conversation.hidden = :hidden", { hidden: false })
       .andWhere("conversation.unreadCount > 0")
       .getRawOne<{ conversations: string; messages: string }>();
 
@@ -211,6 +219,7 @@ export class ConversationService {
     const conversation = await this.findEntity(user.id, id);
 
     if (dto.archived !== undefined) conversation.archived = dto.archived;
+    if (dto.hidden !== undefined) conversation.hidden = dto.hidden;
 
     if (dto.customerId !== undefined) {
       if (dto.customerId === null) {
@@ -295,6 +304,27 @@ export class ConversationService {
    * parallel, so the counters are changed in the database, not in memory.
    */
   async registerMessage(conversation: Conversation, message: Message) {
+    await this.moveToTop(conversation, message);
+
+    if (message.direction === MessageDirection.INBOUND) {
+      await this.conversationRepository
+        .createQueryBuilder()
+        .update(Conversation)
+        .set({ unreadCount: () => "unreadCount + 1", archived: false })
+        .where("id = :id", { id: conversation.id })
+        .execute();
+    }
+
+    await this.emitFresh(conversation);
+  }
+
+  /** Old messages brought from the phone: they move the chat, but are not unread. */
+  async registerHistory(conversation: Conversation, newest: Message) {
+    await this.moveToTop(conversation, newest);
+    await this.emitFresh(conversation);
+  }
+
+  private async moveToTop(conversation: Conversation, message: Message) {
     await this.conversationRepository
       .createQueryBuilder()
       .update(Conversation)
@@ -308,16 +338,9 @@ export class ConversationService {
         sentAt: message.sentAt,
       })
       .execute();
+  }
 
-    if (message.direction === MessageDirection.INBOUND) {
-      await this.conversationRepository
-        .createQueryBuilder()
-        .update(Conversation)
-        .set({ unreadCount: () => "unreadCount + 1", archived: false })
-        .where("id = :id", { id: conversation.id })
-        .execute();
-    }
-
+  private async emitFresh(conversation: Conversation) {
     const fresh = await this.conversationRepository.findOne({
       where: { id: conversation.id },
       relations: { customer: true },

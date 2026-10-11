@@ -65,6 +65,9 @@ const OUTBOUND_STATUS_RANK: Partial<Record<MessageStatus, number>> = {
 /** Time to let our own send finish before a "sent by me" webhook creates a copy. */
 const OWN_ECHO_GRACE_MILLISECONDS = 2500;
 
+/** How many past messages come along when a contact is imported. */
+const HISTORY_IMPORT_MESSAGES = 30;
+
 export interface OutboundMediaRequest {
   s3Key: string;
   mimeType: string;
@@ -344,6 +347,75 @@ export class MessageService {
     if (isMedia) {
       void this.downloadMedia(connection, message);
     }
+  }
+
+  /**
+   * Copies the newest messages of a chat already on the phone into the
+   * inbox, so an imported contact arrives with the conversation so far.
+   * They come in as read, they are not news for the broker.
+   */
+  async importHistory(
+    connection: WhatsappConnection,
+    conversation: Conversation,
+    chatJid: string,
+    limit = HISTORY_IMPORT_MESSAGES,
+  ) {
+    const records = await this.evolutionApiService
+      .findMessages(connection.instanceName, chatJid, limit)
+      .catch(() => []);
+
+    const saved: Message[] = [];
+    for (const record of records) {
+      const key = record.key;
+      if (!key?.id) continue;
+      const parsed = parseEvolutionMessage(record);
+      if (!parsed) continue;
+      if (await this.existsByExternalId(connection.userId, key.id)) continue;
+
+      const isMedia = MEDIA_MESSAGE_TYPES.has(parsed.type);
+      const message = this.messageRepository.create({
+        userId: connection.userId,
+        conversationId: conversation.id,
+        externalId: key.id,
+        direction: key.fromMe
+          ? MessageDirection.OUTBOUND
+          : MessageDirection.INBOUND,
+        type: parsed.type,
+        status: key.fromMe ? MessageStatus.DELIVERED : MessageStatus.READ,
+        body: parsed.body,
+        mimeType: parsed.mimeType,
+        fileName: parsed.fileName,
+        sizeBytes: parsed.sizeBytes,
+        durationSeconds: parsed.durationSeconds,
+        thumbnailBase64: parsed.thumbnailBase64,
+        location: parsed.location,
+        quotedExternalId: parsed.quotedExternalId,
+        mediaStatus: isMedia
+          ? MessageMediaStatus.DOWNLOADING
+          : MessageMediaStatus.NONE,
+        sentAt: toDate(record.messageTimestamp),
+      });
+
+      try {
+        saved.push(await this.messageRepository.save(message));
+      } catch {
+        continue; // Arrived through the webhook meanwhile.
+      }
+    }
+
+    if (!saved.length) return 0;
+
+    const newest = saved.reduce((latest, message) =>
+      message.sentAt > latest.sentAt ? message : latest,
+    );
+    await this.conversationService.registerHistory(conversation, newest);
+
+    for (const message of saved) {
+      if (MEDIA_MESSAGE_TYPES.has(message.type)) {
+        await this.downloadMedia(connection, message);
+      }
+    }
+    return saved.length;
   }
 
   async handleStatusUpdate(

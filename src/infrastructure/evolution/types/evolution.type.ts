@@ -127,3 +127,32 @@ export interface EvolutionMediaDownload {
 export type EvolutionSendMediaType = "image" | "video" | "document" | "audio";
 
 export type EvolutionPresence = "composing" | "recording" | "paused";
+
+/** A contact Evolution keeps for the instance, from the phone's address book or a chat. */
+export interface EvolutionContact {
+  id?: string;
+  remoteJid?: string;
+  pushName?: string | null;
+  profilePicUrl?: string | null;
+  updatedAt?: string | null;
+}
+
+/** A WhatsApp chat as Evolution stores it, with its newest message. */
+export interface EvolutionChat {
+  id?: string;
+  remoteJid?: string;
+  name?: string | null;
+  pushName?: string | null;
+  profilePicUrl?: string | null;
+  updatedAt?: string | null;
+  lastMessage?: EvolutionMessage | null;
+}
+
+export interface EvolutionMessagePage {
+  messages?: {
+    total?: number;
+    pages?: number;
+    currentPage?: number;
+    records?: EvolutionMessage[];
+  };
+}

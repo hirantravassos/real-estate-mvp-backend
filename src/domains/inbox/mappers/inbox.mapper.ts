@@ -31,6 +31,7 @@ export class InboxMapper {
       lastMessageDirection: entity.lastMessageDirection,
       unreadCount: entity.unreadCount,
       archived: entity.archived,
+      hidden: entity.hidden,
       customer: entity.customer
         ? {
             id: entity.customer.id,
