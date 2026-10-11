@@ -2,7 +2,7 @@ import {
   BadGatewayException,
   Injectable,
   Logger,
-  UnauthorizedException,
+  BadRequestException,
 } from "@nestjs/common";
 
 const PEOPLE_API_URL = "https://people.googleapis.com/v1/people/me/connections";
@@ -52,7 +52,7 @@ export class GooglePeopleService {
       });
 
       if (response.status === 401 || response.status === 403) {
-        throw new UnauthorizedException(
+        throw new BadRequestException(
           "O Google não liberou os contatos. Entre de novo e marque a permissão de contatos.",
         );
       }
