@@ -21,6 +21,7 @@ import { PropertyMatch } from "./entities/property-match.entity";
 import { CatalogMatcherService } from "./services/catalog-matcher.service";
 import { HuntAiService } from "./services/hunt-ai.service";
 import { ListingImportService } from "./services/listing-import.service";
+import { ListingPageReaderService } from "./services/listing-page-reader.service";
 import { PortalAccountService } from "./services/portal-account.service";
 import { PortalBrowserService } from "./services/portal-browser.service";
 import { PortalSessionService } from "./services/portal-session.service";
@@ -63,6 +64,8 @@ import { PropertyMatchService } from "./services/property-match.service";
     PropertyHuntRunnerService,
     PropertyHuntService,
     PropertyMatchService,
+    ListingPageReaderService,
   ],
+  exports: [ListingPageReaderService],
 })
 export class PropertyHuntModule {}

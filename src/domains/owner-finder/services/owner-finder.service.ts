@@ -8,6 +8,7 @@ import { Repository } from "typeorm";
 import { AiService } from "../../ai/services/ai.service";
 import { CreditPricingService } from "../../credits/services/credit-pricing.service";
 import { PropertyMatch } from "../../property-hunts/entities/property-match.entity";
+import { ListingPageReaderService } from "../../property-hunts/services/listing-page-reader.service";
 import { PropertyContact } from "../../properties/entities/property-contact.entity";
 import { Property } from "../../properties/entities/property.entity";
 import { PropertyKindEnum } from "../../properties/mappers/property.mapper";
@@ -25,12 +26,23 @@ import {
   OwnerContactSaveDto,
   OwnerContactSearchDto,
 } from "../dtos/owner-finder.dto";
+import {
+  advertiserSignalOf,
+  phoneFromContacts,
+} from "../helpers/advertiser-signals.helper";
 
 /** Most owner contacts the AI brings back for one property. */
 const MAXIMUM_CONTACTS = 5;
 
+/** Ads the AI may suggest, before they are checked on the page. */
+const MAXIMUM_CANDIDATES = 10;
+
 /** Listings this property came from, read to know which broker to skip. */
 const MAXIMUM_ORIGIN_LISTINGS = 3;
+
+/** Listing pages opened to confirm who posted them and to get the phone. */
+const MAXIMUM_PAGES_CHECKED = 8;
+const PAGE_CHECK_TIMEOUT_MILLISECONDS = 50_000;
 
 const kindWords: Record<PropertyKindEnum, string> = {
   [PropertyKindEnum.HOUSE]: "casa",
@@ -71,9 +83,9 @@ export interface OwnerContact {
   sourceTitle: string;
   /** How sure the AI is that the ad is of this same property. */
   matchConfidence: MatchConfidence;
-  /** Why the AI believes the contact is the owner's. */
+  /** Why the contact is believed to be the owner's. */
   evidence: string;
-  /** True when the page was really read during the search. */
+  /** True when the listing page was opened and confirmed the owner. */
   verified: boolean;
   /** True when this phone is already saved on the property. */
   alreadySaved: boolean;
@@ -129,9 +141,9 @@ Não procure outros imóveis e não traga anúncios de imóveis parecidos.
 Confira se o anúncio é do mesmo imóvel pelo endereço, nome do prédio, andar, metragem, quartos e preço. matchConfidence: "high" quando endereço ou prédio e as características batem; "medium" quando bairro e características batem mas o endereço não aparece; "low" quando só parece.
 Só conta como dono: selo "Particular" na OLX, vendedor pessoa física, portal só de proprietários, textos como "direto com o proprietário", "direto com o dono", "sem corretor", "não aceito corretor".
 Ignore anúncios de corretor, imobiliária, com CRECI ou dos anunciantes informados como intermediários; some quantos ignorou em ignoredIntermediaries.
-Só inclua um contato quando o telefone estiver escrito no anúncio, com DDD. Nunca invente nome ou telefone; nome desconhecido fica null.
+O telefone só entra se estiver escrito no anúncio, com DDD; quando estiver escondido atrás de "ver telefone", use null, o anúncio será aberto para conferir. Nunca invente nome ou telefone; nome desconhecido fica null.
 sourceUrl é o link direto do anúncio. evidence explica em uma frase curta, em português, por que o contato é do dono e do mesmo imóvel.
-Traga no máximo ${MAXIMUM_CONTACTS} contatos, os mais seguros primeiro. Se não achar, devolva a lista vazia.`;
+Traga no máximo ${MAXIMUM_CANDIDATES} anúncios, os mais seguros primeiro. Se não achar, devolva a lista vazia.`;
 
 @Injectable()
 export class OwnerFinderService {
@@ -144,6 +156,7 @@ export class OwnerFinderService {
     private readonly propertyContactRepository: Repository<PropertyContact>,
     @InjectRepository(PropertyMatch)
     private readonly propertyMatchRepository: Repository<PropertyMatch>,
+    private readonly pageReader: ListingPageReaderService,
   ) {}
 
   /** Free links to look for the owner's ad and the official registries. */
@@ -191,12 +204,51 @@ export class OwnerFinderService {
       result.citations.map((citation) => this.comparableUrl(citation.url)),
     );
     const parsed = this.parse(result.text);
-    const contacts = new Map<string, OwnerContact>();
+    let ignoredIntermediaries = Math.max(0, parsed.ignoredIntermediaries);
 
+    const seenUrls = new Set<string>();
+    const candidates: { contact: AiContact; source: OwnerContactSource }[] = [];
     for (const contact of parsed.contacts) {
       const source = this.sourceOf(contact.sourceUrl);
-      const phone = this.normalizePhone(contact.phone);
-      if (!source || !phone) continue;
+      const comparable = this.comparableUrl(contact.sourceUrl);
+      if (!source || seenUrls.has(comparable)) continue;
+      seenUrls.add(comparable);
+      candidates.push({ contact, source });
+    }
+
+    // Opens each ad to confirm who posted it and press "ver telefone".
+    const pages = await this.pageReader.readPages(
+      user.id,
+      candidates.map(({ contact }) => contact.sourceUrl),
+      {
+        limit: MAXIMUM_PAGES_CHECKED,
+        timeoutMilliseconds: PAGE_CHECK_TIMEOUT_MILLISECONDS,
+      },
+    );
+
+    const contacts = new Map<string, OwnerContact>();
+    for (const { contact, source } of candidates) {
+      const page = pages.get(contact.sourceUrl);
+      let phone = this.normalizePhone(contact.phone);
+      let evidence = contact.evidence.trim();
+      let verified = false;
+
+      if (page) {
+        const signal = advertiserSignalOf(
+          page.text,
+          source.kind === "owner_portal",
+        );
+        if (signal.type === "agency") {
+          ignoredIntermediaries += 1;
+          continue;
+        }
+        if (signal.type === "owner") {
+          verified = true;
+          evidence = `Conferido no anúncio: ${signal.reason ?? evidence}`;
+        }
+        phone ??= phoneFromContacts(page.contacts, signal.type === "owner");
+      }
+      if (!phone) continue;
 
       const found: OwnerContact = {
         name: contact.name?.trim() || null,
@@ -205,8 +257,10 @@ export class OwnerFinderService {
         sourceUrl: contact.sourceUrl,
         sourceTitle: contact.sourceTitle.trim().slice(0, 200) || source.name,
         matchConfidence: contact.matchConfidence,
-        evidence: contact.evidence.trim(),
-        verified: citedUrls.has(this.comparableUrl(contact.sourceUrl)),
+        evidence,
+        verified:
+          verified ||
+          (!page && citedUrls.has(this.comparableUrl(contact.sourceUrl))),
         alreadySaved: target.savedPhones.includes(phone),
       };
 
@@ -229,7 +283,7 @@ export class OwnerFinderService {
             Number(second.verified) - Number(first.verified),
         )
         .slice(0, MAXIMUM_CONTACTS),
-      ignoredIntermediaries: Math.max(0, parsed.ignoredIntermediaries),
+      ignoredIntermediaries,
       creditsCharged: result.creditsCharged,
       balance: result.balance,
     };
@@ -416,7 +470,7 @@ export class OwnerFinderService {
       };
       return {
         contacts: Array.isArray(parsed.contacts)
-          ? parsed.contacts.slice(0, MAXIMUM_CONTACTS * 2)
+          ? parsed.contacts.slice(0, MAXIMUM_CANDIDATES)
           : [],
         ignoredIntermediaries: Number(parsed.ignoredIntermediaries) || 0,
       };
