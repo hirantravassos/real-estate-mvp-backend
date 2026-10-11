@@ -29,6 +29,7 @@ import { OwnerFinderModule } from "./domains/owner-finder/owner-finder.module";
 import { infosimplesConfig } from "./config/infosimples.config";
 import { DocumentLookupModule } from "./domains/document-lookups/document-lookup.module";
 import { BrokerPageModule } from "./domains/broker-pages/broker-page.module";
+import { buildDatabaseOptions } from "./database/database-options";
 
 // const THROTTLE_TTL_MS = 60_000;
 // const THROTTLE_LIMIT = 30;
@@ -57,15 +58,14 @@ import { BrokerPageModule } from "./domains/broker-pages/broker-page.module";
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        type: "mysql",
-        host: configService.getOrThrow<string>("database.host"),
-        port: configService.getOrThrow<number>("database.port"),
-        username: configService.getOrThrow<string>("database.username"),
-        password: configService.getOrThrow<string>("database.password"),
-        database: configService.getOrThrow<string>("database.database"),
+        ...buildDatabaseOptions({
+          host: configService.getOrThrow<string>("database.host"),
+          port: configService.getOrThrow<number>("database.port"),
+          username: configService.getOrThrow<string>("database.username"),
+          password: configService.getOrThrow<string>("database.password"),
+          database: configService.getOrThrow<string>("database.database"),
+        }),
         autoLoadEntities: true,
-        synchronize: true,
-        logging: false,
       }),
     }),
     // ThrottlerModule.forRoot([
