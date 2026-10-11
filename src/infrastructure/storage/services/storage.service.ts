@@ -313,6 +313,17 @@ export class StorageService implements OnApplicationBootstrap {
     });
   }
 
+  async downloadObject(s3Key: string): Promise<Buffer> {
+    const response = await this.s3Client.send(
+      new GetObjectCommand({
+        Bucket: this.bucketConfiguration.name,
+        Key: s3Key,
+      }),
+    );
+    if (!response.Body) throw new Error(`Empty object ${s3Key}`);
+    return Buffer.from(await response.Body.transformToByteArray());
+  }
+
   async deleteObject(s3Key: string): Promise<void> {
     await this.s3Client.send(
       new DeleteObjectCommand({

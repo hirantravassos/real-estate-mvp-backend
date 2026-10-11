@@ -164,13 +164,13 @@ export class EvolutionApiService {
     );
   }
 
-  /** Sends audio as a voice note (Evolution converts it to opus). */
-  async sendVoiceNote(instanceName: string, number: string, url: string) {
+  /** Sends audio, a link or base64, as a voice note (Evolution converts it to opus). */
+  async sendVoiceNote(instanceName: string, number: string, audio: string) {
     return this.request<EvolutionMessage>(
       `/message/sendWhatsAppAudio/${instanceName}`,
       {
         method: "POST",
-        body: { number, audio: url, encoding: true },
+        body: { number, audio, encoding: true },
       },
     );
   }

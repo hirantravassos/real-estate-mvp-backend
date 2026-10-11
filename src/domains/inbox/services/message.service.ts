@@ -411,17 +411,20 @@ export class MessageService {
         );
       } else {
         if (!message.s3Key) throw new Error("Mídia sem arquivo.");
-        const url = await this.storageService.getPresignedUrl(message.s3Key, {
-          expiresInSeconds: 60 * 60,
-        });
 
         if (message.type === MessageType.VOICE) {
+          // Evolution adds a timestamp to audio links, which breaks the
+          // presigned URL signature, so the voice note goes as base64.
+          const audio = await this.storageService.downloadObject(message.s3Key);
           sent = await this.evolutionApiService.sendVoiceNote(
             connection.instanceName,
             number,
-            url,
+            audio.toString("base64"),
           );
         } else {
+          const url = await this.storageService.getPresignedUrl(message.s3Key, {
+            expiresInSeconds: 60 * 60,
+          });
           const mediaTypeByMessage: Partial<
             Record<MessageType, EvolutionSendMediaType>
           > = {
