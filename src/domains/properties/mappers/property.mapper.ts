@@ -6,6 +6,7 @@ export enum PropertyKindEnum {
   HOUSE = "house",
   APARTMENT = "apartment",
   COMMERCIAL = "commercial",
+  LAND = "land",
 }
 
 export enum PropertyLiftEnum {

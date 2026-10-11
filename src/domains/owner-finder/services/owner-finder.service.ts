@@ -48,6 +48,7 @@ const kindWords: Record<PropertyKindEnum, string> = {
   [PropertyKindEnum.HOUSE]: "casa",
   [PropertyKindEnum.APARTMENT]: "apartamento",
   [PropertyKindEnum.COMMERCIAL]: "imóvel comercial",
+  [PropertyKindEnum.LAND]: "terreno",
 };
 
 const confidenceOrder: Record<MatchConfidence, number> = {

@@ -55,6 +55,7 @@ export const PORTALS: Record<PortalKey, PortalDefinition> = {
         [PropertyKindEnum.APARTMENT]: "apartamentos",
         [PropertyKindEnum.HOUSE]: "casas",
         [PropertyKindEnum.COMMERCIAL]: "comercial",
+        [PropertyKindEnum.LAND]: "terrenos-lotes-condominios",
         any: "imoveis",
       });
       const place = [
@@ -90,6 +91,7 @@ export const PORTALS: Record<PortalKey, PortalDefinition> = {
         [PropertyKindEnum.APARTMENT]: "apartamento_residencial",
         [PropertyKindEnum.HOUSE]: "casa_residencial",
         [PropertyKindEnum.COMMERCIAL]: "comercial",
+        [PropertyKindEnum.LAND]: "lote-terreno_residencial",
         any: "",
       });
       const neighborhood = firstNeighborhood(criteria);
@@ -135,6 +137,7 @@ export const PORTALS: Record<PortalKey, PortalDefinition> = {
         [PropertyKindEnum.APARTMENT]: "/apartamento",
         [PropertyKindEnum.HOUSE]: "/casa",
         [PropertyKindEnum.COMMERCIAL]: "",
+        [PropertyKindEnum.LAND]: "",
         any: "",
       });
       return `https://www.quintoandar.com.br/${transaction}/imovel/${place}${kind}`;
@@ -154,6 +157,7 @@ export const PORTALS: Record<PortalKey, PortalDefinition> = {
         [PropertyKindEnum.APARTMENT]: "/apartamentos",
         [PropertyKindEnum.HOUSE]: "/casas",
         [PropertyKindEnum.COMMERCIAL]: "/comercio-e-industria",
+        [PropertyKindEnum.LAND]: "/terrenos",
         any: "",
       });
       const state = criteria.state ? `/estado-${slugify(criteria.state)}` : "";
@@ -186,6 +190,7 @@ export const PORTALS: Record<PortalKey, PortalDefinition> = {
         [PropertyKindEnum.APARTMENT]: "apartamentos",
         [PropertyKindEnum.HOUSE]: "casas",
         [PropertyKindEnum.COMMERCIAL]: "imoveis-comerciais",
+        [PropertyKindEnum.LAND]: "terrenos",
         any: "imoveis",
       });
       const place = [
@@ -213,6 +218,7 @@ export const PORTALS: Record<PortalKey, PortalDefinition> = {
         [PropertyKindEnum.APARTMENT]: "apartamentos",
         [PropertyKindEnum.HOUSE]: "casas",
         [PropertyKindEnum.COMMERCIAL]: "comerciais",
+        [PropertyKindEnum.LAND]: "terrenos",
         any: "imoveis",
       });
       const place = [firstNeighborhood(criteria), criteria.city]

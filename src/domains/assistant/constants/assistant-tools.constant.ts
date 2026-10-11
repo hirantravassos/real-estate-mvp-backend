@@ -92,7 +92,7 @@ export const ASSISTANT_TOOLS: (OpenaiTool & { name: AssistantToolName })[] = [
       ),
       kind: {
         type: ["string", "null"],
-        enum: ["house", "apartment", "commercial", null],
+        enum: ["house", "apartment", "commercial", "land", null],
         description: "Tipo do imóvel.",
       },
       minimumBedrooms: nullable("integer", "Mínimo de dormitórios."),

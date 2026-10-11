@@ -224,7 +224,7 @@ const LISTINGS_SCHEMA = {
 const CRITERIA_RULES = [
   "Regras dos critérios:",
   "- transaction é sale (compra) a menos que fale em aluguel, alugar ou locação, aí é rent.",
-  "- kind: apartment, house ou commercial. Use null se não disser.",
+  "- kind: apartment, house, commercial ou land (terreno, lote). Use null se não disser.",
   "- state é a sigla do estado em maiúsculas (SP, RJ). Deduza pela cidade quando for óbvio (Santos é SP).",
   "- city e neighborhoods com a grafia correta e acentos (Embaré, Gonzaga). Bairro é só o nome, sem a cidade.",
   "- Valores em reais, só o número: 800 mil é 800000, 1,2 milhão é 1200000.",
