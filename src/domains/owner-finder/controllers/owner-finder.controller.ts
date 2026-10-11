@@ -2,27 +2,33 @@ import { Body, Controller, Get, Post, Query, UseGuards } from "@nestjs/common";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { JwtGuard } from "../../auth/guards/jwt.guard";
 import { User } from "../../users/entities/user.entity";
-import { OwnerLeadSaveDto, OwnerSearchDto } from "../dtos/owner-finder.dto";
+import {
+  OwnerContactSaveDto,
+  OwnerContactSearchDto,
+} from "../dtos/owner-finder.dto";
 import { OwnerFinderService } from "../services/owner-finder.service";
 
-/** Finds property owners who advertise by themselves, with no broker in between. */
+/**
+ * Finds the contact of a property's owner, to talk to them without the
+ * broker or agency that advertises it.
+ */
 @Controller("owner-finder")
 @UseGuards(JwtGuard)
 export class OwnerFinderController {
   constructor(private readonly ownerFinderService: OwnerFinderService) {}
 
   @Get("links")
-  links(@Query() dto: OwnerSearchDto) {
-    return this.ownerFinderService.links(dto);
+  links(@GetUser() user: User, @Query() dto: OwnerContactSearchDto) {
+    return this.ownerFinderService.links(user, dto);
   }
 
-  @Post("search")
-  search(@GetUser() user: User, @Body() dto: OwnerSearchDto) {
-    return this.ownerFinderService.search(user, dto);
+  @Post("contacts/search")
+  searchContacts(@GetUser() user: User, @Body() dto: OwnerContactSearchDto) {
+    return this.ownerFinderService.searchContacts(user, dto);
   }
 
-  @Post("leads")
-  saveLead(@GetUser() user: User, @Body() dto: OwnerLeadSaveDto) {
-    return this.ownerFinderService.saveLead(user, dto);
+  @Post("contacts")
+  saveContact(@GetUser() user: User, @Body() dto: OwnerContactSaveDto) {
+    return this.ownerFinderService.saveContact(user, dto);
   }
 }

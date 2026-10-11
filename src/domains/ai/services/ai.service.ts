@@ -78,7 +78,7 @@ export class AiService {
     this.requireConfigured();
 
     const feature = AI_FEATURES[request.feature];
-    const worstCaseCredits =
+    const estimatedCredits =
       request.fixedCredits ??
       this.pricingService.creditsForUsage(
         Math.max(
@@ -90,7 +90,12 @@ export class AiService {
         feature.maximumOutputTokens,
         request.webSearch ? (feature.typicalWebSearchCalls ?? 1) : 0,
       );
-    await this.walletService.ensureBalance(userId, worstCaseCredits);
+    // Web searches can read many more pages than usual, the reserve keeps
+    // the balance able to pay for them.
+    await this.walletService.ensureBalance(
+      userId,
+      Math.ceil(estimatedCredits * (feature.reserveMultiplier ?? 1)),
+    );
 
     const result = await this.openaiService.generate({
       instructions: request.instructions,

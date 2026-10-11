@@ -1,4 +1,4 @@
-import type { AdvertiserType } from "../dtos/owner-finder.dto";
+export type AdvertiserType = "owner" | "agency" | "unknown";
 
 /** A CRECI number is the surest sign of a broker or an agency. */
 const CRECI_NUMBER = /\bcreci\b[^0-9\n]{0,20}\d{3,}/i;

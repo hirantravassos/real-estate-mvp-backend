@@ -28,6 +28,11 @@ export interface AiFeatureDefinition {
   typicalCostInUsd?: number;
   /** Web searches a usual call runs, for features that search the web. */
   typicalWebSearchCalls?: number;
+  /**
+   * The balance asked before a call, as a multiple of a usual call. Set
+   * for calls whose real size is only known after they run.
+   */
+  reserveMultiplier?: number;
 }
 
 export const AI_FEATURES: Record<AiFeature, AiFeatureDefinition> = {
@@ -105,12 +110,13 @@ export const AI_FEATURES: Record<AiFeature, AiFeatureDefinition> = {
     typicalOutputTokens: 0,
     typicalCostInUsd: 0.006,
   },
-  /** Searches the listing sites, the pages read count as input tokens. */
+  /** Looks for the owner contact of one property on the listing sites. */
   owner_search: {
-    label: "Caçar proprietário na internet",
+    label: "Contato do proprietário",
     maximumOutputTokens: 6000,
     typicalInputTokens: 30000,
     typicalOutputTokens: 3000,
     typicalWebSearchCalls: 4,
+    reserveMultiplier: 3,
   },
 };

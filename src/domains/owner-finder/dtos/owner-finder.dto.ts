@@ -1,7 +1,6 @@
 import { Type } from "class-transformer";
 import {
   IsEnum,
-  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
@@ -14,25 +13,32 @@ import {
   MinLength,
 } from "class-validator";
 import { ValidateBrazilianPhoneNumber } from "../../../shared/decorators/validation/brazilian-phone-number.decorator";
-import { ValidateCurrency } from "../../../shared/decorators/validation/currency.decorator";
 import { PropertyKindEnum } from "../../properties/mappers/property.mapper";
 
-export const OWNER_SEARCH_PURPOSES = ["sale", "rent"] as const;
-export type OwnerSearchPurpose = (typeof OWNER_SEARCH_PURPOSES)[number];
+export const MATCH_CONFIDENCES = ["high", "medium", "low"] as const;
+export type MatchConfidence = (typeof MATCH_CONFIDENCES)[number];
 
-export const ADVERTISER_TYPES = ["owner", "agency", "unknown"] as const;
-export type AdvertiserType = (typeof ADVERTISER_TYPES)[number];
-
-export class OwnerSearchDto {
-  /** Neighborhood, city and state, or the full address. */
-  @IsString()
-  @MinLength(3)
-  @MaxLength(200)
-  location: string;
+/**
+ * The property whose owner is searched. A registered property is read from
+ * the database; without one, the broker describes it to check the owner
+ * before registering it.
+ */
+export class OwnerContactSearchDto {
+  @IsOptional()
+  @IsUUID()
+  propertyId?: string | null;
 
   @IsOptional()
-  @IsIn(OWNER_SEARCH_PURPOSES)
-  purpose?: OwnerSearchPurpose;
+  @IsString()
+  @MinLength(5)
+  @MaxLength(300)
+  address?: string | null;
+
+  /** Apartment, block or building name. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  complement?: string | null;
 
   @IsOptional()
   @IsEnum(PropertyKindEnum)
@@ -45,71 +51,36 @@ export class OwnerSearchDto {
   @Max(20)
   bedrooms?: number | null;
 
-  /** In whole reais, like every price in the app. */
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  maximumPrice?: number | null;
-
-  /** Anything else that helps, like the building name. */
-  @IsOptional()
-  @IsString()
-  @MaxLength(300)
-  details?: string | null;
-
-  /** The property being searched for, kept in the credit history. */
-  @IsOptional()
-  @IsUUID()
-  propertyId?: string | null;
-}
-
-export class OwnerLeadSaveDto {
-  @IsString()
-  @MaxLength(200)
-  title: string;
-
-  @IsUrl({ require_protocol: true })
-  @MaxLength(1000)
-  url: string;
-
-  @IsString()
-  @MaxLength(80)
-  source: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(300)
-  address?: string | null;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(120)
-  advertiserName?: string | null;
-
-  @ValidateBrazilianPhoneNumber({ isOptional: true })
-  phone?: string | null;
-
-  @IsOptional()
-  @ValidateCurrency({ isOptional: true })
-  price?: number | null;
-
-  @IsOptional()
-  @IsEnum(PropertyKindEnum)
-  kind?: PropertyKindEnum | null;
-
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  bedrooms?: number | null;
-
-  @IsOptional()
   @IsNumber()
   @Min(0)
   squareMeters?: number | null;
 
-  /** Adds the contact to this property instead of creating a new one. */
+  /** Anything else that tells this property apart, like the listing link. */
   @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  details?: string | null;
+}
+
+export class OwnerContactSaveDto {
   @IsUUID()
-  propertyId?: string | null;
+  propertyId: string;
+
+  @ValidateBrazilianPhoneNumber()
+  phone: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  name?: string | null;
+
+  @IsUrl({ require_protocol: true })
+  @MaxLength(1000)
+  sourceUrl: string;
+
+  @IsString()
+  @MaxLength(80)
+  sourceName: string;
 }
