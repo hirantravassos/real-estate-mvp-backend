@@ -21,6 +21,8 @@ export type AssistantToolName =
   | "search_properties"
   | "search_conversations"
   | "get_conversation"
+  | "list_files"
+  | "generate_document"
   | "propose_whatsapp_message"
   | "propose_visit"
   | "propose_customer_note"
@@ -123,9 +125,86 @@ export const ASSISTANT_TOOLS: (OpenaiTool & { name: AssistantToolName })[] = [
     }),
   },
   {
+    name: "list_files",
+    description:
+      "Lista arquivos que podem ser enviados: documentos e vendas de um cliente, documentos, fotos e vídeos de um imóvel, ou, sem filtro, os arquivos recentes feitos pelo assistente ou anexados no chat.",
+    parameters: objectOf({
+      customerId: nullable("string", "Id do cliente."),
+      propertyId: nullable("string", "Id do imóvel."),
+    }),
+  },
+  {
+    name: "generate_document",
+    description:
+      "Cria um arquivo PDF ou Word na hora (proposta, ficha de imóvel, lista de imóveis, resumo de cliente, recibo, minuta). O corretor recebe o arquivo para baixar e ele pode ser anexado numa mensagem de WhatsApp. Use só dados reais das ferramentas.",
+    parameters: objectOf({
+      title: { type: "string", description: "Título do documento." },
+      subtitle: nullable("string", "Linha abaixo do título."),
+      fileName: nullable("string", "Nome do arquivo, sem extensão."),
+      format: {
+        type: "string",
+        enum: ["pdf", "docx"],
+        description: "pdf por padrão, docx quando o corretor quiser editar.",
+      },
+      customerId: nullable(
+        "string",
+        "Cliente do documento, para guardar na ficha dele.",
+      ),
+      propertyId: nullable(
+        "string",
+        "Imóvel do documento, para guardar nos documentos dele.",
+      ),
+      blocks: {
+        type: "array",
+        description:
+          "Conteúdo em ordem. heading: text. paragraph: text. bullets: items. fields: pares rótulo e valor. table: columns e rows. property: propertyId, desenha foto de capa, dados e link do imóvel. signatures: items com os nomes. page_break: nova página.",
+        items: objectOf({
+          type: {
+            type: "string",
+            enum: [
+              "heading",
+              "paragraph",
+              "bullets",
+              "fields",
+              "table",
+              "property",
+              "signatures",
+              "page_break",
+            ],
+          },
+          text: nullable("string", "Texto de heading e paragraph."),
+          items: {
+            type: ["array", "null"],
+            items: { type: "string" },
+            description: "Itens de bullets ou nomes de signatures.",
+          },
+          fields: {
+            type: ["array", "null"],
+            items: objectOf({
+              label: { type: "string" },
+              value: { type: "string" },
+            }),
+            description: "Pares de fields.",
+          },
+          columns: {
+            type: ["array", "null"],
+            items: { type: "string" },
+            description: "Cabeçalho de table, até 8 colunas.",
+          },
+          rows: {
+            type: ["array", "null"],
+            items: { type: "array", items: { type: "string" } },
+            description: "Linhas de table.",
+          },
+          propertyId: nullable("string", "Imóvel de property."),
+        }),
+      },
+    }),
+  },
+  {
     name: "propose_whatsapp_message",
     description:
-      "Prepara uma mensagem de WhatsApp para um cliente ou conversa. Só é enviada depois que o corretor confirmar. Crie uma proposta por destinatário.",
+      "Prepara uma mensagem de WhatsApp para um cliente ou contato, com anexos se quiser (PDFs, documentos, fotos, vídeos, qualquer arquivo de list_files, generate_document ou anexado pelo corretor). Só é enviada depois que o corretor confirmar. Crie uma proposta por destinatário.",
     parameters: objectOf({
       customerId: nullable("string", "Id do cliente."),
       conversationId: nullable(
@@ -134,7 +213,21 @@ export const ASSISTANT_TOOLS: (OpenaiTool & { name: AssistantToolName })[] = [
       ),
       text: {
         type: "string",
-        description: "A mensagem pronta, como o corretor escreveria.",
+        description:
+          "A mensagem pronta, como o corretor escreveria. Pode ser vazia quando só houver anexos.",
+      },
+      attachments: {
+        type: ["array", "null"],
+        description: "Arquivos que vão junto, na ordem de envio, até 10.",
+        items: objectOf({
+          type: {
+            type: "string",
+            enum: ["document", "property_media"],
+            description:
+              "document para documentos e arquivos, property_media para fotos e vídeos de imóvel.",
+          },
+          id: { type: "string", description: "Id do arquivo." },
+        }),
       },
     }),
   },

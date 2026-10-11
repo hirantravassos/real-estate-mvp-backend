@@ -92,7 +92,8 @@ export const AI_FEATURES: Record<AiFeature, AiFeatureDefinition> = {
    */
   assistant: {
     label: "Assistente",
-    maximumOutputTokens: 2000,
+    /** Room for a whole document written in one step. */
+    maximumOutputTokens: 8000,
     typicalInputTokens: 14000,
     typicalOutputTokens: 1500,
   },

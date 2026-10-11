@@ -62,7 +62,11 @@ const PRESIGNED_UPLOAD_EXPIRY_SECONDS = 60 * 60; // 60 minutes (for large video 
 
 export type InboxAttachmentKind = "image" | "video" | "audio" | "document";
 
-export type DocumentOwnerDomain = "customers" | "properties" | "deals";
+export type DocumentOwnerDomain =
+  | "customers"
+  | "properties"
+  | "deals"
+  | "assistant";
 
 export interface UploadResult {
   s3Key: string;
@@ -210,6 +214,19 @@ export class StorageService implements OnApplicationBootstrap {
     }
 
     return isImage ? "image" : "video";
+  }
+
+  /** Files the broker attaches in the assistant chat. */
+  assistantS3KeyPrefix(userId: string) {
+    return `assistant/${userId}/`;
+  }
+
+  generateAssistantS3Key(userId: string, originalName: string): string {
+    const ext = path
+      .extname(originalName)
+      .toLowerCase()
+      .replace(/[^a-z0-9.]/g, "");
+    return `${this.assistantS3KeyPrefix(userId)}${randomUUID()}${ext}`;
   }
 
   inboxS3KeyPrefix(userId: string, conversationId: string) {

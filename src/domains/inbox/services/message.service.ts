@@ -271,6 +271,21 @@ export class MessageService {
     });
   }
 
+  /**
+   * Queues a file and answers right away, for senders that should not wait
+   * for the safety delays between messages.
+   */
+  async queueMediaTo(
+    conversation: Conversation,
+    media: OutboundMediaRequest,
+    options: OutboundOptions,
+  ) {
+    const message = await this.createMedia(conversation, media, options);
+    return this.startDelivery(conversation, message, {
+      forceDocument: media.forceDocument,
+    });
+  }
+
   private createText(
     conversation: Conversation,
     text: string,

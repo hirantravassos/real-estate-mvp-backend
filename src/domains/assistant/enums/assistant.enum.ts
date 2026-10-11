@@ -25,4 +25,6 @@ export enum AssistantReferenceType {
   PROPERTY = "property",
   CONVERSATION = "conversation",
   VISIT = "visit",
+  /** A file the assistant wrote or the broker attached. */
+  DOCUMENT = "document",
 }

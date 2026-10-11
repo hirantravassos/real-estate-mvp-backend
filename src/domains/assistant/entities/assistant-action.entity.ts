@@ -6,11 +6,25 @@ import {
   AssistantActionStatus,
 } from "../enums/assistant.enum";
 
+export type AssistantAttachmentSource = "document" | "property_media";
+
+/** A file that goes along with a WhatsApp message. */
+export interface AssistantAttachment {
+  source: AssistantAttachmentSource;
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+}
+
 export interface SendMessagePayload {
   conversationId: string | null;
   customerId: string | null;
   recipientName: string;
+  /** May be empty when only files are sent. */
   text: string;
+  /** Missing on actions made before attachments existed. */
+  attachments?: AssistantAttachment[];
 }
 
 export interface ScheduleVisitPayload {

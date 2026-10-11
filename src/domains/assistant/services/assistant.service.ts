@@ -10,7 +10,10 @@ import { User } from "../../users/entities/user.entity";
 import { ASSISTANT_TOOLS } from "../constants/assistant-tools.constant";
 import { AssistantAskDto, AssistantHistoryDto } from "../dtos/assistant.dto";
 import { AssistantAction } from "../entities/assistant-action.entity";
-import { AssistantMessage } from "../entities/assistant-message.entity";
+import {
+  AssistantMessage,
+  AssistantMessageAttachment,
+} from "../entities/assistant-message.entity";
 import {
   AssistantActionStatus,
   AssistantReferenceType,
@@ -22,6 +25,7 @@ import {
   AssistantToolContext,
   AssistantToolService,
 } from "./assistant-tool.service";
+import { AssistantDocumentService } from "./assistant-document.service";
 
 /** Rounds of lookups before the assistant must answer with what it has. */
 const MAXIMUM_TOOL_STEPS = 6;
@@ -43,7 +47,19 @@ const REFERENCE_LABEL: Record<AssistantReferenceType, string> = {
   [AssistantReferenceType.PROPERTY]: "imóvel",
   [AssistantReferenceType.CONVERSATION]: "conversa",
   [AssistantReferenceType.VISIT]: "visita",
+  [AssistantReferenceType.DOCUMENT]: "arquivo",
 };
+
+/** How the model learns which files came with a question. */
+const describeAttachments = (attachments: AssistantMessageAttachment[]) =>
+  attachments.length
+    ? `\n[Arquivos anexados pelo corretor, use com type document: ${attachments
+        .map(
+          (attachment) =>
+            `${attachment.displayName} (${attachment.mimeType}, id ${attachment.id})`,
+        )
+        .join("; ")}]`
+    : "";
 
 const VOICE_PROMPT =
   "Corretor de imóveis falando com o assistente sobre clientes, visitas, imóveis, dormitórios, suítes, vagas, bairros, valores em reais, WhatsApp e funil de vendas.";
@@ -61,6 +77,7 @@ export class AssistantService {
     private readonly actionRepository: Repository<AssistantAction>,
     private readonly aiService: AiService,
     private readonly toolService: AssistantToolService,
+    private readonly documentService: AssistantDocumentService,
   ) {}
 
   async history(user: User, dto: AssistantHistoryDto) {
@@ -101,6 +118,10 @@ export class AssistantService {
   async ask(user: User, dto: AssistantAskDto) {
     const question = dto.text.trim();
     const askedAt = new Date();
+    const attachments = await this.documentService.filesOf(
+      user,
+      dto.attachmentIds ?? [],
+    );
     const pastMessages = await this.messageRepository.find({
       where: { userId: user.id, active: true },
       order: { sentAt: "DESC" },
@@ -119,7 +140,10 @@ export class AssistantService {
       async (respond) => {
         const input: OpenaiConversationItem[] = [
           ...history,
-          { role: "user", content: question },
+          {
+            role: "user",
+            content: question + describeAttachments(attachments),
+          },
         ];
 
         for (let step = 0; step <= MAXIMUM_TOOL_STEPS; step++) {
@@ -163,6 +187,7 @@ export class AssistantService {
         role: AssistantRole.USER,
         content: question,
         fromVoice: dto.fromVoice ?? false,
+        attachments: attachments.length ? attachments : null,
         sentAt: askedAt,
       }),
     );
@@ -214,6 +239,12 @@ export class AssistantService {
       "- Para achar quem falou de um assunto no WhatsApp, use search_conversations com várias palavras e variações, depois leia as conversas relevantes com get_conversation antes de escrever.",
       "- Para mandar imóveis ao corretor, liste título, endereço, valor, dormitórios e o link público.",
       "",
+      "Arquivos:",
+      "- Use generate_document para criar PDFs ou arquivos Word: propostas, fichas e listas de imóveis (blocos property mostram foto, dados e link), resumos de clientes, recibos e minutas. PDF é o padrão; use docx quando o corretor quiser editar.",
+      "- Escreva o documento completo e bem organizado, com títulos e campos. Contratos e minutas são modelos para o corretor revisar: avise isso na resposta e não invente cláusulas jurídicas incomuns nem dados que você não tem; deixe campos para preencher.",
+      "- Se o documento for sobre um cliente ou imóvel, informe customerId ou propertyId para guardar nos documentos dele.",
+      "- Para enviar qualquer arquivo pelo WhatsApp (documentos gerados, anexados pelo corretor, documentos do cliente, do imóvel ou da venda, fotos e vídeos), use list_files para achar os ids e propose_whatsapp_message com attachments.",
+      "",
       "Ações:",
       "- Você não envia, agenda nem altera nada sozinho. Para isso use as ferramentas propose_*, que criam cartões para o corretor revisar e confirmar.",
       "- Nunca diga que já enviou, agendou ou alterou. Diga que deixou pronto para ele confirmar.",
@@ -243,7 +274,11 @@ export class AssistantService {
     const actions = await this.actionsOf(messages);
     return messages.map((message) => {
       if (message.role === AssistantRole.USER) {
-        return { role: "user", content: message.content };
+        return {
+          role: "user",
+          content:
+            message.content + describeAttachments(message.attachments ?? []),
+        };
       }
 
       const notes: string[] = [];

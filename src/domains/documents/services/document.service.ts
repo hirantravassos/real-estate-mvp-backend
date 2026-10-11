@@ -68,6 +68,70 @@ export class DocumentService {
     return this.documentRepository.save(document);
   }
 
+  /** Stores a file made on the server, like a document the assistant wrote. */
+  async uploadBuffer(
+    userId: string,
+    ownerType: DocumentOwnerType,
+    ownerId: string,
+    ownerDomain: DocumentOwnerDomain,
+    file: { buffer: Buffer; fileName: string; mimeType: string },
+    category: string | null = null,
+  ): Promise<Document> {
+    const { s3Key, mimeType, sizeBytes } =
+      await this.storageService.uploadDocument(
+        file.buffer,
+        file.fileName,
+        file.mimeType,
+        userId,
+        ownerDomain,
+        ownerId,
+      );
+    return this.register(userId, ownerType, ownerId, {
+      s3Key,
+      displayName: file.fileName,
+      mimeType,
+      sizeBytes,
+      category,
+    });
+  }
+
+  /** Records a file already in the bucket, uploaded straight by the browser. */
+  async register(
+    userId: string,
+    ownerType: DocumentOwnerType,
+    ownerId: string,
+    file: {
+      s3Key: string;
+      displayName: string;
+      mimeType: string;
+      sizeBytes: number;
+      category?: string | null;
+    },
+  ): Promise<Document> {
+    const document = new Document();
+    document.userId = userId;
+    document.ownerType = ownerType;
+    document.ownerId = ownerId;
+    document.displayName = file.displayName.substring(0, 255);
+    document.s3Key = file.s3Key;
+    document.mimeType = file.mimeType.substring(0, 100);
+    document.sizeBytes = file.sizeBytes;
+    document.category = file.category ?? null;
+    return this.documentRepository.save(document);
+  }
+
+  /** The broker's own documents by id, with the storage key to send them. */
+  async findManyWithKeys(userId: string, documentIds: string[]) {
+    if (!documentIds.length) return [];
+    return this.documentRepository
+      .createQueryBuilder("document")
+      .addSelect("document.s3Key")
+      .where("document.id IN (:...documentIds)", { documentIds })
+      .andWhere("document.userId = :userId", { userId })
+      .andWhere("document.active = :active", { active: true })
+      .getMany();
+  }
+
   async getPresignedUrl(
     userId: string,
     documentId: string,

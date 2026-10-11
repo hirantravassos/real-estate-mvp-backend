@@ -21,7 +21,10 @@ import {
   AssistantActionConfirmDto,
   AssistantAskDto,
   AssistantHistoryDto,
+  AssistantUploadDto,
+  AssistantUploadRequestDto,
 } from "../dtos/assistant.dto";
+import { AssistantDocumentService } from "../services/assistant-document.service";
 import { AssistantActionService } from "../services/assistant-action.service";
 import { AssistantService } from "../services/assistant.service";
 
@@ -51,7 +54,28 @@ export class AssistantController {
   constructor(
     private readonly assistantService: AssistantService,
     private readonly actionService: AssistantActionService,
+    private readonly documentService: AssistantDocumentService,
   ) {}
+
+  /** Where the browser puts a file attached in the chat, before asking. */
+  @Post("uploads/presigned")
+  presignUpload(@GetUser() user: User, @Body() dto: AssistantUploadRequestDto) {
+    return this.documentService.presignUpload(user, dto);
+  }
+
+  @Post("uploads")
+  registerUpload(@GetUser() user: User, @Body() dto: AssistantUploadDto) {
+    return this.documentService.registerUpload(user, dto);
+  }
+
+  /** Download link of a file the assistant made or one attached in the chat. */
+  @Get("files/:documentId")
+  fileUrl(
+    @GetUser() user: User,
+    @Param("documentId", ParseUUIDPipe) documentId: string,
+  ) {
+    return this.documentService.downloadUrl(user, documentId);
+  }
 
   @Get("messages")
   history(@GetUser() user: User, @Query() dto: AssistantHistoryDto) {
