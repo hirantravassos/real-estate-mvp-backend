@@ -131,6 +131,10 @@ export class PropertyMediaService {
       media.displayName = dto.displayName;
     }
 
+    if (dto.visibleToCustomer !== undefined) {
+      media.visibleToCustomer = dto.visibleToCustomer;
+    }
+
     if (dto.isCover === true) {
       if (media.type !== PropertyMediaType.IMAGE) {
         throw new BadRequestException("Apenas imagens podem ser capa.");
@@ -151,6 +155,7 @@ export class PropertyMediaService {
       .addSelect("media.s3Key")
       .where("media.propertyId = :propertyId", { propertyId })
       .andWhere("media.active = :active", { active: true })
+      .andWhere("media.visibleToCustomer = :visible", { visible: true })
       .orderBy("media.sortOrder", "ASC")
       .addOrderBy("media.createdAt", "ASC")
       .getMany();
@@ -167,7 +172,7 @@ export class PropertyMediaService {
     );
   }
 
-  /** Media of a property with the storage keys, to send through WhatsApp. */
+  /** Media a customer may see, with the storage keys, to send through WhatsApp. */
   async findForMessaging(userId: string, propertyId: string) {
     return this.mediaRepository
       .createQueryBuilder("media")
@@ -175,6 +180,7 @@ export class PropertyMediaService {
       .where("media.propertyId = :propertyId", { propertyId })
       .andWhere("media.userId = :userId", { userId })
       .andWhere("media.active = :active", { active: true })
+      .andWhere("media.visibleToCustomer = :visible", { visible: true })
       .orderBy("media.sortOrder", "ASC")
       .addOrderBy("media.createdAt", "ASC")
       .getMany();

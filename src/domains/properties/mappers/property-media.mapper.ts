@@ -10,6 +10,7 @@ export class PropertyMediaMapper {
       sizeBytes: Number(media.sizeBytes),
       sortOrder: media.sortOrder,
       isCover: media.isCover,
+      visibleToCustomer: media.visibleToCustomer,
       createdAt: media.createdAt,
       updatedAt: media.updatedAt,
     };

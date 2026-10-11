@@ -341,6 +341,7 @@ export class AssistantDocumentService {
       .andWhere("media.userId = :userId", { userId: user.id })
       .andWhere("media.active = :active", { active: true })
       .andWhere("media.type = :type", { type: PropertyMediaType.IMAGE })
+      .andWhere("media.visibleToCustomer = :visible", { visible: true })
       .orderBy("media.isCover", "DESC")
       .addOrderBy("media.sortOrder", "ASC")
       .getOne();

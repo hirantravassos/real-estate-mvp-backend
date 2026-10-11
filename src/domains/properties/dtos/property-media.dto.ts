@@ -78,4 +78,8 @@ export class MediaUpdateDto {
   @IsOptional()
   @IsBoolean()
   isCover?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  visibleToCustomer?: boolean;
 }
