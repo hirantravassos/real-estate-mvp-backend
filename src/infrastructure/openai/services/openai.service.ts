@@ -33,8 +33,18 @@ export interface OpenaiGenerateRequest {
   jsonSchema?: OpenaiJsonSchema;
   /** Pictures sent along, as data URLs, read in low detail to keep it cheap. */
   images?: string[];
+  /** High detail reads small print, like the digits of a CPF on a photo. */
+  imageDetail?: "low" | "high";
+  /** Documents sent along, like a PDF as a data URL. */
+  files?: OpenaiInputFile[];
   /** Lets the model search the web before answering. */
   webSearch?: OpenaiWebSearch;
+}
+
+export interface OpenaiInputFile {
+  fileName: string;
+  /** data:application/pdf;base64,... */
+  dataUrl: string;
 }
 
 export interface OpenaiUsage {
@@ -172,21 +182,27 @@ export class OpenaiService {
     const body: Record<string, unknown> = {
       model: this.configuration.model,
       instructions: request.instructions,
-      input: request.images?.length
-        ? [
-            {
-              role: "user",
-              content: [
-                { type: "input_text", text: request.input },
-                ...request.images.map((image) => ({
-                  type: "input_image",
-                  image_url: image,
-                  detail: "low",
-                })),
-              ],
-            },
-          ]
-        : request.input,
+      input:
+        request.images?.length || request.files?.length
+          ? [
+              {
+                role: "user",
+                content: [
+                  { type: "input_text", text: request.input },
+                  ...(request.images ?? []).map((image) => ({
+                    type: "input_image",
+                    image_url: image,
+                    detail: request.imageDetail ?? "low",
+                  })),
+                  ...(request.files ?? []).map((file) => ({
+                    type: "input_file",
+                    filename: file.fileName,
+                    file_data: file.dataUrl,
+                  })),
+                ],
+              },
+            ]
+          : request.input,
       max_output_tokens: request.maximumOutputTokens,
       store: false,
     };

@@ -9,7 +9,8 @@ export type AiFeature =
   | "hunt_listing"
   | "assistant"
   | "assistant_voice"
-  | "owner_search";
+  | "owner_search"
+  | "property_document_reading";
 
 export interface AiFeatureDefinition {
   label: string;
@@ -118,5 +119,15 @@ export const AI_FEATURES: Record<AiFeature, AiFeatureDefinition> = {
     typicalOutputTokens: 3000,
     typicalWebSearchCalls: 4,
     reserveMultiplier: 3,
+  },
+  /**
+   * Reads the registration, IPTU and owners' IDs already stored to fill what
+   * the certificates ask. Every PDF page goes as text and picture.
+   */
+  property_document_reading: {
+    label: "Ler documentos do imóvel",
+    maximumOutputTokens: 2500,
+    typicalInputTokens: 20000,
+    typicalOutputTokens: 800,
   },
 };

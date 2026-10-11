@@ -45,6 +45,7 @@ import {
   PropertyLegalProfile,
 } from "../entities/property-legal-profile.entity";
 import { normalizeTaxDocument } from "../helpers/tax-document.helper";
+import { PropertyLegalProfileService } from "./property-legal-profile.service";
 
 const STORABLE_RECEIPT_MIME_TYPES = new Set([
   "application/pdf",
@@ -58,11 +59,6 @@ const extensionByMimeType: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
-};
-
-const trimmedOrNull = (value: string | null | undefined) => {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
 };
 
 const fileNameSafe = (value: string) =>
@@ -82,8 +78,6 @@ export class DocumentLookupService {
   private readonly runningLookups = new Set<string>();
 
   constructor(
-    @InjectRepository(PropertyLegalProfile)
-    private readonly profileRepository: Repository<PropertyLegalProfile>,
     @InjectRepository(PropertyDocumentLookup)
     private readonly lookupRepository: Repository<PropertyDocumentLookup>,
     private readonly propertyService: PropertyService,
@@ -91,11 +85,12 @@ export class DocumentLookupService {
     private readonly infosimplesService: InfosimplesService,
     private readonly pricingService: CreditPricingService,
     private readonly walletService: CreditWalletService,
+    private readonly profileService: PropertyLegalProfileService,
   ) {}
 
   async overview(user: User, propertyId: string) {
     const property = await this.propertyService.findOne(user, propertyId);
-    const profile = await this.profileOf(user, propertyId);
+    const profile = await this.profileService.profileOf(user, propertyId);
     const history = await this.lookupRepository.find({
       where: { userId: user.id, propertyId, active: true },
       order: { createdAt: "DESC" },
@@ -106,7 +101,8 @@ export class DocumentLookupService {
     const definitions = PUBLIC_LOOKUPS.filter(
       (definition) =>
         definition.key !== "occupancy_permit" ||
-        property.kind !== PropertyKindEnum.APARTMENT,
+        (property.kind !== PropertyKindEnum.APARTMENT &&
+          property.kind !== PropertyKindEnum.LAND),
     );
 
     const items = definitions.flatMap((definition) => {
@@ -148,12 +144,20 @@ export class DocumentLookupService {
       });
     });
 
+    const [ownerSuggestions, readableDocuments] = await Promise.all([
+      this.profileService.ownerSuggestions(user, propertyId, profile.owners),
+      this.profileService.readableDocuments(user, propertyId),
+    ]);
+
     return {
       automaticAvailable: this.infosimplesService.isConfigured,
       needsOwners:
         profile.owners.length === 0 &&
         definitions.some((definition) => definition.perOwner),
       profile: this.toProfileDto(profile),
+      ownerSuggestions,
+      readableDocumentCount: readableDocuments.length,
+      readingPriceInCredits: this.profileService.readingPriceInCredits(),
       items,
     };
   }
@@ -164,31 +168,16 @@ export class DocumentLookupService {
     dto: PropertyLegalProfileSaveDto,
   ) {
     await this.propertyService.findOne(user, propertyId);
-    const profile = await this.profileOf(user, propertyId);
+    return this.toProfileDto(
+      await this.profileService.save(user, propertyId, dto),
+    );
+  }
 
-    const owners: PropertyLegalOwner[] = [];
-    for (const owner of dto.owners) {
-      const documentNumber = normalizeTaxDocument(owner.documentNumber);
-      if (!documentNumber) {
-        throw new BadRequestException(
-          `O CPF ou CNPJ de ${owner.name.trim()} não é válido.`,
-        );
-      }
-      if (owners.some((saved) => saved.documentNumber === documentNumber)) {
-        continue;
-      }
-      owners.push({ name: owner.name.trim(), documentNumber });
-    }
-
-    profile.city = trimmedOrNull(dto.city);
-    profile.state = trimmedOrNull(dto.state)?.toUpperCase() ?? null;
-    profile.registrationNumber = trimmedOrNull(dto.registrationNumber);
-    profile.registryOffice = trimmedOrNull(dto.registryOffice);
-    profile.propertyTaxNumber = trimmedOrNull(dto.propertyTaxNumber);
-    profile.unionPropertyNumber = trimmedOrNull(dto.unionPropertyNumber);
-    profile.owners = owners;
-
-    return this.toProfileDto(await this.profileRepository.save(profile));
+  /** The AI fills the blanks from the registration, IPTU and IDs stored. */
+  async readDocuments(user: User, propertyId: string) {
+    await this.propertyService.findOne(user, propertyId);
+    const result = await this.profileService.readDocuments(user, propertyId);
+    return { ...result, profile: this.toProfileDto(result.profile) };
   }
 
   async run(
@@ -213,7 +202,7 @@ export class DocumentLookupService {
       );
     }
 
-    const profile = await this.profileOf(user, propertyId);
+    const profile = await this.profileService.profileOf(user, propertyId);
     const owner = this.ownerFor(definition, profile, dto);
     const missingFields = definition.automatic.requiredFields.filter(
       (field) => !profile[field],
@@ -403,25 +392,6 @@ export class DocumentLookupService {
       status: PropertyDocumentLookupStatus.FAILED,
       message: `O portal não respondeu agora, tente de novo ou emita pelo link. ${consultation.message}`,
     };
-  }
-
-  private async profileOf(user: User, propertyId: string) {
-    const existing = await this.profileRepository.findOneBy({
-      userId: user.id,
-      propertyId,
-    });
-    if (existing) return existing;
-    return this.profileRepository.create({
-      userId: user.id,
-      propertyId,
-      city: null,
-      state: null,
-      registrationNumber: null,
-      registryOffice: null,
-      propertyTaxNumber: null,
-      unionPropertyNumber: null,
-      owners: [],
-    });
   }
 
   private toProfileDto(profile: PropertyLegalProfile) {

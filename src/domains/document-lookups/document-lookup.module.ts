@@ -8,16 +8,28 @@ import { DocumentLookupController } from "./controllers/document-lookup.controll
 import { PropertyDocumentLookup } from "./entities/property-document-lookup.entity";
 import { PropertyLegalProfile } from "./entities/property-legal-profile.entity";
 import { DocumentLookupService } from "./services/document-lookup.service";
+import { PropertyLegalProfileService } from "./services/property-legal-profile.service";
+import { StorageModule } from "../../infrastructure/storage/storage.module";
+import { AiModule } from "../ai/ai.module";
+import { DealSigner } from "../deals/entities/deal-signer.entity";
+import { PropertyContact } from "../properties/entities/property-contact.entity";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([PropertyLegalProfile, PropertyDocumentLookup]),
+    TypeOrmModule.forFeature([
+      PropertyLegalProfile,
+      PropertyDocumentLookup,
+      PropertyContact,
+      DealSigner,
+    ]),
     InfosimplesModule,
+    StorageModule,
+    AiModule,
     CreditModule,
     DocumentModule,
     PropertyModule,
   ],
   controllers: [DocumentLookupController],
-  providers: [DocumentLookupService],
+  providers: [DocumentLookupService, PropertyLegalProfileService],
 })
 export class DocumentLookupModule {}

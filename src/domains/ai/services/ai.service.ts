@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import {
   OpenaiCitation,
+  OpenaiInputFile,
   OpenaiJsonSchema,
   OpenaiRespondRequest,
   OpenaiRespondResult,
@@ -28,6 +29,9 @@ export interface AiRequest {
   description?: string;
   /** Pictures for the AI to look at, as data URLs. */
   images?: string[];
+  imageDetail?: "low" | "high";
+  /** Documents for the AI to read, like PDFs. */
+  files?: OpenaiInputFile[];
   /** Lets the AI search the web, each search is charged too. */
   webSearch?: OpenaiWebSearch;
 }
@@ -85,7 +89,11 @@ export class AiService {
           this.openaiService.estimateTokens(
             request.instructions + request.input,
           ),
-          request.webSearch ? feature.typicalInputTokens : 0,
+          // Pages and pictures weigh much more than their text, the typical
+          // input of the feature stands for them.
+          request.webSearch || request.files?.length || request.images?.length
+            ? feature.typicalInputTokens
+            : 0,
         ),
         feature.maximumOutputTokens,
         request.webSearch ? (feature.typicalWebSearchCalls ?? 1) : 0,
@@ -103,6 +111,8 @@ export class AiService {
       maximumOutputTokens: feature.maximumOutputTokens,
       jsonSchema: request.jsonSchema,
       images: request.images,
+      imageDetail: request.imageDetail,
+      files: request.files,
       webSearch: request.webSearch,
     });
 

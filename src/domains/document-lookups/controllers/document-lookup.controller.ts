@@ -36,6 +36,14 @@ export class DocumentLookupController {
     return this.documentLookupService.saveProfile(user, propertyId, dto);
   }
 
+  @Post("profile/read-documents")
+  readDocuments(
+    @GetUser() user: User,
+    @Param("propertyId") propertyId: string,
+  ) {
+    return this.documentLookupService.readDocuments(user, propertyId);
+  }
+
   @Post(":lookupKey/run")
   run(
     @GetUser() user: User,
