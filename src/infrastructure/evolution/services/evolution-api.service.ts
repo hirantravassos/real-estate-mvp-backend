@@ -32,6 +32,20 @@ export const EVOLUTION_WEBHOOK_EVENTS = [
   "MESSAGES_UPDATE",
 ];
 
+/**
+ * Behaviour of every instance. The full history sync makes WhatsApp hand
+ * over all past chats on pairing, so imported contacts bring old messages.
+ */
+const INSTANCE_SETTINGS = {
+  rejectCall: false,
+  msgCall: "",
+  groupsIgnore: true,
+  alwaysOnline: false,
+  readMessages: false,
+  readStatus: false,
+  syncFullHistory: true,
+};
+
 const REQUEST_TIMEOUT_MILLISECONDS = 60_000;
 
 interface RequestOptions {
@@ -79,12 +93,17 @@ export class EvolutionApiService {
         instanceName,
         qrcode: true,
         integration: "WHATSAPP-BAILEYS",
-        groupsIgnore: true,
-        alwaysOnline: false,
-        readMessages: false,
-        syncFullHistory: false,
+        ...INSTANCE_SETTINGS,
         webhook: this.webhookSettings(webhookUrl),
       },
+    });
+  }
+
+  /** Brings an instance created with older settings up to date. */
+  async applySettings(instanceName: string) {
+    await this.request(`/settings/set/${instanceName}`, {
+      method: "POST",
+      body: INSTANCE_SETTINGS,
     });
   }
 

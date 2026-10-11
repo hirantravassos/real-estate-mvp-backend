@@ -79,6 +79,12 @@ export class WhatsappConnectionService {
       if (state === "open") {
         return this.status(user);
       }
+      // History only syncs on pairing, so the settings must land before the QR code.
+      await this.evolutionApiService
+        .applySettings(connection.instanceName)
+        .catch((error: unknown) => {
+          this.logger.warn(`Apply settings failed: ${String(error)}`);
+        });
     }
 
     if (!qrCode?.base64) {

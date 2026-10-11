@@ -24,6 +24,8 @@ import {
 } from "../../properties/mappers/property.mapper";
 import { User } from "../../users/entities/user.entity";
 import { PORTALS } from "../constants/portals.constant";
+import { WhatsappConnection } from "../../inbox/entities/whatsapp-connection.entity";
+import { brokerMarkLines, stampBrokerMark } from "../helpers/watermark.helper";
 import { PropertyMatch } from "../entities/property-match.entity";
 import { AMENITY_LABELS } from "../helpers/match-score.helper";
 import { truncate } from "../helpers/text.helper";
@@ -62,6 +64,8 @@ export class ListingImportService implements OnApplicationBootstrap {
     @InjectRepository(PropertyMatch)
     private readonly matchRepository: Repository<PropertyMatch>,
     private readonly storageService: StorageService,
+    @InjectRepository(WhatsappConnection)
+    private readonly connectionRepository: Repository<WhatsappConnection>,
   ) {}
 
   async importMatch(user: User, match: PropertyMatch) {
@@ -70,8 +74,30 @@ export class ListingImportService implements OnApplicationBootstrap {
       this.toProperty(user, match, listing),
     );
 
-    const media = await this.copyMedia(user.id, property.id, match, listing);
+    const markLines = await this.brokerMarkOf(user);
+    const media = await this.copyMedia(
+      user.id,
+      property.id,
+      match,
+      listing,
+      markLines,
+    );
     return { property, mediaCount: media };
+  }
+
+  /** Every imported photo carries the broker's name and contact. */
+  private async brokerMarkOf(user: User) {
+    const connection = user.phone
+      ? null
+      : await this.connectionRepository
+          .findOne({ where: { userId: user.id } })
+          .catch(() => null);
+    return brokerMarkLines({
+      name: user.name,
+      creci: user.creci,
+      phone: user.phone ?? connection?.phone ?? null,
+      email: user.email,
+    });
   }
 
   private toProperty(
@@ -234,6 +260,7 @@ export class ListingImportService implements OnApplicationBootstrap {
     propertyId: string,
     match: PropertyMatch,
     listing: ListingSnapshot,
+    markLines: string[],
   ) {
     const referer = match.portal ? PORTALS[match.portal].homeUrl : undefined;
     const sources = [
@@ -252,7 +279,14 @@ export class ListingImportService implements OnApplicationBootstrap {
       const chunk = sources.slice(start, start + PARALLEL_DOWNLOADS);
       const results = await Promise.all(
         chunk.map((source, offset) =>
-          this.copyOne(userId, propertyId, source, start + offset, referer),
+          this.copyOne(
+            userId,
+            propertyId,
+            source,
+            start + offset,
+            markLines,
+            referer,
+          ),
         ),
       );
       saved.push(...results.filter((media): media is PropertyMedia => !!media));
@@ -271,6 +305,7 @@ export class ListingImportService implements OnApplicationBootstrap {
     propertyId: string,
     source: { url: string; type: PropertyMediaType },
     order: number,
+    markLines: string[],
     referer?: string,
   ) {
     try {
@@ -305,6 +340,14 @@ export class ListingImportService implements OnApplicationBootstrap {
         }
         const { width } = await sharp(buffer).metadata();
         if (!width || width < 300) return null;
+
+        try {
+          buffer = await stampBrokerMark(buffer, markLines);
+          mimeType = "image/jpeg";
+        } catch (error) {
+          // A photo without the mark is better than a lost photo.
+          this.logger.error(`Broker mark not stamped: ${String(error)}`);
+        }
       } else if (!mimeType.startsWith("video/")) {
         return null;
       }

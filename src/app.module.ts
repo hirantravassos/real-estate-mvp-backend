@@ -32,6 +32,7 @@ import { DocumentLookupModule } from "./domains/document-lookups/document-lookup
 import { BrokerPageModule } from "./domains/broker-pages/broker-page.module";
 import { subscriptionsConfig } from "./config/subscriptions.config";
 import { SubscriptionModule } from "./domains/subscriptions/subscription.module";
+import { buildDatabaseOptions } from "./database/database-options";
 
 /** Loose default, only the routes with UserThrottlerGuard are counted. */
 const THROTTLE_TTL_MS = 60_000;
@@ -62,15 +63,14 @@ const THROTTLE_LIMIT = 120;
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        type: "mysql",
-        host: configService.getOrThrow<string>("database.host"),
-        port: configService.getOrThrow<number>("database.port"),
-        username: configService.getOrThrow<string>("database.username"),
-        password: configService.getOrThrow<string>("database.password"),
-        database: configService.getOrThrow<string>("database.database"),
+        ...buildDatabaseOptions({
+          host: configService.getOrThrow<string>("database.host"),
+          port: configService.getOrThrow<number>("database.port"),
+          username: configService.getOrThrow<string>("database.username"),
+          password: configService.getOrThrow<string>("database.password"),
+          database: configService.getOrThrow<string>("database.database"),
+        }),
         autoLoadEntities: true,
-        synchronize: true,
-        logging: false,
       }),
     }),
     ThrottlerModule.forRoot([
