@@ -105,9 +105,9 @@ export const AI_FEATURES: Record<AiFeature, AiFeatureDefinition> = {
     typicalOutputTokens: 0,
     typicalCostInUsd: 0.006,
   },
-  /** Searches the listing sites, the pages read count as input tokens. */
+  /** Looks for the owner contact of one property on the listing sites. */
   owner_search: {
-    label: "Caçar proprietário na internet",
+    label: "Contato do proprietário",
     maximumOutputTokens: 6000,
     typicalInputTokens: 30000,
     typicalOutputTokens: 3000,

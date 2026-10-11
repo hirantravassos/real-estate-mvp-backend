@@ -1,158 +1,166 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { AiService } from "../../ai/services/ai.service";
 import { CreditPricingService } from "../../credits/services/credit-pricing.service";
-import { Property } from "../../properties/entities/property.entity";
+import { PropertyMatch } from "../../property-hunts/entities/property-match.entity";
 import { PropertyContact } from "../../properties/entities/property-contact.entity";
+import { Property } from "../../properties/entities/property.entity";
 import { PropertyKindEnum } from "../../properties/mappers/property.mapper";
-import { PropertyService } from "../../properties/services/property.service";
 import { User } from "../../users/entities/user.entity";
 import {
-  OWNER_LISTING_SOURCES,
+  OWNER_CONTACT_SOURCES,
   OWNER_REGISTRY_SOURCES,
   OWNER_SEARCH_PHRASES,
-  OwnerListingSource,
+  OwnerContactSource,
+  OwnerRegistrySource,
 } from "../constants/owner-sources.constant";
 import {
-  ADVERTISER_TYPES,
-  AdvertiserType,
-  OwnerLeadSaveDto,
-  OwnerSearchDto,
+  MATCH_CONFIDENCES,
+  MatchConfidence,
+  OwnerContactSaveDto,
+  OwnerContactSearchDto,
 } from "../dtos/owner-finder.dto";
 
-/** Most listings the AI brings back in one search. */
-const MAXIMUM_LEADS = 12;
+/** Most owner contacts the AI brings back for one property. */
+const MAXIMUM_CONTACTS = 5;
+
+/** Listings this property came from, read to know which broker to skip. */
+const MAXIMUM_ORIGIN_LISTINGS = 3;
 
 const kindWords: Record<PropertyKindEnum, string> = {
   [PropertyKindEnum.HOUSE]: "casa",
   [PropertyKindEnum.APARTMENT]: "apartamento",
-  [PropertyKindEnum.COMMERCIAL]: "sala comercial",
+  [PropertyKindEnum.COMMERCIAL]: "imóvel comercial",
 };
 
-export interface OwnerLead {
-  title: string;
-  url: string;
-  source: string;
-  advertiserType: AdvertiserType;
-  advertiserName: string | null;
-  /** Only digits, with the area code, as written on the listing. */
-  phone: string | null;
-  /** In whole reais. */
-  price: number | null;
-  address: string | null;
+const confidenceOrder: Record<MatchConfidence, number> = {
+  high: 0,
+  medium: 1,
+  low: 2,
+};
+
+/** What is known about the property whose owner is searched. */
+interface OwnerTarget {
+  propertyId: string | null;
   kind: PropertyKindEnum | null;
+  address: string;
+  complement: string | null;
+  buildingName: string | null;
   bedrooms: number | null;
   squareMeters: number | null;
-  /** Why the AI believes the advertiser is, or is not, the owner. */
+  floor: number | null;
+  price: number | null;
+  details: string | null;
+  /** Ads of this property already known, usually posted by a broker. */
+  originListings: { url: string | null; advertiser: string | null }[];
+  /** Digits of the contacts already saved on the property. */
+  savedPhones: string[];
+}
+
+export interface OwnerContact {
+  name: string | null;
+  /** Only digits, with the area code. */
+  phone: string;
+  sourceName: string;
+  sourceUrl: string;
+  sourceTitle: string;
+  /** How sure the AI is that the ad is of this same property. */
+  matchConfidence: MatchConfidence;
+  /** Why the AI believes the contact is the owner's. */
   evidence: string;
   /** True when the page was really read during the search. */
   verified: boolean;
+  /** True when this phone is already saved on the property. */
+  alreadySaved: boolean;
 }
 
-interface AiLead {
-  title: string;
-  url: string;
-  advertiserType: AdvertiserType;
-  advertiserName: string | null;
+interface AiContact {
+  name: string | null;
   phone: string | null;
-  priceInReais: number | null;
-  address: string | null;
-  kind: PropertyKindEnum | null;
-  bedrooms: number | null;
-  squareMeters: number | null;
+  sourceUrl: string;
+  sourceTitle: string;
+  matchConfidence: MatchConfidence;
   evidence: string;
 }
 
-const nullable = (type: string) => ({ type: [type, "null"] });
-
-const LEADS_SCHEMA = {
-  name: "owner_leads",
+const CONTACTS_SCHEMA = {
+  name: "owner_contacts",
   schema: {
     type: "object",
     properties: {
-      leads: {
+      contacts: {
         type: "array",
         items: {
           type: "object",
           properties: {
-            title: { type: "string" },
-            url: { type: "string" },
-            advertiserType: { type: "string", enum: ADVERTISER_TYPES },
-            advertiserName: nullable("string"),
-            phone: nullable("string"),
-            priceInReais: nullable("number"),
-            address: nullable("string"),
-            kind: {
-              type: ["string", "null"],
-              enum: [...Object.values(PropertyKindEnum), null],
-            },
-            bedrooms: nullable("integer"),
-            squareMeters: nullable("number"),
+            name: { type: ["string", "null"] },
+            phone: { type: ["string", "null"] },
+            sourceUrl: { type: "string" },
+            sourceTitle: { type: "string" },
+            matchConfidence: { type: "string", enum: MATCH_CONFIDENCES },
             evidence: { type: "string" },
           },
           required: [
-            "title",
-            "url",
-            "advertiserType",
-            "advertiserName",
+            "name",
             "phone",
-            "priceInReais",
-            "address",
-            "kind",
-            "bedrooms",
-            "squareMeters",
+            "sourceUrl",
+            "sourceTitle",
+            "matchConfidence",
             "evidence",
           ],
           additionalProperties: false,
         },
       },
+      ignoredIntermediaries: { type: "integer" },
     },
-    required: ["leads"],
+    required: ["contacts", "ignoredIntermediaries"],
     additionalProperties: false,
   },
 };
 
-const INSTRUCTIONS = `Você ajuda um corretor de imóveis brasileiro a captar imóveis direto com o proprietário, sem imobiliária ou outro corretor no meio.
-Pesquise na internet anúncios que combinem com o pedido, somente nos sites permitidos.
-Prefira anúncios publicados pelo próprio dono: selo "Particular" na OLX, vendedor pessoa física, textos como "direto com o proprietário", "direto com o dono", "sem corretor", "não aceito corretor", anúncios sem CRECI e sem nome de imobiliária.
-Classifique cada anúncio em advertiserType: "owner" quando há sinais claros de ser o dono, "agency" quando é imobiliária, corretor ou tem CRECI, "unknown" quando não dá para saber.
-Use apenas dados que aparecem na página do anúncio. Nunca invente telefone, nome, preço ou endereço; quando não aparecer, use null.
-O telefone só entra se estiver escrito no anúncio, com DDD.
-url deve ser o link direto do anúncio, não de uma lista de resultados.
-evidence explica em uma frase curta, em português, o que indica quem é o anunciante.
-Traga no máximo ${MAXIMUM_LEADS} anúncios, os de donos primeiro. Se não achar nada, devolva a lista vazia.`;
+const INSTRUCTIONS = `Você ajuda um corretor de imóveis brasileiro a falar direto com o proprietário de UM imóvel específico, cortando o intermediário (corretor ou imobiliária que esteja anunciando esse imóvel).
+Pesquise na internet, somente nos sites permitidos, anúncios deste mesmo imóvel publicados pelo próprio dono, e traga apenas o contato do dono.
+Não procure outros imóveis e não traga anúncios de imóveis parecidos.
+Confira se o anúncio é do mesmo imóvel pelo endereço, nome do prédio, andar, metragem, quartos e preço. matchConfidence: "high" quando endereço ou prédio e as características batem; "medium" quando bairro e características batem mas o endereço não aparece; "low" quando só parece.
+Só conta como dono: selo "Particular" na OLX, vendedor pessoa física, portal só de proprietários, textos como "direto com o proprietário", "direto com o dono", "sem corretor", "não aceito corretor".
+Ignore anúncios de corretor, imobiliária, com CRECI ou dos anunciantes informados como intermediários; some quantos ignorou em ignoredIntermediaries.
+Só inclua um contato quando o telefone estiver escrito no anúncio, com DDD. Nunca invente nome ou telefone; nome desconhecido fica null.
+sourceUrl é o link direto do anúncio. evidence explica em uma frase curta, em português, por que o contato é do dono e do mesmo imóvel.
+Traga no máximo ${MAXIMUM_CONTACTS} contatos, os mais seguros primeiro. Se não achar, devolva a lista vazia.`;
 
 @Injectable()
 export class OwnerFinderService {
   constructor(
     private readonly aiService: AiService,
     private readonly pricingService: CreditPricingService,
-    private readonly propertyService: PropertyService,
     @InjectRepository(Property)
     private readonly propertyRepository: Repository<Property>,
     @InjectRepository(PropertyContact)
     private readonly propertyContactRepository: Repository<PropertyContact>,
+    @InjectRepository(PropertyMatch)
+    private readonly propertyMatchRepository: Repository<PropertyMatch>,
   ) {}
 
-  /** Free search links: listing sites and the official registries. */
-  links(dto: OwnerSearchDto) {
-    const description = this.describe(dto);
-    const location = dto.location.toLowerCase();
+  /** Free links to look for the owner's ad and the official registries. */
+  async links(user: User, dto: OwnerContactSearchDto) {
+    const target = await this.target(user, dto);
 
     return {
       price: this.pricingService.featurePrice("owner_search"),
-      listings: OWNER_LISTING_SOURCES.map((source) => ({
+      sources: OWNER_CONTACT_SOURCES.map((source) => ({
         key: source.key,
         name: source.name,
         kind: source.kind,
         hint: source.hint,
-        url: this.googleSearchUrl(source, description),
+        url: this.googleSearchUrl(source, target),
       })),
-      registries: OWNER_REGISTRY_SOURCES.filter(
-        (source) =>
-          !source.onlyFor ||
-          source.onlyFor.some((word) => location.includes(word)),
+      registries: OWNER_REGISTRY_SOURCES.filter((source) =>
+        this.coversAddress(source, target.address),
       ).map((source) => ({
         key: source.key,
         name: source.name,
@@ -162,168 +170,262 @@ export class OwnerFinderService {
     };
   }
 
-  /** The AI reads the listing sites and brings the ads posted by owners. */
-  async search(user: User, dto: OwnerSearchDto) {
-    const allowedDomains = OWNER_LISTING_SOURCES.map((source) => source.domain);
+  /** The AI looks for ads of this property posted by its owner. */
+  async searchContacts(user: User, dto: OwnerContactSearchDto) {
+    const target = await this.target(user, dto);
+    const allowedDomains = OWNER_CONTACT_SOURCES.map((source) => source.domain);
 
     const result = await this.aiService.generate(user.id, {
       feature: "owner_search",
       instructions: INSTRUCTIONS,
       input: [
-        `Pedido: ${this.describe(dto)}.`,
-        dto.details ? `Detalhes: ${dto.details}` : null,
+        this.describe(target),
         `Sites permitidos: ${allowedDomains.join(", ")}.`,
-      ]
-        .filter(Boolean)
-        .join("\n"),
-      jsonSchema: LEADS_SCHEMA,
+      ].join("\n"),
+      jsonSchema: CONTACTS_SCHEMA,
       webSearch: { allowedDomains, country: "BR" },
-      referenceId: dto.propertyId ?? null,
+      referenceId: target.propertyId,
     });
 
     const citedUrls = new Set(
       result.citations.map((citation) => this.comparableUrl(citation.url)),
     );
     const parsed = this.parse(result.text);
-    const seen = new Set<string>();
-    const leads: OwnerLead[] = [];
-    let ignoredAgencyLeads = 0;
+    const contacts = new Map<string, OwnerContact>();
 
-    for (const lead of parsed) {
-      const source = this.sourceOf(lead.url);
-      if (!source) continue;
-      const comparable = this.comparableUrl(lead.url);
-      if (seen.has(comparable)) continue;
-      seen.add(comparable);
+    for (const contact of parsed.contacts) {
+      const source = this.sourceOf(contact.sourceUrl);
+      const phone = this.normalizePhone(contact.phone);
+      if (!source || !phone) continue;
 
-      if (lead.advertiserType === "agency") {
-        ignoredAgencyLeads += 1;
-        continue;
+      const found: OwnerContact = {
+        name: contact.name?.trim() || null,
+        phone,
+        sourceName: source.name,
+        sourceUrl: contact.sourceUrl,
+        sourceTitle: contact.sourceTitle.trim().slice(0, 200) || source.name,
+        matchConfidence: contact.matchConfidence,
+        evidence: contact.evidence.trim(),
+        verified: citedUrls.has(this.comparableUrl(contact.sourceUrl)),
+        alreadySaved: target.savedPhones.includes(phone),
+      };
+
+      const known = contacts.get(phone);
+      if (
+        !known ||
+        confidenceOrder[found.matchConfidence] <
+          confidenceOrder[known.matchConfidence]
+      ) {
+        contacts.set(phone, found);
       }
-
-      leads.push({
-        title: lead.title.trim().slice(0, 200) || source.name,
-        url: lead.url,
-        source: source.name,
-        advertiserType: lead.advertiserType,
-        advertiserName: lead.advertiserName?.trim() || null,
-        phone: this.normalizePhone(lead.phone),
-        price:
-          lead.priceInReais && lead.priceInReais > 0
-            ? Math.round(lead.priceInReais)
-            : null,
-        address: lead.address?.trim() || null,
-        kind: lead.kind,
-        bedrooms: lead.bedrooms,
-        squareMeters: lead.squareMeters,
-        evidence: lead.evidence.trim(),
-        verified: citedUrls.has(comparable),
-      });
     }
 
-    leads.sort(
-      (first, second) =>
-        Number(second.advertiserType === "owner") -
-          Number(first.advertiserType === "owner") ||
-        Number(Boolean(second.phone)) - Number(Boolean(first.phone)),
-    );
-
     return {
-      leads,
-      ignoredAgencyLeads,
+      contacts: [...contacts.values()]
+        .sort(
+          (first, second) =>
+            confidenceOrder[first.matchConfidence] -
+              confidenceOrder[second.matchConfidence] ||
+            Number(second.verified) - Number(first.verified),
+        )
+        .slice(0, MAXIMUM_CONTACTS),
+      ignoredIntermediaries: Math.max(0, parsed.ignoredIntermediaries),
       creditsCharged: result.creditsCharged,
       balance: result.balance,
     };
   }
 
-  /**
-   * Keeps a listing found: a new property with the owner as contact, or
-   * the owner added to the property the broker was searching for.
-   */
-  async saveLead(user: User, dto: OwnerLeadSaveDto) {
-    const note = [
-      `Encontrado em ${dto.source}: ${dto.url}`,
-      dto.advertiserName ? `Anunciante: ${dto.advertiserName}` : null,
-    ]
-      .filter(Boolean)
-      .join("\n");
+  /** Saves a contact found as an owner of the property. */
+  async saveContact(user: User, dto: OwnerContactSaveDto) {
+    const property = await this.findProperty(user, dto.propertyId);
+    const phone = this.normalizePhone(dto.phone);
+    if (!phone) throw new BadRequestException("Telefone inválido.");
 
-    if (dto.propertyId) {
-      const property = await this.propertyRepository
-        .findOneOrFail({
-          where: { id: dto.propertyId, user: { id: user.id }, active: true },
-        })
-        .catch(() => {
-          throw new NotFoundException("Imóvel não encontrado.");
-        });
+    const alreadySaved = (property.contacts ?? []).some(
+      (contact) => this.normalizePhone(contact.phone) === phone,
+    );
 
-      property.comment = [property.comment, note].filter(Boolean).join("\n\n");
-      await this.propertyRepository.save(property);
+    if (!alreadySaved) {
+      await this.propertyContactRepository.save(
+        this.propertyContactRepository.create({
+          user,
+          property,
+          name: dto.name?.trim() || null,
+          phone,
+        }),
+      );
 
-      if (dto.phone) {
-        await this.propertyContactRepository.save(
-          this.propertyContactRepository.create({
-            user,
-            property,
-            name: dto.advertiserName ?? null,
-            phone: dto.phone,
-          }),
-        );
-      }
-      return { propertyId: property.id };
+      const note = `Proprietário encontrado em ${dto.sourceName}: ${dto.sourceUrl}`;
+      await this.propertyRepository.update(
+        { id: property.id },
+        { comment: [property.comment, note].filter(Boolean).join("\n\n") },
+      );
     }
 
-    const property = await this.propertyService.save(user, {
+    return { propertyId: property.id, alreadySaved };
+  }
+
+  private async target(
+    user: User,
+    dto: OwnerContactSearchDto,
+  ): Promise<OwnerTarget> {
+    if (dto.propertyId) {
+      const property = await this.findProperty(user, dto.propertyId);
+      const matches = await this.propertyMatchRepository.find({
+        where: { propertyId: property.id, userId: user.id },
+        order: { createdAt: "DESC" },
+        take: MAXIMUM_ORIGIN_LISTINGS,
+      });
+
+      return {
+        propertyId: property.id,
+        kind: property.kind,
+        address: property.address,
+        complement: property.address2?.trim() || null,
+        buildingName: property.alias?.trim() || null,
+        bedrooms: property.infoBedrooms,
+        squareMeters: property.infoSquareMeters
+          ? Number(property.infoSquareMeters)
+          : null,
+        floor: property.infoFloor,
+        price: Number(property.price) || null,
+        details: dto.details?.trim() || null,
+        originListings: matches.map((match) => ({
+          url: match.externalUrl,
+          advertiser: this.describeAdvertiser(match),
+        })),
+        savedPhones: (property.contacts ?? [])
+          .map((contact) => this.normalizePhone(contact.phone))
+          .filter((phone): phone is string => Boolean(phone)),
+      };
+    }
+
+    if (!dto.address?.trim()) {
+      throw new BadRequestException(
+        "Informe o imóvel cadastrado ou o endereço do imóvel.",
+      );
+    }
+
+    return {
+      propertyId: null,
       kind: dto.kind ?? null,
-      alias: dto.title.slice(0, 120),
-      address: dto.address || dto.title,
-      address2: "A confirmar",
-      comment: note,
-      price: String(dto.price ?? 0),
-      contacts: dto.phone
-        ? [{ phone: dto.phone, name: dto.advertiserName ?? null }]
-        : [],
-      infoBedrooms: dto.bedrooms ?? null,
-      infoSquareMeters: dto.squareMeters ?? null,
-    });
-    return { propertyId: property.id };
+      address: dto.address.trim(),
+      complement: dto.complement?.trim() || null,
+      buildingName: null,
+      bedrooms: dto.bedrooms ?? null,
+      squareMeters: dto.squareMeters ?? null,
+      floor: null,
+      price: null,
+      details: dto.details?.trim() || null,
+      originListings: [],
+      savedPhones: [],
+    };
   }
 
-  private describe(dto: OwnerSearchDto) {
+  /** City only registries show up for addresses of that city. */
+  private coversAddress(source: OwnerRegistrySource, address: string) {
+    if (!source.onlyFor) return true;
+    const postalCode = /\b(\d{5})-?\d{3}\b/.exec(address);
+    if (postalCode && source.postalCodeRanges) {
+      const prefix = Number(postalCode[1]);
+      return source.postalCodeRanges.some(
+        ([first, last]) => prefix >= first && prefix <= last,
+      );
+    }
+    const location = address.toLowerCase();
+    return source.onlyFor.some((word) => location.includes(word));
+  }
+
+  private async findProperty(user: User, propertyId: string) {
+    return this.propertyRepository
+      .findOneOrFail({
+        where: { id: propertyId, user: { id: user.id }, active: true },
+        relations: { contacts: true },
+      })
+      .catch(() => {
+        throw new NotFoundException("Imóvel não encontrado.");
+      });
+  }
+
+  private describeAdvertiser(match: PropertyMatch) {
+    const advertiser = match.listing?.advertiser;
+    if (!advertiser || advertiser.kind === "owner") return null;
     const parts = [
-      dto.kind ? kindWords[dto.kind] : "imóvel",
-      dto.purpose === "rent" ? "para alugar" : "à venda",
-      dto.bedrooms ? `${dto.bedrooms} quartos` : null,
-      `em ${dto.location.trim()}`,
-      dto.maximumPrice
-        ? `até R$ ${dto.maximumPrice.toLocaleString("pt-BR")}`
-        : null,
-    ];
-    return parts.filter(Boolean).join(" ");
+      advertiser.name,
+      advertiser.company,
+      advertiser.creci ? `CRECI ${advertiser.creci}` : null,
+    ].filter(Boolean);
+    return parts.length ? parts.join(", ") : null;
   }
 
-  private googleSearchUrl(source: OwnerListingSource, description: string) {
+  private describe(target: OwnerTarget) {
+    const lines = [
+      `Imóvel: ${target.kind ? kindWords[target.kind] : "imóvel"}.`,
+      `Endereço: ${target.address}.`,
+      target.complement ? `Complemento: ${target.complement}.` : null,
+      target.buildingName ? `Apelido ou prédio: ${target.buildingName}.` : null,
+      target.bedrooms ? `Quartos: ${target.bedrooms}.` : null,
+      target.squareMeters ? `Área: ${target.squareMeters} m².` : null,
+      target.floor ? `Andar: ${target.floor}.` : null,
+      target.price
+        ? `Preço de referência: R$ ${target.price.toLocaleString("pt-BR")}.`
+        : null,
+      target.details ? `Detalhes: ${target.details}` : null,
+      ...target.originListings.map((listing) =>
+        [
+          "Anúncio já conhecido deste imóvel",
+          listing.advertiser
+            ? `, intermediário a ignorar: ${listing.advertiser}`
+            : "",
+          listing.url ? ` (${listing.url})` : "",
+          ".",
+        ].join(""),
+      ),
+    ];
+    return lines.filter(Boolean).join("\n");
+  }
+
+  /** Searches the owner's ad of this address, never other properties. */
+  private googleSearchUrl(source: OwnerContactSource, target: OwnerTarget) {
+    const place = target.address
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .slice(0, 4)
+      .join(" ");
     const ownerPhrases = OWNER_SEARCH_PHRASES.map((phrase) => `"${phrase}"`);
-    const words =
-      source.kind === "owner_portal"
-        ? description
-        : `${description} (${ownerPhrases.join(" OR ")})`;
-    const query = `site:${source.domain} ${words}`;
+    const words = [
+      `site:${source.domain}`,
+      target.kind ? kindWords[target.kind] : null,
+      target.buildingName,
+      place,
+      source.kind === "owner_portal" ? null : `(${ownerPhrases.join(" OR ")})`,
+    ];
+    const query = words.filter(Boolean).join(" ");
     return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
   }
 
-  private parse(text: string): AiLead[] {
+  private parse(text: string): {
+    contacts: AiContact[];
+    ignoredIntermediaries: number;
+  } {
     try {
-      const parsed = JSON.parse(text) as { leads?: AiLead[] };
-      return Array.isArray(parsed.leads)
-        ? parsed.leads.slice(0, MAXIMUM_LEADS * 2)
-        : [];
+      const parsed = JSON.parse(text) as {
+        contacts?: AiContact[];
+        ignoredIntermediaries?: number;
+      };
+      return {
+        contacts: Array.isArray(parsed.contacts)
+          ? parsed.contacts.slice(0, MAXIMUM_CONTACTS * 2)
+          : [],
+        ignoredIntermediaries: Number(parsed.ignoredIntermediaries) || 0,
+      };
     } catch {
-      return [];
+      return { contacts: [], ignoredIntermediaries: 0 };
     }
   }
 
-  /** Listings outside the allowed sites are dropped, the AI may invent them. */
+  /** Contacts outside the allowed sites are dropped, the AI may invent them. */
   private sourceOf(url: string) {
     try {
       const parsed = new URL(url);
@@ -332,7 +434,7 @@ export class OwnerFinderService {
       }
       const host = parsed.hostname.toLowerCase();
       return (
-        OWNER_LISTING_SOURCES.find(
+        OWNER_CONTACT_SOURCES.find(
           (source) =>
             host === source.domain || host.endsWith(`.${source.domain}`),
         ) ?? null
@@ -352,7 +454,7 @@ export class OwnerFinderService {
   }
 
   /** Keeps Brazilian numbers with area code, as 10 or 11 digits. */
-  private normalizePhone(phone: string | null) {
+  private normalizePhone(phone: string | null | undefined) {
     if (!phone) return null;
     let digits = phone.replace(/\D/g, "");
     if (digits.length > 11 && digits.startsWith("55")) {
