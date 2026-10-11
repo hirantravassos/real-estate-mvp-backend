@@ -29,4 +29,18 @@ export class User extends BaseEntity {
   /** The broker's own character, same look options as the customers'. */
   @Column({ type: "json", nullable: true })
   avatar: CustomerAvatar | null;
+
+  /** Version of the Terms of Use and Privacy Policy last accepted. */
+  @Column({ type: "varchar", length: 20, nullable: true })
+  termsVersion: string | null;
+
+  /** Evidence of the acceptance, kept as proof of consent. */
+  @Column({ type: "datetime", nullable: true })
+  termsAcceptedAt: Date | null;
+
+  @Column({ type: "varchar", length: 64, nullable: true })
+  termsAcceptedIp: string | null;
+
+  @Column({ type: "varchar", length: 500, nullable: true })
+  termsAcceptedUserAgent: string | null;
 }

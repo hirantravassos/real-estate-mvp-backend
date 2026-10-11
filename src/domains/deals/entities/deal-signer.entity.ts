@@ -20,6 +20,10 @@ export class DealSigner extends BaseEntity {
   @Column({ type: "uuid", nullable: false })
   dealId: string;
 
+  /** Set when the signer is a partner broker of the sale. */
+  @Column({ type: "uuid", nullable: true })
+  partnerId: string | null;
+
   @Column({ type: "varchar", length: 255, nullable: false })
   name: string;
 

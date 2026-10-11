@@ -1,6 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
 import type { MulterModuleOptions } from "@nestjs/platform-express";
-import type { Request } from "express";
 import { memoryStorage } from "multer";
 
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
@@ -50,23 +49,7 @@ export const requireFile = (file: Express.Multer.File | undefined) => {
   return file;
 };
 
-export interface RequestEvidence {
-  ip: string | null;
-  userAgent: string | null;
-}
-
-/** Who signed from where, read behind the hosting proxy. */
-export const readRequestEvidence = (request: Request): RequestEvidence => {
-  const forwardedFor = request.headers["x-forwarded-for"];
-  const forwardedAddress = (
-    Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor
-  )
-    ?.split(",")[0]
-    ?.trim();
-  const userAgent = request.headers["user-agent"];
-
-  return {
-    ip: (forwardedAddress || request.ip || null)?.substring(0, 64) ?? null,
-    userAgent: userAgent ? userAgent.substring(0, 500) : null,
-  };
-};
+export {
+  readRequestEvidence,
+  type RequestEvidence,
+} from "../../../shared/utils/request-evidence.util";

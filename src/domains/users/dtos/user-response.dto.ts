@@ -6,6 +6,11 @@ export class UserResponseDto {
   name!: string;
   profileImage!: string | null;
   avatar!: CustomerAvatar | null;
+  terms!: {
+    acceptedVersion: string | null;
+    acceptedAt: string | null;
+    currentVersion: string;
+  };
   createdAt!: string;
   updatedAt!: string;
 }

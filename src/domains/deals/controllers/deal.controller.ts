@@ -18,6 +18,7 @@ import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { User } from "../../users/entities/user.entity";
 import { DealService } from "../services/deal.service";
 import { DealSignatureService } from "../services/deal-signature.service";
+import { DealPartnerService } from "../services/deal-partner.service";
 import {
   DealCancelDto,
   DealChecklistItemCreateDto,
@@ -28,6 +29,8 @@ import {
   DealMessageDto,
   DealMilestoneCreateDto,
   DealMilestoneUpdateDto,
+  DealPartnerCreateDto,
+  DealPartnerUpdateDto,
   DealPortalDto,
   DealSignerCreateDto,
   DealSignerReviewDto,
@@ -47,6 +50,7 @@ export class DealController {
   constructor(
     private readonly dealService: DealService,
     private readonly signatureService: DealSignatureService,
+    private readonly partnerService: DealPartnerService,
   ) {}
 
   @Get()
@@ -271,6 +275,43 @@ export class DealController {
     @Param("signerId", ParseUUIDPipe) signerId: string,
   ) {
     return this.signatureService.resetSignature(user, id, signerId);
+  }
+
+  @Post(":id/partners")
+  addPartner(
+    @GetUser() user: User,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: DealPartnerCreateDto,
+  ) {
+    return this.partnerService.addPartner(user, id, dto);
+  }
+
+  @Patch(":id/partners/:partnerId")
+  updatePartner(
+    @GetUser() user: User,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Param("partnerId", ParseUUIDPipe) partnerId: string,
+    @Body() dto: DealPartnerUpdateDto,
+  ) {
+    return this.partnerService.updatePartner(user, id, partnerId, dto);
+  }
+
+  @Delete(":id/partners/:partnerId")
+  removePartner(
+    @GetUser() user: User,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Param("partnerId", ParseUUIDPipe) partnerId: string,
+  ) {
+    return this.partnerService.removePartner(user, id, partnerId);
+  }
+
+  @Post(":id/partners/:partnerId/regenerate")
+  regeneratePartnerLink(
+    @GetUser() user: User,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Param("partnerId", ParseUUIDPipe) partnerId: string,
+  ) {
+    return this.partnerService.regenerateToken(user, id, partnerId);
   }
 
   @Post(":id/milestones")

@@ -2,6 +2,7 @@ import { User } from "../entities/user.entity.js";
 import { DateHelper } from "../../../shared/utils/date.util.js";
 import { UserCreateDto } from "../dtos/user-create.dto";
 import { TokenPayload } from "google-auth-library";
+import { CURRENT_TERMS_VERSION } from "../../../shared/constants/legal.constant";
 
 export class UserMapper {
   static toDto(user: User) {
@@ -11,6 +12,13 @@ export class UserMapper {
       name: user.name,
       profileImage: user.profileImage,
       avatar: user.avatar ?? null,
+      terms: {
+        acceptedVersion: user.termsVersion ?? null,
+        acceptedAt: user.termsAcceptedAt
+          ? DateHelper.formatUtcToIso(user.termsAcceptedAt)
+          : null,
+        currentVersion: CURRENT_TERMS_VERSION,
+      },
       createdAt: DateHelper.formatUtcToIso(user.createdAt),
       updatedAt: DateHelper.formatUtcToIso(user.updatedAt),
     };
