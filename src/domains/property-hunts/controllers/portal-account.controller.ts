@@ -17,9 +17,7 @@ import {
 import type { ConfigType } from "@nestjs/config";
 import { timingSafeEqual } from "crypto";
 import { portalsConfig } from "../../../config/portals.config";
-import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { JwtGuard } from "../../auth/guards/jwt.guard";
-import { User } from "../../users/entities/user.entity";
 import {
   PortalAccountCodeDto,
   PortalAccountSaveDto,
@@ -29,7 +27,11 @@ import { PortalAccountService } from "../services/portal-account.service";
 
 const portalPipe = new ParseEnumPipe(PortalKey);
 
-/** The broker's logins on the listing portals, and the platform's shared ones. */
+/**
+ * The platform's logins on the listing portals. Every hunt browses with
+ * them, so the brokers never connect anything. Managed only with the
+ * CREDITS_ADMIN_KEY, like the credit grants.
+ */
 @Controller("portal-accounts")
 export class PortalAccountController {
   constructor(
@@ -38,83 +40,56 @@ export class PortalAccountController {
     private readonly accountService: PortalAccountService,
   ) {}
 
+  /** Which portals the hunts browse signed in, shown to the brokers. */
   @Get()
   @UseGuards(JwtGuard)
-  list(@GetUser() user: User) {
-    return this.accountService.listForUser(user);
+  readiness() {
+    return this.accountService.readiness();
   }
 
-  @Put(":portal")
-  @UseGuards(JwtGuard)
-  connect(
-    @GetUser() user: User,
-    @Param("portal", portalPipe) portal: PortalKey,
-    @Body() dto: PortalAccountSaveDto,
-  ) {
-    return this.accountService.connect(user.id, portal, dto);
-  }
-
-  @Post(":portal/code")
-  @UseGuards(JwtGuard)
-  code(
-    @GetUser() user: User,
-    @Param("portal", portalPipe) portal: PortalKey,
-    @Body() dto: PortalAccountCodeDto,
-  ) {
-    return this.accountService.submitCode(user.id, portal, dto.code);
-  }
-
-  @Post(":portal/check")
-  @UseGuards(JwtGuard)
-  check(@GetUser() user: User, @Param("portal", portalPipe) portal: PortalKey) {
-    return this.accountService.check(user.id, portal);
-  }
-
-  @Delete(":portal")
-  @UseGuards(JwtGuard)
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(
-    @GetUser() user: User,
-    @Param("portal", portalPipe) portal: PortalKey,
-  ) {
-    await this.accountService.remove(user.id, portal);
-  }
-
-  /** Platform accounts, protected by CREDITS_ADMIN_KEY like the credit grants. */
   @Get("platform")
-  listPlatform(@Headers("x-admin-key") adminKey: string | undefined) {
+  list(@Headers("x-admin-key") adminKey: string | undefined) {
     this.ensureAdmin(adminKey);
-    return this.accountService.listPlatform();
+    return this.accountService.list();
   }
 
   @Put("platform/:portal")
-  connectPlatform(
+  connect(
     @Headers("x-admin-key") adminKey: string | undefined,
     @Param("portal", portalPipe) portal: PortalKey,
     @Body() dto: PortalAccountSaveDto,
   ) {
     this.ensureAdmin(adminKey);
-    return this.accountService.connect(null, portal, dto);
+    return this.accountService.connect(portal, dto);
   }
 
   @Post("platform/:portal/code")
-  codePlatform(
+  code(
     @Headers("x-admin-key") adminKey: string | undefined,
     @Param("portal", portalPipe) portal: PortalKey,
     @Body() dto: PortalAccountCodeDto,
   ) {
     this.ensureAdmin(adminKey);
-    return this.accountService.submitCode(null, portal, dto.code);
+    return this.accountService.submitCode(portal, dto.code);
+  }
+
+  @Post("platform/:portal/check")
+  check(
+    @Headers("x-admin-key") adminKey: string | undefined,
+    @Param("portal", portalPipe) portal: PortalKey,
+  ) {
+    this.ensureAdmin(adminKey);
+    return this.accountService.check(portal);
   }
 
   @Delete("platform/:portal")
   @HttpCode(HttpStatus.NO_CONTENT)
-  async removePlatform(
+  async remove(
     @Headers("x-admin-key") adminKey: string | undefined,
     @Param("portal", portalPipe) portal: PortalKey,
   ) {
     this.ensureAdmin(adminKey);
-    await this.accountService.remove(null, portal);
+    await this.accountService.remove(portal);
   }
 
   private ensureAdmin(adminKey: string | undefined) {
