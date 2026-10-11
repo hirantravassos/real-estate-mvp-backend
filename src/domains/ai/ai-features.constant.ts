@@ -2,7 +2,8 @@ export type AiFeature =
   | "reply_suggestions"
   | "rewrite"
   | "presentation"
-  | "contact_import";
+  | "contact_import"
+  | "avatar_from_photo";
 
 export interface AiFeatureDefinition {
   label: string;
@@ -44,6 +45,14 @@ export const AI_FEATURES: Record<AiFeature, AiFeatureDefinition> = {
     maximumOutputTokens: 4000,
     typicalInputTokens: 1600,
     typicalOutputTokens: 350,
+    fixedPriceSafetyMultiplier: 1.5,
+  },
+  /** Priced per photo: a small picture in low detail and a short answer. */
+  avatar_from_photo: {
+    label: "Bonequinho pela foto do WhatsApp",
+    maximumOutputTokens: 600,
+    typicalInputTokens: 1000,
+    typicalOutputTokens: 250,
     fixedPriceSafetyMultiplier: 1.5,
   },
 };

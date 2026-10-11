@@ -22,6 +22,10 @@ import { ConversationService } from "../../inbox/services/conversation.service";
 import { MessageService } from "../../inbox/services/message.service";
 import { WhatsappConnectionService } from "../../inbox/services/whatsapp-connection.service";
 import { Kanban } from "../../kanbans/entities/kanban.entity";
+import {
+  PhotoAvatarJob,
+  PhotoAvatarService,
+} from "../../avatars/services/photo-avatar.service";
 import { User } from "../../users/entities/user.entity";
 import { ContactImportDto, ContactSource } from "../dtos/contact-import.dto";
 
@@ -67,6 +71,7 @@ export class ContactImportService {
     private readonly messageService: MessageService,
     private readonly evolutionApiService: EvolutionApiService,
     private readonly googlePeopleService: GooglePeopleService,
+    private readonly photoAvatarService: PhotoAvatarService,
   ) {}
 
   /** Every contact and chat of the connected WhatsApp, chats first. */
@@ -214,6 +219,7 @@ export class ContactImportService {
     const created: { id: string; name: string; phone: string }[] = [];
     const skipped: { phone: string; name: string; reason: SkipReason }[] = [];
     const historyJobs: HistoryJob[] = [];
+    const photoJobs: PhotoAvatarJob[] = [];
 
     for (const item of dto.contacts) {
       const name = item.name.trim();
@@ -249,6 +255,9 @@ export class ContactImportService {
 
       knownKeys.add(key);
       created.push({ id: customer.id, name: customer.name, phone });
+      if (dto.avatarFromPhoto) {
+        photoJobs.push({ customerId: customer.id, name: customer.name, phone });
+      }
 
       if (connection) {
         const conversation = await this.linkConversation(
@@ -266,12 +275,20 @@ export class ContactImportService {
     if (connection && historyJobs.length) {
       void this.importHistories(connection, historyJobs);
     }
+    if (connection && photoJobs.length) {
+      void this.photoAvatarService
+        .applyFromWhatsapp(user.id, connection.instanceName, photoJobs)
+        .catch((error: unknown) => {
+          this.logger.warn(`Photo avatars failed: ${String(error)}`);
+        });
+    }
 
     return {
       created: created.length,
       customers: created,
       skipped,
       historyQueued: historyJobs.length,
+      photosQueued: connection ? photoJobs.length : 0,
     };
   }
 

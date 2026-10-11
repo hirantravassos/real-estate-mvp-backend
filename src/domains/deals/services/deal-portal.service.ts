@@ -5,6 +5,9 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
+import { RealtimeGateway } from "../../../infrastructure/realtime/realtime.gateway";
+import { CustomerAvatarDto } from "../../customers/dtos/customer-avatar.dto";
+import { Customer } from "../../customers/entities/customer.entity";
 import { PropertyMediaService } from "../../properties/services/property-media.service";
 import { PropertyMediaType } from "../../properties/entities/property-media.entity";
 import { DocumentOwnerType } from "../../documents/entities/document.entity";
@@ -28,6 +31,9 @@ export class DealPortalService {
   constructor(
     @InjectRepository(DealChecklistItem)
     private readonly checklistRepository: Repository<DealChecklistItem>,
+    @InjectRepository(Customer)
+    private readonly customerRepository: Repository<Customer>,
+    private readonly realtimeGateway: RealtimeGateway,
     private readonly dealService: DealService,
     private readonly documentService: DocumentService,
     private readonly propertyMediaService: PropertyMediaService,
@@ -76,6 +82,23 @@ export class DealPortalService {
     );
     this.activityService.notifyBroker(deal.userId, deal.id);
 
+    return this.getPortal(token);
+  }
+
+  /** The customer dresses up their own character, the broker sees it too. */
+  async updateCustomerAvatar(token: string, avatar: CustomerAvatarDto) {
+    const deal = await this.findDealByTokenOrThrow(token);
+    const look = {
+      gender: avatar.gender,
+      skinTone: avatar.skinTone,
+      hairStyle: avatar.hairStyle,
+      hairColor: avatar.hairColor,
+      facialHair: avatar.gender === "masculine" ? avatar.facialHair : "none",
+      outfitStyle: avatar.outfitStyle,
+      outfitColor: avatar.outfitColor,
+    };
+    await this.customerRepository.update(deal.customer.id, { avatar: look });
+    this.realtimeGateway.emitToUser(deal.userId, "customers.updated", {});
     return this.getPortal(token);
   }
 

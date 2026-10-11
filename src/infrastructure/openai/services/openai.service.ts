@@ -20,6 +20,8 @@ export interface OpenaiGenerateRequest {
   input: string;
   maximumOutputTokens: number;
   jsonSchema?: OpenaiJsonSchema;
+  /** Pictures sent along, as data URLs, read in low detail to keep it cheap. */
+  images?: string[];
 }
 
 export interface OpenaiUsage {
@@ -86,7 +88,21 @@ export class OpenaiService {
     const body: Record<string, unknown> = {
       model: this.configuration.model,
       instructions: request.instructions,
-      input: request.input,
+      input: request.images?.length
+        ? [
+            {
+              role: "user",
+              content: [
+                { type: "input_text", text: request.input },
+                ...request.images.map((image) => ({
+                  type: "input_image",
+                  image_url: image,
+                  detail: "low",
+                })),
+              ],
+            },
+          ]
+        : request.input,
       max_output_tokens: request.maximumOutputTokens,
       store: false,
     };

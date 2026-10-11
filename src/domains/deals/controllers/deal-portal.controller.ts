@@ -5,6 +5,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Put,
   Req,
   UploadedFile,
   UseInterceptors,
@@ -15,6 +16,7 @@ import { DealPortalService } from "../services/deal-portal.service";
 import { DealSignatureService } from "../services/deal-signature.service";
 import { DealPartnerService } from "../services/deal-partner.service";
 import { DealSignDto } from "../dtos/deal.dto";
+import { CustomerAvatarDto } from "../../customers/dtos/customer-avatar.dto";
 import {
   dealContractUploadOptions,
   dealDocumentUploadOptions,
@@ -51,6 +53,14 @@ export class DealPortalController {
       itemId,
       requireFile(file),
     );
+  }
+
+  @Put("portal/:token/avatar")
+  updateCustomerAvatar(
+    @Param("token") token: string,
+    @Body() dto: CustomerAvatarDto,
+  ) {
+    return this.portalService.updateCustomerAvatar(token, dto);
   }
 
   @Get("portal/:token/documents/:documentId/url")

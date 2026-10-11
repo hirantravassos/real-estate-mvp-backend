@@ -366,7 +366,11 @@ export class DealMapper {
       downPaymentAmount: deal.downPaymentAmount,
       paymentMethod: deal.paymentMethod,
       usesFgts: deal.usesFgts,
-      customer: { firstName: deal.customer.name.trim().split(/\s+/)[0] },
+      customer: {
+        firstName: deal.customer.name.trim().split(/\s+/)[0],
+        name: deal.customer.name,
+        avatar: deal.customer.avatar ?? null,
+      },
       broker: {
         name: deal.user.name,
         profileImage: deal.user.profileImage,

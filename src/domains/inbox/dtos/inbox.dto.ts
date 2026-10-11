@@ -70,6 +70,11 @@ export class ConversationCustomerCreateDto {
   @IsString()
   @MaxLength(1000)
   note?: string | null;
+
+  /** Builds the character from the public WhatsApp photo, charged per photo. */
+  @IsOptional()
+  @IsBoolean()
+  avatarFromPhoto?: boolean;
 }
 
 export class MessageListDto {

@@ -14,7 +14,8 @@ export type RealtimeEvent =
   | "message.updated"
   | "message.removed"
   | "credits.updated"
-  | "deal.updated";
+  | "deal.updated"
+  | "customers.updated";
 
 const userRoom = (userId: string) => `user:${userId}`;
 

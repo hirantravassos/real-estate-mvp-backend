@@ -97,6 +97,11 @@ export class ContactImportDto {
   @IsBoolean()
   importHistory: boolean;
 
+  /** Builds each character from the public WhatsApp photo, charged per photo. */
+  @IsOptional()
+  @IsBoolean()
+  avatarFromPhoto?: boolean;
+
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(IMPORT_BATCH_SIZE)

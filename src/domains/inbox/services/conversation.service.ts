@@ -8,6 +8,7 @@ import { CustomerRepository } from "../../customers/repositories/customer.reposi
 import { User } from "../../users/entities/user.entity";
 import { CustomerMapper } from "../../customers/mappers/customer.mapper";
 import { Kanban } from "../../kanbans/entities/kanban.entity";
+import { PhotoAvatarService } from "../../avatars/services/photo-avatar.service";
 import {
   ConversationCustomerCreateDto,
   ConversationFilterDto,
@@ -42,6 +43,7 @@ export class ConversationService {
     private readonly connectionService: WhatsappConnectionService,
     private readonly evolutionApiService: EvolutionApiService,
     private readonly realtimeGateway: RealtimeGateway,
+    private readonly photoAvatarService: PhotoAvatarService,
   ) {}
 
   async findAll(user: User, filter: ConversationFilterDto) {
@@ -315,6 +317,22 @@ export class ConversationService {
     await this.conversationRepository.update(conversation.id, {
       customerId: customer.id,
     });
+
+    if (created && dto.avatarFromPhoto) {
+      const connection = await this.connectionService
+        .requireConnected(user.id)
+        .catch(() => null);
+      if (connection) {
+        void this.photoAvatarService
+          .applyFromWhatsapp(user.id, connection.instanceName, [
+            { customerId: customer.id, name: customer.name, phone },
+          ])
+          .then((updated) => {
+            if (updated) void this.emitFresh(conversation);
+          })
+          .catch(() => undefined);
+      }
+    }
 
     return {
       conversation: this.emitUpdated(conversation),

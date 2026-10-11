@@ -3,6 +3,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { EvolutionModule } from "../../infrastructure/evolution/evolution.module";
 import { GoogleModule } from "../../infrastructure/google/google.module";
 import { AiModule } from "../ai/ai.module";
+import { AvatarModule } from "../avatars/avatar.module";
 import { CreditModule } from "../credits/credit.module";
 import { CustomerModule } from "../customers/customer.module";
 import { Conversation } from "../inbox/entities/conversation.entity";
@@ -18,6 +19,7 @@ import { ContactImportService } from "./services/contact-import.service";
     EvolutionModule,
     GoogleModule,
     AiModule,
+    AvatarModule,
     CreditModule,
     CustomerModule,
     InboxModule,

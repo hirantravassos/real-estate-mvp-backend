@@ -5,6 +5,7 @@ import { EvolutionModule } from "../../infrastructure/evolution/evolution.module
 import { RealtimeModule } from "../../infrastructure/realtime/realtime.module";
 import { StorageModule } from "../../infrastructure/storage/storage.module";
 import { AiModule } from "../ai/ai.module";
+import { AvatarModule } from "../avatars/avatar.module";
 import { CustomerModule } from "../customers/customer.module";
 import { Kanban } from "../kanbans/entities/kanban.entity";
 import { Property } from "../properties/entities/property.entity";
@@ -37,6 +38,7 @@ import { WhatsappConnectionService } from "./services/whatsapp-connection.servic
     RealtimeModule,
     StorageModule,
     AiModule,
+    AvatarModule,
     CustomerModule,
     PropertyModule,
   ],

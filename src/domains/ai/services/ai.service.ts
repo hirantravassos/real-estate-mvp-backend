@@ -17,6 +17,8 @@ export interface AiRequest {
   fixedCredits?: number;
   /** Shown in the credit history instead of the feature name. */
   description?: string;
+  /** Pictures for the AI to look at, as data URLs. */
+  images?: string[];
 }
 
 export interface AiResult {
@@ -58,6 +60,7 @@ export class AiService {
       input: request.input,
       maximumOutputTokens: feature.maximumOutputTokens,
       jsonSchema: request.jsonSchema,
+      images: request.images,
     });
 
     const usedCredits = this.pricingService.creditsForUsage(
