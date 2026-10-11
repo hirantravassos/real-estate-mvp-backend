@@ -1,4 +1,4 @@
-import { IsIn } from "class-validator";
+import { IsIn, IsOptional } from "class-validator";
 
 export const CUSTOMER_AVATAR_GENDERS = ["feminine", "masculine"] as const;
 export const CUSTOMER_AVATAR_SKIN_TONES = [
@@ -25,6 +25,13 @@ export const CUSTOMER_AVATAR_HAIR_COLORS = [
   "gray",
   "pink",
 ] as const;
+export const CUSTOMER_AVATAR_FACIAL_HAIRS = [
+  "none",
+  "stubble",
+  "goatee",
+  "mustache",
+  "beard",
+] as const;
 export const CUSTOMER_AVATAR_OUTFIT_STYLES = [
   "casual",
   "suit",
@@ -47,6 +54,8 @@ export type CustomerAvatarHairStyle =
   (typeof CUSTOMER_AVATAR_HAIR_STYLES)[number];
 export type CustomerAvatarHairColor =
   (typeof CUSTOMER_AVATAR_HAIR_COLORS)[number];
+export type CustomerAvatarFacialHair =
+  (typeof CUSTOMER_AVATAR_FACIAL_HAIRS)[number];
 export type CustomerAvatarOutfitStyle =
   (typeof CUSTOMER_AVATAR_OUTFIT_STYLES)[number];
 export type CustomerAvatarOutfitColor =
@@ -57,6 +66,8 @@ export interface CustomerAvatar {
   skinTone: CustomerAvatarSkinTone;
   hairStyle: CustomerAvatarHairStyle;
   hairColor: CustomerAvatarHairColor;
+  /** Optional, looks saved before beards existed do not have it. */
+  facialHair?: CustomerAvatarFacialHair;
   outfitStyle: CustomerAvatarOutfitStyle;
   outfitColor: CustomerAvatarOutfitColor;
 }
@@ -74,6 +85,10 @@ export class CustomerAvatarDto implements CustomerAvatar {
 
   @IsIn(CUSTOMER_AVATAR_HAIR_COLORS)
   hairColor: CustomerAvatarHairColor;
+
+  @IsOptional()
+  @IsIn(CUSTOMER_AVATAR_FACIAL_HAIRS)
+  facialHair?: CustomerAvatarFacialHair;
 
   @IsIn(CUSTOMER_AVATAR_OUTFIT_STYLES)
   outfitStyle: CustomerAvatarOutfitStyle;
