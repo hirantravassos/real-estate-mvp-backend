@@ -16,4 +16,11 @@ export const openaiConfig = registerAs("openai", () => ({
   outputCostPerMillionUsd: parseFloat(
     process.env.OPENAI_OUTPUT_COST_PER_MILLION_USD || "2",
   ),
+  /** What OpenAI charges us for each web search the model runs, in US dollars. */
+  webSearchCostPerCallUsd: parseFloat(
+    process.env.OPENAI_WEB_SEARCH_COST_PER_CALL_USD || "0.01",
+  ),
+  /** Web search does not run with minimal reasoning, this effort is used instead. */
+  webSearchReasoningEffort:
+    process.env.OPENAI_WEB_SEARCH_REASONING_EFFORT || "low",
 }));

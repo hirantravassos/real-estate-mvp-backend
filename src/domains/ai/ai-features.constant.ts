@@ -3,7 +3,8 @@ export type AiFeature =
   | "rewrite"
   | "presentation"
   | "contact_import"
-  | "avatar_from_photo";
+  | "avatar_from_photo"
+  | "owner_search";
 
 export interface AiFeatureDefinition {
   label: string;
@@ -11,6 +12,8 @@ export interface AiFeatureDefinition {
   /** A usual call, used to show the broker how many credits it costs. */
   typicalInputTokens: number;
   typicalOutputTokens: number;
+  /** Web searches a usual call runs, for features that search the web. */
+  typicalWebSearchCalls?: number;
   /**
    * Set for features sold at a fixed price instead of the tokens used.
    * The typical tokens are then the most one call can use (the input is
@@ -54,5 +57,13 @@ export const AI_FEATURES: Record<AiFeature, AiFeatureDefinition> = {
     typicalInputTokens: 1000,
     typicalOutputTokens: 250,
     fixedPriceSafetyMultiplier: 1.5,
+  },
+  /** Searches the listing sites, the pages read count as input tokens. */
+  owner_search: {
+    label: "Caçar proprietário na internet",
+    maximumOutputTokens: 6000,
+    typicalInputTokens: 30000,
+    typicalOutputTokens: 3000,
+    typicalWebSearchCalls: 4,
   },
 };

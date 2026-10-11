@@ -29,9 +29,13 @@ export class CreditPricingService {
     );
   }
 
-  creditsForUsage(inputTokens: number, outputTokens: number) {
+  creditsForUsage(
+    inputTokens: number,
+    outputTokens: number,
+    webSearchCalls = 0,
+  ) {
     const costInBrl =
-      this.openaiService.costInUsd(inputTokens, outputTokens) *
+      this.openaiService.costInUsd(inputTokens, outputTokens, webSearchCalls) *
       this.configuration.usdToBrlRate;
     const priceInBrl = costInBrl * this.configuration.profitMultiplier;
     return Math.max(1, Math.ceil(priceInBrl / this.cheapestCreditPriceInBrl));
@@ -53,6 +57,7 @@ export class CreditPricingService {
     const credits = this.creditsForUsage(
       definition.typicalInputTokens,
       definition.typicalOutputTokens,
+      definition.typicalWebSearchCalls ?? 0,
     );
     return Math.ceil(credits * (definition.fixedPriceSafetyMultiplier ?? 1));
   }
