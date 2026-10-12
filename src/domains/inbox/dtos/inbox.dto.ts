@@ -18,6 +18,14 @@ import {
 import { ValidateBoolean } from "../../../shared/decorators/validation/boolean.decorator";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 
+/** Without a phone the broker scans a QR code, with it they type a pairing code. */
+export class WhatsappConnectDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  phone?: string | null;
+}
+
 export class ConversationFilterDto extends PaginationRequestDto {
   @IsOptional()
   @IsString()
