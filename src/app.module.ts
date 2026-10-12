@@ -23,6 +23,7 @@ import { CreditModule } from "./domains/credits/credit.module";
 import { InboxModule } from "./domains/inbox/inbox.module";
 import { DealModule } from "./domains/deals/deal.module";
 import { ContactImportModule } from "./domains/contact-imports/contact-import.module";
+import { CustomerReclassificationModule } from "./domains/customer-reclassifications/customer-reclassification.module";
 import { PropertyHuntModule } from "./domains/property-hunts/property-hunt.module";
 import { portalsConfig } from "./config/portals.config";
 import { AssistantModule } from "./domains/assistant/assistant.module";
@@ -93,6 +94,7 @@ const THROTTLE_LIMIT = 120;
     InboxModule,
     DealModule,
     ContactImportModule,
+    CustomerReclassificationModule,
     PropertyHuntModule,
     AssistantModule,
     OwnerFinderModule,
