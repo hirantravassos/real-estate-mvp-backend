@@ -50,6 +50,10 @@ import { AssistantToolName } from "../constants/assistant-tools.constant";
 import { StorageService } from "../../../infrastructure/storage/services/storage.service";
 import { AssistantDocumentService } from "./assistant-document.service";
 import {
+  AssistantPaidActionService,
+  PaidActionDraft,
+} from "./assistant-paid-action.service";
+import {
   AssistantAction,
   AssistantActionPayload,
   AssistantAttachment,
@@ -73,6 +77,15 @@ import {
   customerWarmthOf,
   WARMTH_LABEL,
 } from "../helpers/customer-warmth.helper";
+import {
+  booleanOf,
+  limitOf,
+  numberOf,
+  propertyTitleOf,
+  requireId,
+  textOf,
+  ToolArguments,
+} from "../helpers/tool-arguments.helper";
 
 /** What one question gathered while the tools ran. */
 export interface AssistantToolContext {
@@ -80,13 +93,9 @@ export interface AssistantToolContext {
   references: Map<string, AssistantReference>;
 }
 
-type ToolArguments = Record<string, unknown>;
-
 const CONVERSATION_MESSAGES = 25;
 const CUSTOMER_MESSAGES = 15;
 const MAXIMUM_VISIT_RANGE_DAYS = 92;
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const DATE_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 const WARMTH_VALUES = new Set<CustomerWarmth>([
@@ -101,26 +110,6 @@ const describeSize = (bytes: number) =>
   bytes >= 1024 * 1024
     ? `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} MB`
     : `${Math.max(1, Math.round(bytes / 1024))} KB`;
-
-const textOf = (value: unknown) =>
-  typeof value === "string" && value.trim() ? value.trim() : null;
-
-const numberOf = (value: unknown) =>
-  typeof value === "number" && Number.isFinite(value) ? value : null;
-
-const booleanOf = (value: unknown) =>
-  typeof value === "boolean" ? value : null;
-
-const limitOf = (value: unknown, fallback: number, maximum: number) =>
-  Math.min(Math.max(Math.round(numberOf(value) ?? fallback), 1), maximum);
-
-const requireId = (value: unknown, label: string) => {
-  const id = textOf(value);
-  if (!id || !UUID_PATTERN.test(id)) {
-    throw new BadRequestException(`Id de ${label} inválido.`);
-  }
-  return id;
-};
 
 /**
  * Runs the tools the assistant calls. Every query is limited to the broker
@@ -160,6 +149,7 @@ export class AssistantToolService {
     private readonly checklistRepository: Repository<DealChecklistItem>,
     private readonly documentService: AssistantDocumentService,
     private readonly storageService: StorageService,
+    private readonly paidActionService: AssistantPaidActionService,
   ) {}
 
   get timezone() {
@@ -194,7 +184,7 @@ export class AssistantToolService {
     }
   }
 
-  private dispatch(
+  private async dispatch(
     user: User,
     name: AssistantToolName,
     parameters: ToolArguments,
@@ -229,6 +219,45 @@ export class AssistantToolService {
         return this.proposeStageChange(user, parameters, context);
       case "propose_lost_status":
         return this.proposeLostStatus(user, parameters, context);
+      case "list_whatsapp_contacts":
+        return this.paidActionService.listWhatsappContacts(
+          user,
+          parameters,
+          this.timezone,
+        );
+      case "list_certificates":
+        return this.paidActionService.listCertificates(
+          user,
+          parameters,
+          this.timezone,
+        );
+      case "propose_property_hunt":
+        return this.proposeDraft(
+          user,
+          context,
+          await this.paidActionService.prepareHunt(user, parameters),
+        );
+      case "propose_owner_search":
+        return this.proposeDraft(
+          user,
+          context,
+          await this.paidActionService.prepareOwnerSearch(user, parameters),
+        );
+      case "propose_contact_import":
+        return this.proposeDraft(
+          user,
+          context,
+          await this.paidActionService.prepareContactImport(user, parameters),
+        );
+      case "propose_certificate_lookup":
+        return this.proposeDraft(
+          user,
+          context,
+          await this.paidActionService.prepareCertificateLookup(
+            user,
+            parameters,
+          ),
+        );
       default:
         throw new BadRequestException(
           `Ferramenta desconhecida: ${String(name)}.`,
@@ -579,7 +608,7 @@ export class AssistantToolService {
       this.remember(context, {
         type: AssistantReferenceType.PROPERTY,
         id: property.id,
-        label: this.propertyTitle(property),
+        label: propertyTitleOf(property),
       }),
     );
 
@@ -587,7 +616,7 @@ export class AssistantToolService {
       total,
       properties: properties.map((property) => ({
         id: property.id,
-        title: this.propertyTitle(property),
+        title: propertyTitleOf(property),
         kind: property.kind ? KIND_LABEL[property.kind] : null,
         address: customerAddressOf(property),
         ...(isFromPortal(property)
@@ -738,7 +767,7 @@ export class AssistantToolService {
         }),
       ]);
       return {
-        property: this.propertyTitle(property),
+        property: propertyTitleOf(property),
         documents: documents.map((document) => this.describeFile(document)),
         photosAndVideos: media.map((item) => ({
           type: "property_media",
@@ -1159,6 +1188,29 @@ export class AssistantToolService {
     };
   }
 
+  /** A paid action: the model learns the price to tell the broker. */
+  private async proposeDraft(
+    user: User,
+    context: AssistantToolContext,
+    draft: PaidActionDraft,
+  ) {
+    const proposal = await this.propose(
+      user,
+      context,
+      draft.kind,
+      draft.title,
+      draft.payload,
+    );
+    const { estimatedCredits } = draft.payload as { estimatedCredits: number };
+    return {
+      ...proposal,
+      estimatedCredits,
+      status: estimatedCredits
+        ? `aguardando o corretor confirmar o custo de ${estimatedCredits} créditos`
+        : proposal.status,
+    };
+  }
+
   private async findCustomer(user: User, id: string) {
     const customer = await this.customerRepository.findOne({
       where: { id, userId: user.id, active: true },
@@ -1183,19 +1235,9 @@ export class AssistantToolService {
       when: formatWhen(visit.startsAt, this.timezone),
       endsAt: inTimezone(visit.endsAt, this.timezone).format("HH:mm"),
       address: visit.address,
-      property: visit.property ? this.propertyTitle(visit.property) : null,
+      property: visit.property ? propertyTitleOf(visit.property) : null,
       notes: visit.notes ? shorten(visit.notes, 200) : null,
     };
-  }
-
-  private propertyTitle(property: Property) {
-    return (
-      property.alias ??
-      [property.kind ? KIND_LABEL[property.kind] : "Imóvel", property.address]
-        .filter(Boolean)
-        .join(" em ")
-        .substring(0, 120)
-    );
   }
 
   private publicLinkOf(propertyId: string) {

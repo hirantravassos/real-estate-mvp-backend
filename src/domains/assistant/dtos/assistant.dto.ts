@@ -98,4 +98,10 @@ export class AssistantActionConfirmDto {
   @IsString()
   @MaxLength(4000)
   text?: string;
+
+  /** The price the broker saw on the card, required for the paid actions. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  acceptedCredits?: number;
 }

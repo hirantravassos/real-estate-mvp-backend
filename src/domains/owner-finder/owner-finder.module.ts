@@ -18,5 +18,6 @@ import { OwnerFinderService } from "./services/owner-finder.service";
   ],
   controllers: [OwnerFinderController],
   providers: [OwnerFinderService],
+  exports: [OwnerFinderService],
 })
 export class OwnerFinderModule {}

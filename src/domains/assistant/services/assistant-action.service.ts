@@ -39,8 +39,10 @@ import {
 import {
   AssistantActionKind,
   AssistantActionStatus,
+  PAID_ACTION_KINDS,
 } from "../enums/assistant.enum";
 import { AssistantMapper } from "../mappers/assistant.mapper";
+import { AssistantPaidActionService } from "./assistant-paid-action.service";
 
 const MAXIMUM_WHATSAPP_IMAGE_BYTES = 16 * 1024 * 1024;
 const MAXIMUM_WHATSAPP_VIDEO_BYTES = 64 * 1024 * 1024;
@@ -103,6 +105,7 @@ export class AssistantActionService {
     private readonly customerService: CustomerService,
     private readonly customerCommentService: CustomerCommentService,
     private readonly realtimeGateway: RealtimeGateway,
+    private readonly paidActionService: AssistantPaidActionService,
   ) {}
 
   async confirm(user: User, actionId: string, dto: AssistantActionConfirmDto) {
@@ -116,6 +119,21 @@ export class AssistantActionService {
         ...(action.payload as SendMessagePayload),
         text: dto.text.trim(),
       };
+    }
+
+    const paid = PAID_ACTION_KINDS.has(action.kind);
+    if (paid && action.status === AssistantActionStatus.PENDING) {
+      // The broker must have seen the price: a paid action is never confirmed
+      // in bulk or by a screen that does not show it.
+      const { estimatedCredits } = action.payload as {
+        estimatedCredits: number;
+      };
+      if (estimatedCredits > 0 && dto.acceptedCredits !== estimatedCredits) {
+        throw new BadRequestException(
+          `Confirme o custo de ${estimatedCredits} créditos antes.`,
+        );
+      }
+      await this.paidActionService.ensureAffordable(user, action);
     }
 
     // Only one request wins, so a double tap never sends twice.
@@ -132,7 +150,11 @@ export class AssistantActionService {
     }
 
     try {
-      await this.execute(user, action);
+      if (paid) {
+        action.result = await this.paidActionService.execute(user, action);
+      } else {
+        await this.execute(user, action);
+      }
       action.status = AssistantActionStatus.DONE;
       action.errorMessage = null;
     } catch (error) {
@@ -152,6 +174,7 @@ export class AssistantActionService {
     action.executedAt = new Date();
     await this.actionRepository.update(action.id, {
       status: action.status,
+      result: action.result ?? null,
       errorMessage: action.errorMessage,
       executedAt: action.executedAt,
     });

@@ -10,6 +10,7 @@ export class AssistantMapper {
       status: entity.status,
       title: entity.title,
       payload: entity.payload,
+      result: entity.result ?? null,
       errorMessage: entity.errorMessage,
       executedAt: entity.executedAt,
       createdAt: entity.createdAt,

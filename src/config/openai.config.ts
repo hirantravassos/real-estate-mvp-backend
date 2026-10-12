@@ -6,15 +6,15 @@ export const openaiConfig = registerAs("openai", () => ({
     /\/+$/,
     "",
   ),
-  model: process.env.OPENAI_MODEL || "gpt-5-mini",
+  model: process.env.OPENAI_MODEL || "gpt-6-luna",
   /** Leave empty for models without reasoning. */
-  reasoningEffort: process.env.OPENAI_REASONING_EFFORT ?? "minimal",
+  reasoningEffort: process.env.OPENAI_REASONING_EFFORT ?? "low",
   /** What OpenAI charges us, in US dollars per one million tokens. */
   inputCostPerMillionUsd: parseFloat(
-    process.env.OPENAI_INPUT_COST_PER_MILLION_USD || "0.25",
+    process.env.OPENAI_INPUT_COST_PER_MILLION_USD || "0.10",
   ),
   outputCostPerMillionUsd: parseFloat(
-    process.env.OPENAI_OUTPUT_COST_PER_MILLION_USD || "2",
+    process.env.OPENAI_OUTPUT_COST_PER_MILLION_USD || "0.50",
   ),
   /** Turns the broker's voice into text for the assistant. */
   transcriptionModel:
