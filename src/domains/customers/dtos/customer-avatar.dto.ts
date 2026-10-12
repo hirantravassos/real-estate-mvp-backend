@@ -16,6 +16,12 @@ export const CUSTOMER_AVATAR_HAIR_STYLES = [
   "bun",
   "spiky",
   "bald",
+  "ponytail",
+  "afro",
+  "mohawk",
+  "bob",
+  "braids",
+  "pigtails",
 ] as const;
 export const CUSTOMER_AVATAR_HAIR_COLORS = [
   "black",
@@ -24,6 +30,9 @@ export const CUSTOMER_AVATAR_HAIR_COLORS = [
   "ginger",
   "gray",
   "pink",
+  "auburn",
+  "blue",
+  "purple",
 ] as const;
 export const CUSTOMER_AVATAR_FACIAL_HAIRS = [
   "none",
@@ -37,6 +46,12 @@ export const CUSTOMER_AVATAR_OUTFIT_STYLES = [
   "suit",
   "dress",
   "hoodie",
+  "jacket",
+  "overalls",
+  "tracksuit",
+  "sweater",
+  "hawaiian",
+  "tuxedo",
 ] as const;
 export const CUSTOMER_AVATAR_OUTFIT_COLORS = [
   "coral",
@@ -45,6 +60,33 @@ export const CUSTOMER_AVATAR_OUTFIT_COLORS = [
   "sunflower",
   "lavender",
   "graphite",
+  "cherry",
+  "navy",
+  "cream",
+  "rose",
+] as const;
+export const CUSTOMER_AVATAR_EYEWEARS = [
+  "none",
+  "round",
+  "square",
+  "sunglasses",
+  "heart",
+  "star",
+] as const;
+export const CUSTOMER_AVATAR_HEADWEARS = [
+  "none",
+  "cap",
+  "beanie",
+  "headphones",
+  "flower",
+  "bow",
+  "crown",
+] as const;
+export const CUSTOMER_AVATAR_NECKWEARS = [
+  "none",
+  "necklace",
+  "pearls",
+  "scarf",
 ] as const;
 
 export type CustomerAvatarGender = (typeof CUSTOMER_AVATAR_GENDERS)[number];
@@ -60,6 +102,9 @@ export type CustomerAvatarOutfitStyle =
   (typeof CUSTOMER_AVATAR_OUTFIT_STYLES)[number];
 export type CustomerAvatarOutfitColor =
   (typeof CUSTOMER_AVATAR_OUTFIT_COLORS)[number];
+export type CustomerAvatarEyewear = (typeof CUSTOMER_AVATAR_EYEWEARS)[number];
+export type CustomerAvatarHeadwear = (typeof CUSTOMER_AVATAR_HEADWEARS)[number];
+export type CustomerAvatarNeckwear = (typeof CUSTOMER_AVATAR_NECKWEARS)[number];
 
 export interface CustomerAvatar {
   gender: CustomerAvatarGender;
@@ -70,6 +115,12 @@ export interface CustomerAvatar {
   facialHair?: CustomerAvatarFacialHair;
   outfitStyle: CustomerAvatarOutfitStyle;
   outfitColor: CustomerAvatarOutfitColor;
+  /** Accessories are optional, looks saved before them have none. */
+  eyewear?: CustomerAvatarEyewear;
+  headwear?: CustomerAvatarHeadwear;
+  neckwear?: CustomerAvatarNeckwear;
+  /** Color of hats, scarves and pendants, the outfit color when missing. */
+  accessoryColor?: CustomerAvatarOutfitColor;
 }
 
 /** The look of the customer's little character on the broker's screen. */
@@ -95,4 +146,20 @@ export class CustomerAvatarDto implements CustomerAvatar {
 
   @IsIn(CUSTOMER_AVATAR_OUTFIT_COLORS)
   outfitColor: CustomerAvatarOutfitColor;
+
+  @IsOptional()
+  @IsIn(CUSTOMER_AVATAR_EYEWEARS)
+  eyewear?: CustomerAvatarEyewear;
+
+  @IsOptional()
+  @IsIn(CUSTOMER_AVATAR_HEADWEARS)
+  headwear?: CustomerAvatarHeadwear;
+
+  @IsOptional()
+  @IsIn(CUSTOMER_AVATAR_NECKWEARS)
+  neckwear?: CustomerAvatarNeckwear;
+
+  @IsOptional()
+  @IsIn(CUSTOMER_AVATAR_OUTFIT_COLORS)
+  accessoryColor?: CustomerAvatarOutfitColor;
 }

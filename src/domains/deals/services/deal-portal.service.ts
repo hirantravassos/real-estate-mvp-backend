@@ -96,6 +96,10 @@ export class DealPortalService {
       facialHair: avatar.gender === "masculine" ? avatar.facialHair : "none",
       outfitStyle: avatar.outfitStyle,
       outfitColor: avatar.outfitColor,
+      eyewear: avatar.eyewear,
+      headwear: avatar.headwear,
+      neckwear: avatar.neckwear,
+      accessoryColor: avatar.accessoryColor,
     };
     await this.customerRepository.update(deal.customer.id, { avatar: look });
     this.realtimeGateway.emitToUser(deal.userId, "customers.updated", {});
