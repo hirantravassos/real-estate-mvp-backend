@@ -52,6 +52,30 @@ const readSize = (
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+/** A MySQL text column holds 65535 bytes. */
+const THUMBNAIL_MAXIMUM_LENGTH = 60_000;
+
+/**
+ * Webhooks send the thumbnail as base64, but messages read back from
+ * Evolution's database may carry the raw bytes, as {"0": 255, ...} or a
+ * serialized Buffer. Both become base64, anything else is dropped.
+ */
+const readThumbnail = (value: unknown): string | null => {
+  let thumbnail: string | null = null;
+  if (typeof value === "string") {
+    thumbnail = value;
+  } else if (value && typeof value === "object") {
+    const data = (value as { data?: unknown }).data;
+    const bytes: unknown[] = Array.isArray(data) ? data : Object.values(value);
+    if (bytes.length && bytes.every((byte) => typeof byte === "number")) {
+      thumbnail = Buffer.from(bytes).toString("base64");
+    }
+  }
+  return thumbnail && thumbnail.length <= THUMBNAIL_MAXIMUM_LENGTH
+    ? thumbnail
+    : null;
+};
+
 const emptyParsed = (type: MessageType): ParsedMessage => ({
   type,
   body: null,
@@ -89,7 +113,7 @@ export const parseEvolutionMessage = (
       body: image.caption ?? null,
       mimeType: image.mimetype ?? "image/jpeg",
       sizeBytes: readSize(image.fileLength),
-      thumbnailBase64: image.jpegThumbnail ?? null,
+      thumbnailBase64: readThumbnail(image.jpegThumbnail),
       quotedExternalId: image.contextInfo?.stanzaId ?? null,
     };
   }
@@ -102,7 +126,7 @@ export const parseEvolutionMessage = (
       mimeType: video.mimetype ?? "video/mp4",
       sizeBytes: readSize(video.fileLength),
       durationSeconds: video.seconds ?? null,
-      thumbnailBase64: video.jpegThumbnail ?? null,
+      thumbnailBase64: readThumbnail(video.jpegThumbnail),
     };
   }
 
@@ -123,7 +147,7 @@ export const parseEvolutionMessage = (
       ...emptyParsed(MessageType.DOCUMENT),
       body: document.caption ?? null,
       mimeType: document.mimetype ?? "application/octet-stream",
-      fileName: document.fileName ?? "documento",
+      fileName: document.fileName?.substring(0, 255) || "documento",
       sizeBytes: readSize(document.fileLength),
       quotedExternalId: document.contextInfo?.stanzaId ?? null,
     };

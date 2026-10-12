@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import {
   EvolutionConnectionUpdate,
+  EvolutionHistoryChat,
   EvolutionMessage,
   EvolutionMessageUpdate,
   EvolutionQrCodeUpdate,
@@ -9,6 +10,7 @@ import {
 import { WhatsappConnection } from "../entities/whatsapp-connection.entity";
 import { MessageService } from "./message.service";
 import { WhatsappConnectionService } from "./whatsapp-connection.service";
+import { WhatsappHistorySyncService } from "./whatsapp-history-sync.service";
 
 /** "MESSAGES_UPSERT", "messages.upsert" and "messages-upsert" all become "messages.upsert". */
 const normalizeEvent = (event: string) =>
@@ -24,6 +26,7 @@ export class EvolutionWebhookService {
   constructor(
     private readonly connectionService: WhatsappConnectionService,
     private readonly messageService: MessageService,
+    private readonly historySyncService: WhatsappHistorySyncService,
   ) {}
 
   async handle(token: string, payload: EvolutionWebhookPayload) {
@@ -68,6 +71,19 @@ export class EvolutionWebhookService {
         for (const update of asList<EvolutionMessageUpdate>(payload.data)) {
           await this.messageService.handleStatusUpdate(connection, update);
         }
+        return;
+      case "chats.set":
+        await this.historySyncService.handleChats(
+          connection,
+          asList<EvolutionHistoryChat>(payload.data),
+        );
+        return;
+      case "messages.set":
+        await this.historySyncService.handleMessages(
+          connection,
+          asList<EvolutionMessage>(payload.data),
+          typeof payload.progress === "number" ? payload.progress : null,
+        );
         return;
       default:
         return;

@@ -27,7 +27,8 @@ interface EvolutionMediaContent {
   fileLength?: number | string | { low: number };
   seconds?: number;
   ptt?: boolean;
-  jpegThumbnail?: string;
+  /** Base64 from webhooks, raw bytes when read back from Evolution's database. */
+  jpegThumbnail?: unknown;
 }
 
 interface EvolutionContextInfo {
@@ -100,6 +101,15 @@ export interface EvolutionWebhookPayload {
   instance: string;
   data: unknown;
   date_time?: string;
+  /** Sent with "messages.set", how far the history sync after pairing went (0 to 100). */
+  progress?: number | null;
+  isLatest?: boolean | null;
+}
+
+/** A chat from the history WhatsApp hands over on pairing ("chats.set"). */
+export interface EvolutionHistoryChat {
+  remoteJid?: string;
+  name?: string | null;
 }
 
 export interface EvolutionQrCode {

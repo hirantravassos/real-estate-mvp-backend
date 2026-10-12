@@ -30,6 +30,9 @@ export const EVOLUTION_WEBHOOK_EVENTS = [
   "CONNECTION_UPDATE",
   "MESSAGES_UPSERT",
   "MESSAGES_UPDATE",
+  // The history sync after pairing, only read to show its progress.
+  "CHATS_SET",
+  "MESSAGES_SET",
 ];
 
 /**

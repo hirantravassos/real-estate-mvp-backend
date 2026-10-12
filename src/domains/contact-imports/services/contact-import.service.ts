@@ -8,7 +8,6 @@ import { Customer } from "../../customers/entities/customer.entity";
 import { CustomerMapper } from "../../customers/mappers/customer.mapper";
 import { CustomerRepository } from "../../customers/repositories/customer.repository";
 import { Conversation } from "../../inbox/entities/conversation.entity";
-import { WhatsappConnection } from "../../inbox/entities/whatsapp-connection.entity";
 import {
   parseEvolutionMessage,
   previewOf,
@@ -19,7 +18,10 @@ import {
   toCustomerPhone,
 } from "../../inbox/helpers/whatsapp-phone.helper";
 import { ConversationService } from "../../inbox/services/conversation.service";
-import { MessageService } from "../../inbox/services/message.service";
+import {
+  HistoryImportJob,
+  MessageService,
+} from "../../inbox/services/message.service";
 import { WhatsappConnectionService } from "../../inbox/services/whatsapp-connection.service";
 import { Kanban } from "../../kanbans/entities/kanban.entity";
 import {
@@ -47,11 +49,6 @@ export interface ContactCandidate {
 }
 
 export type SkipReason = "invalid_phone" | "already_customer" | "failed";
-
-interface HistoryJob {
-  conversation: Conversation;
-  chatJid: string;
-}
 
 const BRAZIL_JID_PREFIX = "55";
 const WHATSAPP_USER_SUFFIX = "@s.whatsapp.net";
@@ -218,7 +215,7 @@ export class ContactImportService {
 
     const created: { id: string; name: string; phone: string }[] = [];
     const skipped: { phone: string; name: string; reason: SkipReason }[] = [];
-    const historyJobs: HistoryJob[] = [];
+    const historyJobs: HistoryImportJob[] = [];
     const photoJobs: PhotoAvatarJob[] = [];
 
     for (const item of dto.contacts) {
@@ -267,13 +264,20 @@ export class ContactImportService {
           dto.importHistory,
         );
         if (conversation && dto.importHistory && item.chatJid) {
-          historyJobs.push({ conversation, chatJid: item.chatJid });
+          historyJobs.push({
+            conversation,
+            chatJids: [item.chatJid, conversation.remoteJid],
+          });
         }
       }
     }
 
     if (connection && historyJobs.length) {
-      void this.importHistories(connection, historyJobs);
+      void this.messageService
+        .importHistories(connection, historyJobs)
+        .catch((error: unknown) => {
+          this.logger.warn(`History import failed: ${String(error)}`);
+        });
     }
     if (connection && photoJobs.length) {
       void this.photoAvatarService
@@ -360,22 +364,6 @@ export class ContactImportService {
       });
     }
     return conversation;
-  }
-
-  /** One chat at a time in the background, the phone is not flooded. */
-  private async importHistories(
-    connection: WhatsappConnection,
-    jobs: HistoryJob[],
-  ) {
-    for (const job of jobs) {
-      await this.messageService
-        .importHistory(connection, job.conversation, job.chatJid)
-        .catch((error: unknown) => {
-          this.logger.warn(
-            `History import of ${job.chatJid} failed: ${String(error)}`,
-          );
-        });
-    }
   }
 
   private fromChat(chat: EvolutionChat): ContactCandidate | null {
