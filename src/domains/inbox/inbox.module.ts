@@ -7,6 +7,8 @@ import { StorageModule } from "../../infrastructure/storage/storage.module";
 import { AiModule } from "../ai/ai.module";
 import { AvatarModule } from "../avatars/avatar.module";
 import { CustomerModule } from "../customers/customer.module";
+import { DealModule } from "../deals/deal.module";
+import { DocumentModule } from "../documents/document.module";
 import { Kanban } from "../kanbans/entities/kanban.entity";
 import { Property } from "../properties/entities/property.entity";
 import { PropertyModule } from "../properties/property.module";
@@ -20,6 +22,7 @@ import { WhatsappConnection } from "./entities/whatsapp-connection.entity";
 import { ConversationService } from "./services/conversation.service";
 import { EvolutionWebhookService } from "./services/evolution-webhook.service";
 import { InboxAiService } from "./services/inbox-ai.service";
+import { MessageAttachmentService } from "./services/message-attachment.service";
 import { MessageService } from "./services/message.service";
 import { PropertyPresentationSenderService } from "./services/property-presentation-sender.service";
 import { WhatsappConnectionService } from "./services/whatsapp-connection.service";
@@ -40,6 +43,8 @@ import { WhatsappConnectionService } from "./services/whatsapp-connection.servic
     AiModule,
     AvatarModule,
     CustomerModule,
+    DealModule,
+    DocumentModule,
     PropertyModule,
   ],
   controllers: [
@@ -52,6 +57,7 @@ import { WhatsappConnectionService } from "./services/whatsapp-connection.servic
     WhatsappConnectionService,
     ConversationService,
     MessageService,
+    MessageAttachmentService,
     InboxAiService,
     PropertyPresentationSenderService,
     EvolutionWebhookService,
