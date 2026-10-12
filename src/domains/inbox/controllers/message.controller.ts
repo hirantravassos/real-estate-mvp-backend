@@ -14,16 +14,21 @@ import { JwtGuard } from "../../auth/guards/jwt.guard";
 import { User } from "../../users/entities/user.entity";
 import {
   AttachmentUploadRequestDto,
+  MessageAttachmentSaveDto,
   MessageListDto,
   MessageMediaSendDto,
   MessageTextSendDto,
 } from "../dtos/inbox.dto";
+import { MessageAttachmentService } from "../services/message-attachment.service";
 import { MessageService } from "../services/message.service";
 
 @Controller("inbox")
 @UseGuards(JwtGuard)
 export class MessageController {
-  constructor(private readonly messageService: MessageService) {}
+  constructor(
+    private readonly messageService: MessageService,
+    private readonly messageAttachmentService: MessageAttachmentService,
+  ) {}
 
   @Get("conversations/:conversationId/messages")
   findAll(
@@ -79,5 +84,15 @@ export class MessageController {
     download?: boolean,
   ) {
     return this.messageService.mediaUrl(user, messageId, download ?? false);
+  }
+
+  /** Keeps the photo or file of a message in a customer, property or sale. */
+  @Post("messages/:messageId/save")
+  saveAttachment(
+    @GetUser() user: User,
+    @Param("messageId", ParseUUIDPipe) messageId: string,
+    @Body() dto: MessageAttachmentSaveDto,
+  ) {
+    return this.messageAttachmentService.save(user, messageId, dto);
   }
 }

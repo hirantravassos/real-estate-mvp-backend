@@ -43,5 +43,6 @@ import { DealPartnerService } from "./services/deal-partner.service";
     DealPortalService,
     DealPartnerService,
   ],
+  exports: [DealService],
 })
 export class DealModule {}

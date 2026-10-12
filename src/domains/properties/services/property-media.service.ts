@@ -75,6 +75,59 @@ export class PropertyMediaService {
       );
     }
 
+    return this.register(userId, propertyId, {
+      type:
+        mediaType === "image"
+          ? PropertyMediaType.IMAGE
+          : PropertyMediaType.VIDEO,
+      displayName: dto.displayName,
+      s3Key: dto.s3Key,
+      mimeType: dto.mimeType,
+      sizeBytes: actualSize,
+    });
+  }
+
+  /** Puts a file the server already holds, like a chat photo, in the gallery. */
+  async addFromBuffer(
+    userId: string,
+    propertyId: string,
+    file: { buffer: Buffer; fileName: string; mimeType: string },
+  ): Promise<PropertyMedia> {
+    const mediaType = this.storageService.validateMediaUpload(
+      file.mimeType,
+      file.buffer.length,
+    );
+    const s3Key = this.storageService.generateMediaS3Key(
+      userId,
+      propertyId,
+      file.fileName,
+    );
+    await this.storageService.uploadBuffer(s3Key, file.buffer, file.mimeType);
+
+    return this.register(userId, propertyId, {
+      type:
+        mediaType === "image"
+          ? PropertyMediaType.IMAGE
+          : PropertyMediaType.VIDEO,
+      displayName: file.fileName,
+      s3Key,
+      mimeType: file.mimeType,
+      sizeBytes: file.buffer.length,
+    });
+  }
+
+  /** Appends the media at the end of the gallery, the first photo becomes the cover. */
+  private async register(
+    userId: string,
+    propertyId: string,
+    file: {
+      type: PropertyMediaType;
+      displayName: string;
+      s3Key: string;
+      mimeType: string;
+      sizeBytes: number;
+    },
+  ): Promise<PropertyMedia> {
     const maxOrder = await this.mediaRepository.maximum("sortOrder", {
       userId,
       propertyId,
@@ -84,12 +137,11 @@ export class PropertyMediaService {
     const media = new PropertyMedia();
     media.userId = userId;
     media.propertyId = propertyId;
-    media.type =
-      mediaType === "image" ? PropertyMediaType.IMAGE : PropertyMediaType.VIDEO;
-    media.displayName = dto.displayName.substring(0, 255);
-    media.s3Key = dto.s3Key;
-    media.mimeType = dto.mimeType;
-    media.sizeBytes = actualSize;
+    media.type = file.type;
+    media.displayName = file.displayName.substring(0, 255);
+    media.s3Key = file.s3Key;
+    media.mimeType = file.mimeType;
+    media.sizeBytes = file.sizeBytes;
     media.sortOrder = (maxOrder ?? -1) + 1;
     media.isCover = false;
 

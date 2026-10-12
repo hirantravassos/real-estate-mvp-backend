@@ -7,6 +7,8 @@ import { StorageModule } from "../../infrastructure/storage/storage.module";
 import { AiModule } from "../ai/ai.module";
 import { AvatarModule } from "../avatars/avatar.module";
 import { CustomerModule } from "../customers/customer.module";
+import { DealModule } from "../deals/deal.module";
+import { DocumentModule } from "../documents/document.module";
 import { Kanban } from "../kanbans/entities/kanban.entity";
 import { Property } from "../properties/entities/property.entity";
 import { PropertyModule } from "../properties/property.module";
@@ -21,6 +23,7 @@ import { ConversationService } from "./services/conversation.service";
 import { EvolutionWebhookService } from "./services/evolution-webhook.service";
 import { InboxAiService } from "./services/inbox-ai.service";
 import { InboxSyncService } from "./services/inbox-sync.service";
+import { MessageAttachmentService } from "./services/message-attachment.service";
 import { MessageService } from "./services/message.service";
 import { PropertyPresentationSenderService } from "./services/property-presentation-sender.service";
 import { WhatsappConnectionService } from "./services/whatsapp-connection.service";
@@ -42,6 +45,8 @@ import { WhatsappHistorySyncService } from "./services/whatsapp-history-sync.ser
     AiModule,
     AvatarModule,
     CustomerModule,
+    DealModule,
+    DocumentModule,
     PropertyModule,
   ],
   controllers: [
@@ -55,6 +60,7 @@ import { WhatsappHistorySyncService } from "./services/whatsapp-history-sync.ser
     WhatsappHistorySyncService,
     ConversationService,
     MessageService,
+    MessageAttachmentService,
     InboxAiService,
     InboxSyncService,
     PropertyPresentationSenderService,

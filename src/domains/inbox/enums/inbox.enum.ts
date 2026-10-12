@@ -47,3 +47,11 @@ export const MEDIA_MESSAGE_TYPES = new Set<MessageType>([
   MessageType.DOCUMENT,
   MessageType.STICKER,
 ]);
+
+/** Where a photo or file received in a chat can be kept. */
+export enum MessageAttachmentTarget {
+  CUSTOMER = "customer",
+  PROPERTY_DOCUMENT = "property_document",
+  PROPERTY_MEDIA = "property_media",
+  DEAL_ITEM = "deal_item",
+}

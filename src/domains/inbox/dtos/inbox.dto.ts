@@ -4,6 +4,7 @@ import {
   IsNumberString,
   IsArray,
   IsBoolean,
+  IsEnum,
   IsIn,
   IsInt,
   IsISO8601,
@@ -14,9 +15,11 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
 } from "class-validator";
 import { ValidateBoolean } from "../../../shared/decorators/validation/boolean.decorator";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
+import { MessageAttachmentTarget } from "../enums/inbox.enum";
 
 /** Without a phone the broker scans a QR code, with it they type a pairing code. */
 export class WhatsappConnectDto {
@@ -214,4 +217,33 @@ export class PresentationSendDto {
 
   @IsBoolean()
   aiGenerated: boolean;
+}
+
+/** Keeps the photo or file of a message in a customer, property or sale. */
+export class MessageAttachmentSaveDto {
+  @IsEnum(MessageAttachmentTarget)
+  target: MessageAttachmentTarget;
+
+  /** The customer, the property or the sale that receives the file. */
+  @IsUUID()
+  recordId: string;
+
+  /** Item of the sale checklist, needed when the target is a sale. */
+  @ValidateIf(
+    (dto: MessageAttachmentSaveDto) =>
+      dto.target === MessageAttachmentTarget.DEAL_ITEM,
+  )
+  @IsUUID()
+  checklistItemId?: string | null;
+
+  /** Which suggested document of the property this file is. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  category?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  displayName?: string | null;
 }

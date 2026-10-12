@@ -525,7 +525,35 @@ export class DealService {
       "deals",
       file,
     );
+    await this.markChecklistReceived(deal, item, actor, partnerName);
+  }
 
+  /** Keeps a file the server already holds, like a photo from the inbox, in a checklist item. */
+  async saveChecklistFile(
+    user: User,
+    id: string,
+    itemId: string,
+    file: { buffer: Buffer; fileName: string; mimeType: string },
+  ) {
+    const deal = await this.findOwnedOrThrow(user.id, id);
+    const item = await this.findChecklistItemOrThrow(user.id, id, itemId);
+    await this.documentService.uploadBuffer(
+      deal.userId,
+      DocumentOwnerType.DEAL_ITEM,
+      item.id,
+      "deals",
+      file,
+    );
+    await this.markChecklistReceived(deal, item, DealEventActor.BROKER);
+    return this.findOne(user, id);
+  }
+
+  private async markChecklistReceived(
+    deal: Deal,
+    item: DealChecklistItem,
+    actor: DealEventActor,
+    partnerName?: string,
+  ) {
     const sentByBroker = actor === DealEventActor.BROKER;
     item.status = sentByBroker
       ? DealChecklistStatus.APPROVED
