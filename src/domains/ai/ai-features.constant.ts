@@ -3,6 +3,7 @@ export type AiFeature =
   | "rewrite"
   | "presentation"
   | "contact_import"
+  | "customer_reclassification"
   | "avatar_from_photo"
   | "hunt_criteria"
   | "hunt_conversation"
@@ -68,6 +69,18 @@ export const AI_FEATURES: Record<AiFeature, AiFeatureDefinition> = {
     maximumOutputTokens: 4000,
     typicalInputTokens: 1600,
     typicalOutputTokens: 350,
+    fixedPriceSafetyMultiplier: 1.5,
+  },
+  /**
+   * Priced per customer: one customer's share of a batch call, with the
+   * conversation, the notes and the funnel stages.
+   */
+  customer_reclassification: {
+    label: "Reclassificar clientes com IA",
+    usesBrokerContext: true,
+    maximumOutputTokens: 4000,
+    typicalInputTokens: 2200,
+    typicalOutputTokens: 300,
     fixedPriceSafetyMultiplier: 1.5,
   },
   /** Priced per photo: a small picture in low detail and a short answer. */
