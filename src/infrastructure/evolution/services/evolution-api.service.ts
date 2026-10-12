@@ -86,12 +86,18 @@ export class EvolutionApiService {
     return `${this.configuration.webhookBaseUrl}/webhooks/evolution/${token}`;
   }
 
-  async createInstance(instanceName: string, webhookUrl: string) {
+  /** With a number, WhatsApp also hands over a pairing code for that phone. */
+  async createInstance(
+    instanceName: string,
+    webhookUrl: string,
+    number?: string | null,
+  ) {
     return this.request<{ qrcode?: EvolutionQrCode }>("/instance/create", {
       method: "POST",
       body: {
         instanceName,
         qrcode: true,
+        ...(number ? { number } : {}),
         integration: "WHATSAPP-BAILEYS",
         ...INSTANCE_SETTINGS,
         webhook: this.webhookSettings(webhookUrl),
@@ -130,8 +136,11 @@ export class EvolutionApiService {
     return Array.isArray(instances) ? (instances[0] ?? null) : null;
   }
 
-  async connect(instanceName: string) {
-    return this.request<EvolutionQrCode>(`/instance/connect/${instanceName}`);
+  async connect(instanceName: string, number?: string | null) {
+    const query = number ? `?number=${encodeURIComponent(number)}` : "";
+    return this.request<EvolutionQrCode>(
+      `/instance/connect/${instanceName}${query}`,
+    );
   }
 
   async connectionState(

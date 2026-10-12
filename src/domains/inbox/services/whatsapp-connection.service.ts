@@ -1,4 +1,9 @@
-import { ConflictException, Injectable, Logger } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { randomBytes } from "crypto";
 import { Repository } from "typeorm";
@@ -13,7 +18,11 @@ import { RealtimeGateway } from "../../../infrastructure/realtime/realtime.gatew
 import { User } from "../../users/entities/user.entity";
 import { WhatsappConnection } from "../entities/whatsapp-connection.entity";
 import { WhatsappConnectionStatus } from "../enums/inbox.enum";
-import { numberFromJid } from "../helpers/whatsapp-phone.helper";
+import {
+  numberFromJid,
+  toCustomerPhone,
+  toWhatsappNumber,
+} from "../helpers/whatsapp-phone.helper";
 import { InboxMapper } from "../mappers/inbox.mapper";
 
 /** WhatsApp answers 401 when the phone removed the linked device. */
@@ -49,8 +58,13 @@ export class WhatsappConnectionService {
     );
   }
 
-  /** Creates the Evolution instance when needed and returns a fresh QR code. */
-  async connect(user: User) {
+  /**
+   * Creates the Evolution instance when needed and returns a fresh QR code.
+   * With a phone it also returns a pairing code, for brokers who only have
+   * the phone itself and so can't scan a QR code on its own screen.
+   */
+  async connect(user: User, phone?: string | null) {
+    const pairingNumber = phone ? this.pairingNumberOf(phone) : null;
     const connection = await this.findOrCreate(user.id);
     this.throttleService.assertConnectAttempt(connection.instanceName);
     const token = await this.webhookTokenOf(connection.id);
@@ -58,17 +72,11 @@ export class WhatsappConnectionService {
 
     let qrCode: EvolutionQrCode | undefined;
 
-    const exists = await this.evolutionApiService.instanceExists(
+    let exists = await this.evolutionApiService.instanceExists(
       connection.instanceName,
     );
 
-    if (!exists) {
-      const created = await this.evolutionApiService.createInstance(
-        connection.instanceName,
-        webhookUrl,
-      );
-      qrCode = created?.qrcode;
-    } else {
+    if (exists) {
       await this.evolutionApiService.setWebhook(
         connection.instanceName,
         webhookUrl,
@@ -79,6 +87,21 @@ export class WhatsappConnectionService {
       if (state === "open") {
         return this.status(user);
       }
+      // Evolution only asks WhatsApp for a pairing code on a fresh socket, so the instance starts over.
+      if (pairingNumber) {
+        await this.resetInstance(connection.instanceName);
+        exists = false;
+      }
+    }
+
+    if (!exists) {
+      const created = await this.evolutionApiService.createInstance(
+        connection.instanceName,
+        webhookUrl,
+        pairingNumber,
+      );
+      qrCode = created?.qrcode;
+    } else {
       // History only syncs on pairing, so the settings must land before the QR code.
       await this.evolutionApiService
         .applySettings(connection.instanceName)
@@ -87,11 +110,16 @@ export class WhatsappConnectionService {
         });
     }
 
-    if (!qrCode?.base64) {
-      qrCode = await this.evolutionApiService.connect(connection.instanceName);
+    if (!qrCode?.base64 && !qrCode?.pairingCode) {
+      qrCode = await this.evolutionApiService.connect(
+        connection.instanceName,
+        pairingNumber,
+      );
     }
 
     connection.status = WhatsappConnectionStatus.CONNECTING;
+    connection.qrCode = null;
+    connection.pairingCode = null;
     this.applyQrCode(connection, qrCode);
     await this.save(connection);
 
@@ -181,7 +209,7 @@ export class WhatsappConnectionService {
     connection: WhatsappConnection,
     update: EvolutionQrCodeUpdate,
   ) {
-    if (!update.qrcode?.base64) return;
+    if (!update.qrcode?.base64 && !update.qrcode?.pairingCode) return;
     connection.status = WhatsappConnectionStatus.CONNECTING;
     this.applyQrCode(connection, update.qrcode);
     await this.save(connection);
@@ -221,12 +249,35 @@ export class WhatsappConnectionService {
     connection: WhatsappConnection,
     qrCode: EvolutionQrCode | undefined,
   ) {
-    if (!qrCode?.base64) return;
-    connection.qrCode = qrCode.base64.startsWith("data:")
-      ? qrCode.base64
-      : `data:image/png;base64,${qrCode.base64}`;
+    if (!qrCode?.base64 && !qrCode?.pairingCode) return;
+    if (qrCode.base64) {
+      connection.qrCode = qrCode.base64.startsWith("data:")
+        ? qrCode.base64
+        : `data:image/png;base64,${qrCode.base64}`;
+    }
     connection.pairingCode = qrCode.pairingCode ?? null;
     connection.qrCodeUpdatedAt = new Date();
+  }
+
+  /** "(11) 9 1234-5678" becomes "5511912345678", the number WhatsApp pairs with. */
+  private pairingNumberOf(phone: string) {
+    const customerPhone = toCustomerPhone(phone);
+    if (!customerPhone) {
+      throw new BadRequestException(
+        "Informe o número do seu WhatsApp com DDD, como (11) 9 1234-5678.",
+      );
+    }
+    return toWhatsappNumber(customerPhone);
+  }
+
+  /** Drops an instance that never finished pairing, so the next one starts clean. */
+  private async resetInstance(instanceName: string) {
+    await this.evolutionApiService.logout(instanceName);
+    await this.evolutionApiService
+      .deleteInstance(instanceName)
+      .catch((error: unknown) => {
+        this.logger.warn(`Delete instance failed: ${String(error)}`);
+      });
   }
 
   private async findOrCreate(userId: string) {
