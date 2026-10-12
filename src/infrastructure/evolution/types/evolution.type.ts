@@ -27,7 +27,8 @@ interface EvolutionMediaContent {
   fileLength?: number | string | { low: number };
   seconds?: number;
   ptt?: boolean;
-  jpegThumbnail?: string;
+  /** Base64 from webhooks, raw bytes when read back from Evolution's database. */
+  jpegThumbnail?: unknown;
 }
 
 interface EvolutionContextInfo {
