@@ -34,6 +34,11 @@ export interface AiRequest {
   images?: string[];
   /** Lets the AI search the web, each search is charged too. */
   webSearch?: OpenaiWebSearch;
+  /**
+   * Paid by the platform: no balance is asked and nothing is spent, the
+   * usage is still written with zero credits to audit what it cost us.
+   */
+  free?: boolean;
 }
 
 export interface AiResult {
@@ -101,10 +106,12 @@ export class AiService {
       );
     // Web searches can read many more pages than usual, the reserve keeps
     // the balance able to pay for them.
-    await this.walletService.ensureBalance(
-      userId,
-      Math.ceil(estimatedCredits * (feature.reserveMultiplier ?? 1)),
-    );
+    if (!request.free) {
+      await this.walletService.ensureBalance(
+        userId,
+        Math.ceil(estimatedCredits * (feature.reserveMultiplier ?? 1)),
+      );
+    }
 
     const result = await this.openaiService.generate({
       instructions,
@@ -120,7 +127,9 @@ export class AiService {
       result.outputTokens,
       result.webSearchCalls,
     );
-    const credits = Math.max(usedCredits, request.fixedCredits ?? 0);
+    const credits = request.free
+      ? 0
+      : Math.max(usedCredits, request.fixedCredits ?? 0);
 
     const { charged, balance } = await this.walletService.spend(userId, {
       amount: credits,
