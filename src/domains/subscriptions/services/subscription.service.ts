@@ -4,6 +4,7 @@ import {
   HttpStatus,
   Inject,
   Injectable,
+  Logger,
 } from "@nestjs/common";
 import type { ConfigType } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -63,6 +64,7 @@ export type PlanUsage = Record<PlanLimitResource, number>;
 
 @Injectable()
 export class SubscriptionService {
+  private readonly logger = new Logger(SubscriptionService.name);
   readonly plans: SubscriptionPlan[];
   private readonly accessCache = new Map<
     string,
@@ -80,6 +82,19 @@ export class SubscriptionService {
     private readonly dataSource: DataSource,
   ) {
     this.plans = buildSubscriptionPlans(configuration);
+    if (!this.billingEnabled) {
+      this.logger.warn(
+        "MERCADO_PAGO_ACCESS_TOKEN is empty: billing is off, nobody is blocked nor limited by plan until it is set",
+      );
+    }
+  }
+
+  /**
+   * Without Mercado Pago nobody could pay, so the subscription never closes
+   * the app nor limits anything: the platform works as before billing.
+   */
+  get billingEnabled() {
+    return this.mercadoPagoService.isConfigured;
   }
 
   get trialDays() {
@@ -223,6 +238,8 @@ export class SubscriptionService {
     userId: string,
     limit: { resource: PlanLimitResource; adding: number } | null,
   ) {
+    if (!this.billingEnabled) return;
+
     const snapshot = await this.snapshot(userId);
 
     if (!hasAccess(snapshot.status)) {
@@ -288,9 +305,5 @@ export class SubscriptionService {
           createdAt: MoreThanOrEqual(dayjs().startOf("month").toDate()),
         });
     }
-  }
-
-  get paymentsEnabled() {
-    return this.mercadoPagoService.isConfigured;
   }
 }

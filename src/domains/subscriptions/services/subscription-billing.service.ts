@@ -106,7 +106,8 @@ export class SubscriptionBillingService {
 
     return {
       status,
-      hasAccess: hasAccess(status),
+      hasAccess: !this.subscriptionService.billingEnabled || hasAccess(status),
+      billingEnabled: this.subscriptionService.billingEnabled,
       trialDays: this.subscriptionService.trialDays,
       graceDays: this.subscriptionService.graceDays,
       trialEndsAt: subscription.trialEndsAt,
