@@ -9,6 +9,8 @@ import {
 } from "../dtos/contact-import.dto";
 import { ContactAiAnalysisService } from "../services/contact-ai-analysis.service";
 import { ContactImportService } from "../services/contact-import.service";
+import { PlanLimit } from "../../subscriptions/decorators/subscription.decorator";
+import { PlanLimitResource } from "../../subscriptions/enums/subscription.enum";
 
 /** Brings the broker's existing contacts in, the first step of onboarding. */
 @Controller("contact-imports")
@@ -35,6 +37,7 @@ export class ContactImportController {
   }
 
   @Post()
+  @PlanLimit(PlanLimitResource.CUSTOMERS, { countBodyList: "contacts" })
   import(@GetUser() user: User, @Body() dto: ContactImportDto) {
     return this.contactImportService.importContacts(user, dto);
   }

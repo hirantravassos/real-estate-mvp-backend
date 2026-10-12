@@ -6,7 +6,6 @@ import { PaymentsModule } from "../../infrastructure/payments/payments.module";
 import { RealtimeModule } from "../../infrastructure/realtime/realtime.module";
 import { UserModule } from "../users/user.module";
 import { CreditController } from "./controllers/credit.controller";
-import { MercadoPagoWebhookController } from "./controllers/mercado-pago-webhook.controller";
 import { CreditPurchase } from "./entities/credit-purchase.entity";
 import { CreditTransaction } from "./entities/credit-transaction.entity";
 import { CreditWallet } from "./entities/credit-wallet.entity";
@@ -23,8 +22,8 @@ import { CreditWalletService } from "./services/credit-wallet.service";
     RealtimeModule,
     UserModule,
   ],
-  controllers: [CreditController, MercadoPagoWebhookController],
+  controllers: [CreditController],
   providers: [CreditPricingService, CreditWalletService, CreditPurchaseService],
-  exports: [CreditPricingService, CreditWalletService],
+  exports: [CreditPricingService, CreditWalletService, CreditPurchaseService],
 })
 export class CreditModule {}

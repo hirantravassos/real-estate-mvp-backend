@@ -19,6 +19,8 @@ import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { User } from "../../users/entities/user.entity";
 import { CustomerMapper } from "../mappers/customer.mapper";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
+import { PlanLimit } from "../../subscriptions/decorators/subscription.decorator";
+import { PlanLimitResource } from "../../subscriptions/enums/subscription.enum";
 
 @Controller("customers")
 @UseGuards(JwtGuard)
@@ -45,6 +47,7 @@ export class CustomerController {
   }
 
   @Post()
+  @PlanLimit(PlanLimitResource.CUSTOMERS)
   async create(@GetUser() user: User, @Body() dto: CustomerCreateDto) {
     return CustomerMapper.toDto(await this.customerService.save(user, dto));
   }

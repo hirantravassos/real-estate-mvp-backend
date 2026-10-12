@@ -13,7 +13,13 @@ interface ExceptionResponseBody {
   readonly message: string | string[] | object;
   readonly error: string;
   readonly timestamp: string;
+  /** Machine readable reason, like subscription_inactive or plan_limit_reached. */
+  readonly code?: string;
+  readonly details?: Record<string, unknown>;
 }
+
+/** Fields of an exception body passed to the client besides the message. */
+const DETAIL_FIELDS = ["resource", "limit", "used", "required", "balance"];
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
@@ -25,6 +31,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string | string[] | object = "Erro interno do servidor";
+    let code: string | undefined;
+    let details: Record<string, unknown> | undefined;
 
     if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
@@ -36,6 +44,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           ? // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             (exceptionResponse as any).message || exception.message
           : exception.message;
+
+      if (typeof exceptionResponse === "object" && exceptionResponse !== null) {
+        const body = exceptionResponse as Record<string, unknown>;
+        if (typeof body.code === "string") code = body.code;
+        const detailEntries = DETAIL_FIELDS.filter(
+          (field) => body[field] !== undefined,
+        ).map((field): [string, unknown] => [field, body[field]]);
+        if (detailEntries.length) details = Object.fromEntries(detailEntries);
+      }
     }
 
     const stackTrace =
@@ -59,6 +76,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       message,
       error: HttpStatus[statusCode] ?? "Unknown Error",
       timestamp: new Date().toISOString(),
+      ...(code ? { code } : {}),
+      ...(details ? { details } : {}),
     };
 
     response.status(statusCode).json(responseBody);

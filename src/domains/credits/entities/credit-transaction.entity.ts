@@ -8,6 +8,8 @@ export enum CreditTransactionKind {
   BONUS = "bonus",
   GRANT = "grant",
   REFUND = "refund",
+  /** Monthly credits included in the paid plan. */
+  SUBSCRIPTION = "subscription",
 }
 
 @Entity("credit_transactions")

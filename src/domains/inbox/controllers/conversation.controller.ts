@@ -27,6 +27,8 @@ import {
 import { ConversationService } from "../services/conversation.service";
 import { InboxAiService } from "../services/inbox-ai.service";
 import { PropertyPresentationSenderService } from "../services/property-presentation-sender.service";
+import { PlanLimit } from "../../subscriptions/decorators/subscription.decorator";
+import { PlanLimitResource } from "../../subscriptions/enums/subscription.enum";
 
 @Controller("inbox/conversations")
 @UseGuards(JwtGuard)
@@ -70,6 +72,7 @@ export class ConversationController {
   }
 
   @Post(":id/customer")
+  @PlanLimit(PlanLimitResource.CUSTOMERS)
   saveAsCustomer(
     @GetUser() user: User,
     @Param("id", ParseUUIDPipe) id: string,
