@@ -226,6 +226,12 @@ export class SubscriptionService {
     return snapshot;
   }
 
+  /** Whether the broker may use the app now, for work done in background. */
+  async isActive(userId: string) {
+    if (!this.billingEnabled) return true;
+    return hasAccess((await this.snapshot(userId)).status);
+  }
+
   invalidate(userId: string) {
     this.accessCache.delete(userId);
   }
