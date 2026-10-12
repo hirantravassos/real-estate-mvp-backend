@@ -69,6 +69,12 @@ const OWN_ECHO_GRACE_MILLISECONDS = 2500;
 /** How many past messages come along when a contact is imported. */
 const HISTORY_IMPORT_MESSAGES = 30;
 
+export interface HistoryImportJob {
+  conversation: Conversation;
+  /** Every jid the chat may be stored under in Evolution. */
+  chatJids: (string | null | undefined)[];
+}
+
 export interface OutboundMediaRequest {
   s3Key: string;
   mimeType: string;
@@ -377,22 +383,35 @@ export class MessageService {
   /**
    * Copies the newest messages of a chat already on the phone into the
    * inbox, so an imported contact arrives with the conversation so far.
-   * They come in as read, they are not news for the broker.
+   * They come in as read, they are not news for the broker. A chat may be
+   * stored under its number or its WhatsApp id (LID), so every jid is read.
+   * Media is left to downloadHistoryMedia, so the texts of every chat land first.
    */
   async importHistory(
     connection: WhatsappConnection,
     conversation: Conversation,
-    chatJid: string,
+    chatJids: (string | null | undefined)[],
     limit = HISTORY_IMPORT_MESSAGES,
   ) {
-    const records = await this.evolutionApiService
-      .findMessages(connection.instanceName, chatJid, limit)
-      .catch(() => []);
+    const records = new Map<string, EvolutionMessage>();
+    for (const chatJid of new Set(chatJids.filter(Boolean) as string[])) {
+      const found = await this.evolutionApiService
+        .findMessages(connection.instanceName, chatJid, limit)
+        .catch((error: unknown) => {
+          this.logger.warn(
+            `History of ${chatJid} not read from Evolution: ${String(error)}`,
+          );
+          return [];
+        });
+      for (const record of found) {
+        if (record.key?.id) records.set(record.key.id, record);
+      }
+    }
 
     const saved: Message[] = [];
-    for (const record of records) {
+    let failure: string | null = null;
+    for (const record of records.values()) {
       const key = record.key;
-      if (!key?.id) continue;
       const parsed = parseEvolutionMessage(record);
       if (!parsed) continue;
       if (await this.existsByExternalId(connection.userId, key.id)) continue;
@@ -423,23 +442,65 @@ export class MessageService {
 
       try {
         saved.push(await this.messageRepository.save(message));
-      } catch {
-        continue; // Arrived through the webhook meanwhile.
+      } catch (error) {
+        // Usually the webhook brought it meanwhile, anything else is worth a log.
+        if (!(await this.existsByExternalId(connection.userId, key.id))) {
+          failure =
+            failure ?? (error instanceof Error ? error.message : String(error));
+        }
       }
     }
 
-    if (!saved.length) return 0;
+    if (failure) {
+      this.logger.warn(
+        `Some history messages of conversation ${conversation.id} were not saved: ${failure}`,
+      );
+    }
+    this.logger.log(
+      `History of conversation ${conversation.id}: ${records.size} read, ${saved.length} saved`,
+    );
+
+    if (!saved.length) return saved;
 
     const newest = saved.reduce((latest, message) =>
       message.sentAt > latest.sentAt ? message : latest,
     );
     await this.conversationService.registerHistory(conversation, newest);
+    return saved;
+  }
 
-    for (const message of saved) {
+  /** Brings the photos, videos and audios of imported history, after the texts. */
+  async downloadHistoryMedia(
+    connection: WhatsappConnection,
+    messages: Message[],
+  ) {
+    for (const message of messages) {
       if (MEDIA_MESSAGE_TYPES.has(message.type)) {
         await this.downloadMedia(connection, message);
       }
     }
+  }
+
+  /** One chat at a time in the background, the phone is not flooded. */
+  async importHistories(
+    connection: WhatsappConnection,
+    jobs: HistoryImportJob[],
+  ) {
+    const saved: Message[] = [];
+    for (const job of jobs) {
+      const messages = await this.importHistory(
+        connection,
+        job.conversation,
+        job.chatJids,
+      ).catch((error: unknown) => {
+        this.logger.warn(
+          `History import of conversation ${job.conversation.id} failed: ${String(error)}`,
+        );
+        return [];
+      });
+      saved.push(...messages);
+    }
+    await this.downloadHistoryMedia(connection, saved);
     return saved.length;
   }
 
