@@ -10,7 +10,8 @@ export type AiFeature =
   | "hunt_listing"
   | "assistant"
   | "assistant_voice"
-  | "owner_search";
+  | "owner_search"
+  | "daily_briefing";
 
 export interface AiFeatureDefinition {
   label: string;
@@ -143,5 +144,16 @@ export const AI_FEATURES: Record<AiFeature, AiFeatureDefinition> = {
     typicalOutputTokens: 3000,
     typicalWebSearchCalls: 4,
     reserveMultiplier: 3,
+  },
+  /**
+   * The morning look over the broker's whole base. The first one of the day
+   * is on the house, asking again the same day is billed by the tokens.
+   */
+  daily_briefing: {
+    label: "Resumo do dia",
+    usesBrokerContext: true,
+    maximumOutputTokens: 3500,
+    typicalInputTokens: 7000,
+    typicalOutputTokens: 1800,
   },
 };

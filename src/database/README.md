@@ -10,6 +10,7 @@ starts listening.
 | `Release2Schema` | Everything 2.0.0 adds: 20 tables, 22 columns (nullable or with a default), 1 index, 30 foreign keys and new values on `documents.ownerType`. Nothing is dropped or rewritten, and every step checks first, so it runs on a 1.0.4 database, on one already built by `synchronize` and after stopping halfway. |
 | `Subscriptions`  | Paid plans: `subscriptions` and `subscription_payments` tables, their foreign keys and the `subscription` value on `credit_transactions.kind`. Every step checks first.                                                                                                                                      |
 | `AssistantPaidActions` | The assistant runs the paid features (hunts, owner contact, contact import, certificates) after the broker confirms the price: new values on `assistant_actions.kind` and the nullable `assistant_actions.result` column. |
+| `DailyBriefings` | The AI's morning briefing: `daily_briefings` table, with a unique `userId` + `freeDay` that keeps one free briefing a day per broker. |
 
 ## Commands
 

@@ -33,6 +33,8 @@ import { DocumentLookupModule } from "./domains/document-lookups/document-lookup
 import { BrokerPageModule } from "./domains/broker-pages/broker-page.module";
 import { subscriptionsConfig } from "./config/subscriptions.config";
 import { SubscriptionModule } from "./domains/subscriptions/subscription.module";
+import { dailyBriefingConfig } from "./config/daily-briefing.config";
+import { DailyBriefingModule } from "./domains/daily-briefings/daily-briefing.module";
 import { buildDatabaseOptions } from "./database/database-options";
 
 /** Loose default, only the routes with UserThrottlerGuard are counted. */
@@ -57,6 +59,7 @@ const THROTTLE_LIMIT = 120;
         portalsConfig,
         infosimplesConfig,
         subscriptionsConfig,
+        dailyBriefingConfig,
       ],
       envFilePath: ".env",
     }),
@@ -98,6 +101,7 @@ const THROTTLE_LIMIT = 120;
     DocumentLookupModule,
     BrokerPageModule,
     SubscriptionModule,
+    DailyBriefingModule,
   ],
   // providers: [
   //   {
