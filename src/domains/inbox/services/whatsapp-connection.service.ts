@@ -24,6 +24,7 @@ import {
   toWhatsappNumber,
 } from "../helpers/whatsapp-phone.helper";
 import { InboxMapper } from "../mappers/inbox.mapper";
+import { WhatsappHistorySyncService } from "./whatsapp-history-sync.service";
 
 /** WhatsApp answers 401 when the phone removed the linked device. */
 const LOGGED_OUT_STATUS_REASON = 401;
@@ -41,6 +42,7 @@ export class WhatsappConnectionService {
     private readonly evolutionApiService: EvolutionApiService,
     private readonly throttleService: EvolutionThrottleService,
     private readonly realtimeGateway: RealtimeGateway,
+    private readonly historySyncService: WhatsappHistorySyncService,
   ) {}
 
   async status(user: User) {
@@ -55,6 +57,7 @@ export class WhatsappConnectionService {
     return InboxMapper.toConnectionDto(
       connection,
       this.evolutionApiService.isConfigured,
+      connection ? this.historySyncService.snapshot(connection.id) : null,
     );
   }
 
@@ -121,9 +124,10 @@ export class WhatsappConnectionService {
     connection.qrCode = null;
     connection.pairingCode = null;
     this.applyQrCode(connection, qrCode);
+    this.historySyncService.expectPairing(connection.id);
     await this.save(connection);
 
-    return InboxMapper.toConnectionDto(connection, true);
+    return this.toDto(connection);
   }
 
   async disconnect(user: User) {
@@ -143,9 +147,10 @@ export class WhatsappConnectionService {
     connection.qrCode = null;
     connection.pairingCode = null;
     connection.connectedAt = null;
+    this.historySyncService.clear(connection.id);
     await this.save(connection);
 
-    return InboxMapper.toConnectionDto(connection, true);
+    return this.toDto(connection);
   }
 
   async findByWebhookToken(token: string) {
@@ -184,6 +189,7 @@ export class WhatsappConnectionService {
       if (update.profilePictureUrl) {
         connection.profilePictureUrl = update.profilePictureUrl;
       }
+      this.historySyncService.handleOpened(connection.id);
     } else if (update.state === "connecting") {
       this.throttleService.suspend(connection.instanceName);
       connection.status = WhatsappConnectionStatus.CONNECTING;
@@ -200,6 +206,7 @@ export class WhatsappConnectionService {
       if (update.statusReason === LOGGED_OUT_STATUS_REASON) {
         connection.qrCode = null;
         connection.pairingCode = null;
+        this.historySyncService.clear(connection.id);
       }
     }
     await this.save(connection);
@@ -308,7 +315,15 @@ export class WhatsappConnectionService {
     this.realtimeGateway.emitToUser(
       connection.userId,
       "connection.updated",
-      InboxMapper.toConnectionDto(connection, true),
+      this.toDto(connection),
+    );
+  }
+
+  private toDto(connection: WhatsappConnection) {
+    return InboxMapper.toConnectionDto(
+      connection,
+      true,
+      this.historySyncService.snapshot(connection.id),
     );
   }
 }

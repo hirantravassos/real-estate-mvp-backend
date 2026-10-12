@@ -1,11 +1,13 @@
 import { Conversation } from "../entities/conversation.entity";
 import { Message } from "../entities/message.entity";
 import { WhatsappConnection } from "../entities/whatsapp-connection.entity";
+import type { HistorySyncSnapshot } from "../services/whatsapp-history-sync.service";
 
 export class InboxMapper {
   static toConnectionDto(
     entity: WhatsappConnection | null,
     configured: boolean,
+    historySync: HistorySyncSnapshot | null = null,
   ) {
     return {
       configured,
@@ -17,6 +19,7 @@ export class InboxMapper {
       pairingCode: entity?.pairingCode ?? null,
       qrCodeUpdatedAt: entity?.qrCodeUpdatedAt ?? null,
       connectedAt: entity?.connectedAt ?? null,
+      historySync,
     };
   }
 

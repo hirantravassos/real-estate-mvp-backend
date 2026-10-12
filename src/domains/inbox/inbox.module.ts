@@ -23,6 +23,7 @@ import { InboxAiService } from "./services/inbox-ai.service";
 import { MessageService } from "./services/message.service";
 import { PropertyPresentationSenderService } from "./services/property-presentation-sender.service";
 import { WhatsappConnectionService } from "./services/whatsapp-connection.service";
+import { WhatsappHistorySyncService } from "./services/whatsapp-history-sync.service";
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { WhatsappConnectionService } from "./services/whatsapp-connection.servic
   ],
   providers: [
     WhatsappConnectionService,
+    WhatsappHistorySyncService,
     ConversationService,
     MessageService,
     InboxAiService,
