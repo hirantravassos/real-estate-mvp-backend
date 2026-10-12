@@ -28,7 +28,9 @@ export class AuthService {
     @InjectRepository(Kanban)
     private readonly kanbanRepository: Repository<Kanban>,
   ) {
-    const clientId = this.configService.get<string>("auth.googleClientId");
+    const clientId = this.configService
+      .get<string>("auth.googleClientId")
+      ?.trim();
     const refreshSecret = this.configService.get<string>(
       "auth.jwtRefreshSecret",
     );
@@ -55,6 +57,25 @@ export class AuthService {
   }
 
   async authenticateWithGoogle(idToken: string): Promise<TokenDto> {
+    const payload = await this.verifyGoogleIdToken(idToken);
+
+    const payloadUser = UserMapper.toEntityFromGoogle(payload);
+    let user = await this.userRepository.findByEmail(payloadUser.email);
+
+    if (!user) {
+      user = await this.userRepository.save(payloadUser);
+      await this.onboardNewUser(user);
+    }
+
+    return this.generateTokens(user);
+  }
+
+  /**
+   * Only a rejected Google token is a 401. Database or other failures after
+   * this point surface as 500 with their own log, so they are not mistaken
+   * for a bad credential.
+   */
+  private async verifyGoogleIdToken(idToken: string): Promise<TokenPayload> {
     try {
       const ticket = await this.googleClient.verifyIdToken({
         idToken: idToken,
@@ -63,24 +84,17 @@ export class AuthService {
 
       const payload: TokenPayload | undefined = ticket.getPayload();
 
-      if (!payload) {
-        throw new UnauthorizedException("Invalid Google payload");
+      if (!payload?.email) {
+        throw new Error("Google payload has no email");
       }
 
-      const payloadUser = UserMapper.toEntityFromGoogle(payload);
-      let user = await this.userRepository.findByEmail(payloadUser.email);
-
-      if (!user) {
-        user = await this.userRepository.save(payloadUser);
-        await this.onboardNewUser(user);
-      }
-
-      return this.generateTokens(user);
+      return payload;
     } catch (error) {
-      console.error("Error authenticating with Google:", error);
-      throw new UnauthorizedException(
-        "Authentication failed, google expired token",
+      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `[AuthService.verifyGoogleIdToken]: Google rejected the token, ${reason}`,
       );
+      throw new UnauthorizedException("Invalid Google token");
     }
   }
 
