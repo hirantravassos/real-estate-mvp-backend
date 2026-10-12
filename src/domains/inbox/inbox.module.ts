@@ -20,9 +20,11 @@ import { WhatsappConnection } from "./entities/whatsapp-connection.entity";
 import { ConversationService } from "./services/conversation.service";
 import { EvolutionWebhookService } from "./services/evolution-webhook.service";
 import { InboxAiService } from "./services/inbox-ai.service";
+import { InboxSyncService } from "./services/inbox-sync.service";
 import { MessageService } from "./services/message.service";
 import { PropertyPresentationSenderService } from "./services/property-presentation-sender.service";
 import { WhatsappConnectionService } from "./services/whatsapp-connection.service";
+import { WhatsappHistorySyncService } from "./services/whatsapp-history-sync.service";
 
 @Module({
   imports: [
@@ -50,9 +52,11 @@ import { WhatsappConnectionService } from "./services/whatsapp-connection.servic
   ],
   providers: [
     WhatsappConnectionService,
+    WhatsappHistorySyncService,
     ConversationService,
     MessageService,
     InboxAiService,
+    InboxSyncService,
     PropertyPresentationSenderService,
     EvolutionWebhookService,
   ],
