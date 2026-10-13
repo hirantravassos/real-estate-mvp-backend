@@ -182,3 +182,21 @@ Incidente com dado pessoal: comunicar ANPD e titulares em **3 dias úteis**
 * [Migalhas, transferência internacional no radar da ANPD](https://www.migalhas.com.br/quentes/449475/envio-de-dados-ao-exterior-esta-no-radar-fiscalizatorio-da-anpd)
 * [Eixos de fiscalização 2026/2027](https://www.brasilemfolhas.com.br/2026/10/anpd-define-eixos-de-fiscalizacao-de-dados-para-o-bienio-2026-2027/)
 * [Google, verificação de escopos sensíveis](https://developers.google.com/identity/protocols/oauth2/production-readiness/sensitive-scope-verification)
+
+## Status das correções (13/10/2026)
+
+| Item | Situação |
+| --- | --- |
+| Textos para pessoa física (CPF) e rodapé | Feito. Falta preencher as variáveis `NEXT_PUBLIC_COMPANY_*` em produção |
+| 4.1 Importação de anúncios para o catálogo | Travada como "Em breve" (`LISTING_IMPORT_ENABLED`) |
+| 4.1 Busca nos portais com contas da plataforma | **Aberto** |
+| 4.2 Achar proprietário com raspagem logada | **Aberto** |
+| 4.3 Tom de pele lido da foto | Feito: sorteado pelo id do cliente. Avatares antigos não foram refeitos |
+| Exclusão da conta e anonimização | Feito (`DELETE /users/me` e botão em Ajustes) |
+| Suboperadores na Política | Feito: Railway (site, sistema, Evolution), Google, OpenAI, WhatsApp, Infosimples, Browserless, Photon, e-mail |
+| Teste grátis com IA | Feito: 200 créditos de presente e resumo diário gratuito |
+| Pentest #4, link de assinatura no portal | Feito: o portal não leva mais nenhum link de assinatura |
+| Pentest #7, endereço completo público | Feito: só bairro e cidade em `/p/[id]` e na página do corretor |
+| Log de acesso de 6 meses e expurgo de contas vencidas em 90 dias | **Aberto**: a Política ainda promete |
+| Checkout com link dos Termos e direito de arrependimento | **Aberto** |
+| Pentest #13, #14, #15, #16 e #12b, CPF em texto puro | **Aberto** |
