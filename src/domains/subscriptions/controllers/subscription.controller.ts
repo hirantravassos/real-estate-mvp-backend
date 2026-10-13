@@ -10,7 +10,7 @@ import {
   Post,
   UseGuards,
 } from "@nestjs/common";
-import { Throttle } from "@nestjs/throttler";
+import { SkipThrottle, Throttle } from "@nestjs/throttler";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { JwtGuard } from "../../auth/guards/jwt.guard";
 import { User } from "../../users/entities/user.entity";
@@ -31,8 +31,9 @@ const PAYMENT_ATTEMPTS_PER_MINUTE = 5;
 export class SubscriptionController {
   constructor(private readonly billingService: SubscriptionBillingService) {}
 
-  /** Public, the landing page shows the prices. */
+  /** Public, the landing page shows the prices, rendered by the site server. */
   @Get("plans")
+  @SkipThrottle()
   plans() {
     return this.billingService.publicPlans();
   }

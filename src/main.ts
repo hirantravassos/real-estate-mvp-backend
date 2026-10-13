@@ -3,9 +3,13 @@ import { NestExpressApplication } from "@nestjs/platform-express";
 import { ValidationPipe } from "@nestjs/common";
 import { AppModule } from "./app.module.js";
 import { GlobalExceptionFilter } from "./shared/filters/global-exception.filter.js";
+import { assertDataEncryptionSecret } from "./shared/utils/data-cipher.util.js";
 import type { Request, Response, NextFunction } from "express";
 
 async function bootstrap(): Promise<void> {
+  // CPFs are sealed with it: without the secret nothing may start.
+  assertDataEncryptionSecret();
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // Behind the hosting proxy, so request.ip and the throttler read the real

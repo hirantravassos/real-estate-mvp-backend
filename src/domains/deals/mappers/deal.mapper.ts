@@ -8,11 +8,7 @@ import { DealSigner } from "../entities/deal-signer.entity";
 import { DealMilestone } from "../entities/deal-milestone.entity";
 import { DealEvent } from "../entities/deal-event.entity";
 import { DealPartner } from "../entities/deal-partner.entity";
-import {
-  DealChecklistStatus,
-  DealSignerRole,
-  DealSignerStatus,
-} from "../enums/deal.enum";
+import { DealChecklistStatus, DealSignerStatus } from "../enums/deal.enum";
 
 export interface DealProgressDto {
   checklistTotal: number;
@@ -427,9 +423,10 @@ export class DealMapper {
           role: signer.role,
           status: signer.status,
           signedAt: signer.signedAt,
-          // Only buyers sign from the customer area, everyone else gets their own link.
-          signingToken:
-            signer.role === DealSignerRole.BUYER ? signer.signingToken : null,
+          // The customer area is shared by every buyer, so it never carries a
+          // signing link: each signer gets their own from the broker, and one
+          // buyer can never sign in the name of another.
+          signingToken: null,
         })),
       milestones: (deal.milestones ?? [])
         .filter((milestone) => milestone.active)

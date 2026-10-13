@@ -11,6 +11,7 @@ starts listening.
 | `Subscriptions`  | Paid plans: `subscriptions` and `subscription_payments` tables, their foreign keys and the `subscription` value on `credit_transactions.kind`. Every step checks first.                                                                                                                                      |
 | `AssistantPaidActions` | The assistant runs the paid features (hunts, owner contact, contact import, certificates) after the broker confirms the price: new values on `assistant_actions.kind` and the nullable `assistant_actions.result` column. |
 | `DailyBriefings` | The AI's morning briefing: `daily_briefings` table, with a unique `userId` + `freeDay` that keeps one free briefing a day per broker. |
+| `PrivacyHardening` | `access_logs` table (six months of access records), `users.tokenVersion` (logout ends every session), CPF and CNPJ columns widened and every stored value sealed with `DATA_ENCRYPTION_SECRET`. Needs the secret set, refuses to run without it. Down keeps the columns sealed. |
 
 ## Commands
 

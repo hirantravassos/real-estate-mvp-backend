@@ -74,6 +74,13 @@ export class User extends BaseEntity {
   @Column({ type: "json", nullable: true })
   targetClienteles: string[] | null;
 
+  /**
+   * Goes up on every logout. Tokens carry the version they were issued
+   * with, so the server refuses every older one at once.
+   */
+  @Column({ type: "int", nullable: false, default: 0 })
+  tokenVersion: number;
+
   /** Free notes the AI always reads, written and edited by the broker. */
   @Column({ type: "text", nullable: true })
   aiMemory: string | null;

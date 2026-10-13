@@ -25,10 +25,7 @@ import { Transform, Type } from "class-transformer";
 import { ValidateCurrency } from "../../../shared/decorators/validation/currency.decorator";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 import { InjectRepository } from "@nestjs/typeorm";
-import {
-  customerAddressOf,
-  isFromPortal,
-} from "../helpers/customer-safe.helper";
+import { publicAddressOf } from "../helpers/customer-safe.helper";
 import {
   PropertyConciergeServiceEnum,
   PropertyFurnitureEnum,
@@ -439,10 +436,9 @@ export class PropertyService {
     } = dto;
     return {
       ...presentation,
-      // A property found on a portal shows only its neighborhood and city.
-      ...(isFromPortal(dto)
-        ? { address: customerAddressOf(dto), address2: "" }
-        : {}),
+      // Anyone with the link may open it: only the neighborhood and city.
+      address: publicAddressOf(dto),
+      address2: "",
       agent: {
         name: entity.user.name,
         profileImage: entity.user.profileImage,

@@ -2,6 +2,7 @@ import { Column, Entity, Index, JoinColumn, ManyToOne } from "typeorm";
 import { BaseEntity } from "../../../shared/entities/base.entity";
 import { User } from "../../users/entities/user.entity";
 import { Property } from "../../properties/entities/property.entity";
+import { sealedJsonFieldsTransformer } from "../../../shared/utils/data-cipher.util";
 
 export interface PropertyLegalOwner {
   name: string;
@@ -50,6 +51,11 @@ export class PropertyLegalProfile extends BaseEntity {
   @Column({ type: "varchar", length: 30, nullable: true })
   unionPropertyNumber: string | null;
 
-  @Column({ type: "json", nullable: false })
+  /** Each owner's CPF or CNPJ is sealed at rest (LGPD art. 46). */
+  @Column({
+    type: "json",
+    nullable: false,
+    transformer: sealedJsonFieldsTransformer(["documentNumber"]),
+  })
   owners: PropertyLegalOwner[];
 }

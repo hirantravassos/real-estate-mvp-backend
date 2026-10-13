@@ -21,7 +21,7 @@ import {
   DealStage,
   DealStatus,
 } from "../enums/deal.enum";
-import { DealSignDto } from "../dtos/deal.dto";
+import { DealGovbrCopyDto, DealSignDto } from "../dtos/deal.dto";
 import { RequestEvidence } from "../helpers/deal-upload.helper";
 import { DealMapper } from "../mappers/deal.mapper";
 import { DealActivityService } from "./deal-activity.service";
@@ -116,22 +116,21 @@ export class DealSignatureService {
     evidence: RequestEvidence,
   ) {
     const signer = await this.findSignerByTokenOrThrow(token);
-    const deal = this.assertCanSign(signer);
+    const deal = this.assertCanSign(signer, dto.contractSha256);
 
-    await this.signerRepository.update(
-      { id: signer.id },
-      {
-        status: DealSignerStatus.SIGNED,
-        method: DealSignatureMethod.ELECTRONIC,
-        signedAt: new Date(),
-        signedName: dto.fullName,
-        signedDocumentNumber: dto.documentNumber,
-        signedIp: evidence.ip,
-        signedUserAgent: evidence.userAgent,
-        signedContractSha256: deal.contractSha256,
-        signedDocumentId: null,
-      },
-    );
+    // Only a pending signature turns into a signed one, so two requests
+    // racing on the same link can never overwrite the first evidence.
+    await this.claimPendingSignature(signer.id, {
+      status: DealSignerStatus.SIGNED,
+      method: DealSignatureMethod.ELECTRONIC,
+      signedAt: new Date(),
+      signedName: dto.fullName,
+      signedDocumentNumber: dto.documentNumber,
+      signedIp: evidence.ip,
+      signedUserAgent: evidence.userAgent,
+      signedContractSha256: deal.contractSha256,
+      signedDocumentId: null,
+    });
 
     await this.activityService.record({
       dealId: deal.id,
@@ -148,11 +147,12 @@ export class DealSignatureService {
   /** The copy signed on assinador.iti.br, checked by the broker afterwards. */
   async submitGovbrCopy(
     token: string,
+    dto: DealGovbrCopyDto,
     file: Express.Multer.File,
     evidence: RequestEvidence,
   ) {
     const signer = await this.findSignerByTokenOrThrow(token);
-    const deal = this.assertCanSign(signer);
+    const deal = this.assertCanSign(signer, dto.contractSha256);
 
     const document = await this.documentService.upload(
       deal.userId,
@@ -162,19 +162,16 @@ export class DealSignatureService {
       file,
     );
 
-    await this.signerRepository.update(
-      { id: signer.id },
-      {
-        status: DealSignerStatus.SUBMITTED,
-        method: DealSignatureMethod.GOVBR,
-        signedAt: new Date(),
-        signedName: signer.name,
-        signedIp: evidence.ip,
-        signedUserAgent: evidence.userAgent,
-        signedContractSha256: deal.contractSha256,
-        signedDocumentId: document.id,
-      },
-    );
+    await this.claimPendingSignature(signer.id, {
+      status: DealSignerStatus.SUBMITTED,
+      method: DealSignatureMethod.GOVBR,
+      signedAt: new Date(),
+      signedName: signer.name,
+      signedIp: evidence.ip,
+      signedUserAgent: evidence.userAgent,
+      signedContractSha256: deal.contractSha256,
+      signedDocumentId: document.id,
+    });
 
     await this.activityService.record({
       dealId: deal.id,
@@ -277,7 +274,25 @@ export class DealSignatureService {
     }
   }
 
-  private assertCanSign(signer: DealSigner) {
+  /** Writes the signature only if it is still pending, or refuses. */
+  private async claimPendingSignature(
+    signerId: string,
+    changes: Partial<DealSigner>,
+  ) {
+    const result = await this.signerRepository.update(
+      { id: signerId, status: DealSignerStatus.PENDING },
+      changes,
+    );
+    if (!result.affected) {
+      throw new ConflictException("Este contrato já foi assinado por você.");
+    }
+  }
+
+  /**
+   * The signer must be signing the version in force: a contract replaced
+   * after the page was opened is refused, never signed in their name.
+   */
+  private assertCanSign(signer: DealSigner, contractSha256: string) {
     const deal = signer.deal;
     if (deal.status !== DealStatus.OPEN) {
       throw new BadRequestException("Esta negociação está encerrada.");
@@ -287,6 +302,11 @@ export class DealSignatureService {
     }
     if (signer.status !== DealSignerStatus.PENDING) {
       throw new ConflictException("Este contrato já foi assinado por você.");
+    }
+    if (contractSha256 !== deal.contractSha256) {
+      throw new ConflictException(
+        "O contrato mudou depois que você abriu a página. Recarregue, leia a nova versão e assine de novo.",
+      );
     }
     return deal;
   }

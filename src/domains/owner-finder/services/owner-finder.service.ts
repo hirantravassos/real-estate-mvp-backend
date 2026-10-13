@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -9,6 +10,7 @@ import { AiService } from "../../ai/services/ai.service";
 import { CreditPricingService } from "../../credits/services/credit-pricing.service";
 import { PropertyMatch } from "../../property-hunts/entities/property-match.entity";
 import { ListingPageReaderService } from "../../property-hunts/services/listing-page-reader.service";
+import { OWNER_CONTACT_SEARCH_ENABLED } from "../../property-hunts/constants/portals.constant";
 import { PropertyContact } from "../../properties/entities/property-contact.entity";
 import { Property } from "../../properties/entities/property.entity";
 import { PropertyKindEnum } from "../../properties/mappers/property.mapper";
@@ -186,6 +188,11 @@ export class OwnerFinderService {
 
   /** The AI looks for ads of this property posted by its owner. */
   async searchContacts(user: User, dto: OwnerContactSearchDto) {
+    if (!OWNER_CONTACT_SEARCH_ENABLED) {
+      throw new ForbiddenException(
+        "A busca de anúncios do proprietário chega em breve. Os links gratuitos continuam valendo.",
+      );
+    }
     const target = await this.target(user, dto);
     const allowedDomains = OWNER_CONTACT_SOURCES.map((source) => source.domain);
 

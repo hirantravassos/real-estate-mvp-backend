@@ -1,7 +1,9 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
+import { APP_GUARD } from "@nestjs/core";
 import { ThrottlerModule } from "@nestjs/throttler";
+import { ApiThrottlerGuard } from "./shared/guards/api-throttler.guard";
 import { databaseConfig } from "./config/database.config.js";
 import { authConfig } from "./config/auth.config.js";
 import { mailConfig } from "./config/mail.config.js";
@@ -34,12 +36,15 @@ import { BrokerPageModule } from "./domains/broker-pages/broker-page.module";
 import { subscriptionsConfig } from "./config/subscriptions.config";
 import { SubscriptionModule } from "./domains/subscriptions/subscription.module";
 import { dailyBriefingConfig } from "./config/daily-briefing.config";
+import { dataRetentionConfig } from "./config/data-retention.config";
 import { DailyBriefingModule } from "./domains/daily-briefings/daily-briefing.module";
+import { AccountDeletionModule } from "./domains/account-deletions/account-deletion.module";
+import { DataRetentionModule } from "./domains/data-retention/data-retention.module";
 import { buildDatabaseOptions } from "./database/database-options";
 
 /** Loose default, only the routes with UserThrottlerGuard are counted. */
 const THROTTLE_TTL_MS = 60_000;
-const THROTTLE_LIMIT = 120;
+const THROTTLE_LIMIT = 240;
 
 @Module({
   imports: [
@@ -60,6 +65,7 @@ const THROTTLE_LIMIT = 120;
         infosimplesConfig,
         subscriptionsConfig,
         dailyBriefingConfig,
+        dataRetentionConfig,
       ],
       envFilePath: ".env",
     }),
@@ -102,12 +108,12 @@ const THROTTLE_LIMIT = 120;
     BrokerPageModule,
     SubscriptionModule,
     DailyBriefingModule,
+    AccountDeletionModule,
+    DataRetentionModule,
   ],
-  // providers: [
-  //   {
-  //     provide: APP_GUARD,
-  //     useClass: ThrottlerGuard,
-  //   },
-  // ],
+  // Per broker when signed in, per address otherwise (request.ip is the
+  // real client behind the proxy, see trust proxy in main.ts). Webhooks and
+  // the reads of the site server skip it.
+  providers: [{ provide: APP_GUARD, useClass: ApiThrottlerGuard }],
 })
 export class AppModule {}

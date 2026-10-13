@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -15,6 +16,7 @@ import {
   PropertyMatchPinDto,
   PropertyMatchUpdateDto,
 } from "../dtos/property-hunt.dto";
+import { LISTING_IMPORT_ENABLED } from "../constants/portals.constant";
 import { PropertyMatch } from "../entities/property-match.entity";
 import {
   PropertyMatchOrigin,
@@ -175,6 +177,11 @@ export class PropertyMatchService {
 
   /** Saves a portal listing in the catalog, with its photos and contacts. */
   async importToCatalog(user: User, id: string) {
+    if (!LISTING_IMPORT_ENABLED) {
+      throw new ForbiddenException(
+        "Trazer anúncios de portais para o catálogo chega em breve.",
+      );
+    }
     const match = await this.findEntity(user.id, id);
     if (match.propertyId) {
       return { propertyId: match.propertyId, mediaCount: 0, created: false };

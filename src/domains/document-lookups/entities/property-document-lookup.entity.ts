@@ -1,6 +1,7 @@
 import { Column, Entity, Index, JoinColumn, ManyToOne } from "typeorm";
 import { BaseEntity } from "../../../shared/entities/base.entity";
 import { User } from "../../users/entities/user.entity";
+import { sealedPersonalDataTransformer } from "../../../shared/utils/data-cipher.util";
 
 export enum PropertyDocumentLookupStatus {
   /** The certificate was issued and stored with the property documents. */
@@ -28,7 +29,12 @@ export class PropertyDocumentLookup extends BaseEntity {
   lookupKey: string;
 
   /** The owner the certificate is about, null for certificates of the property. */
-  @Column({ type: "varchar", length: 14, nullable: true })
+  @Column({
+    type: "varchar",
+    length: 255,
+    nullable: true,
+    transformer: sealedPersonalDataTransformer,
+  })
   ownerDocumentNumber: string | null;
 
   @Column({

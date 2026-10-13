@@ -1,3 +1,5 @@
+import { publicRegion } from "../../broker-pages/helpers/public-region.helper";
+
 /** What the hunt kept from the original listing, for the broker only. */
 export interface PropertySourceDetails {
   importedAt: string;
@@ -43,6 +45,18 @@ export const customerAddressOf = (property: LocatedProperty) => {
     .filter(Boolean)
     .join(", ");
   return area || "Localização com o corretor";
+};
+
+const PUBLIC_ADDRESS_FALLBACK = "Localização com o corretor";
+
+/**
+ * The address anyone with the public link may see: only the neighborhood
+ * and city. Street, number and unit point to the owner's home, so they stay
+ * between the broker and the customer.
+ */
+export const publicAddressOf = (property: LocatedProperty) => {
+  if (isFromPortal(property)) return customerAddressOf(property);
+  return publicRegion(property.address) ?? PUBLIC_ADDRESS_FALLBACK;
 };
 
 const URL_PATTERN = /\b(?:https?:\/\/|www\.)\S+/gi;

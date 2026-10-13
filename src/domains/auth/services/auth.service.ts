@@ -10,6 +10,12 @@ import { AccessTokenDto } from "../dtos/access-token.dto";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Kanban } from "../../kanbans/entities/kanban.entity";
+import { Subscription } from "../../subscriptions/entities/subscription.entity";
+import { deletedGoogleIdOf } from "../../account-deletions/helpers/deleted-account.helper";
+import { AccessLogService } from "../../access-logs/services/access-log.service";
+import { AccessLogEvent } from "../../access-logs/entities/access-log.entity";
+import { RequestEvidence } from "../../../shared/utils/request-evidence.util";
+import { announceSessionsEnded } from "../../../shared/utils/session-events.util";
 
 @Injectable()
 export class AuthService {
@@ -27,6 +33,9 @@ export class AuthService {
     private readonly jwtService: JwtService,
     @InjectRepository(Kanban)
     private readonly kanbanRepository: Repository<Kanban>,
+    @InjectRepository(Subscription)
+    private readonly subscriptionRepository: Repository<Subscription>,
+    private readonly accessLogService: AccessLogService,
   ) {
     const clientId = this.configService
       .get<string>("auth.googleClientId")
@@ -64,7 +73,10 @@ export class AuthService {
     this.refreshExpirationTime = refreshExpiration ?? 604800;
   }
 
-  async authenticateWithGoogle(idToken: string): Promise<TokenDto> {
+  async authenticateWithGoogle(
+    idToken: string,
+    evidence: RequestEvidence,
+  ): Promise<TokenDto> {
     const payload = await this.verifyGoogleIdToken(idToken);
 
     const payloadUser = UserMapper.toEntityFromGoogle(payload);
@@ -73,6 +85,7 @@ export class AuthService {
     if (!user) {
       user = await this.userRepository.save(payloadUser);
       await this.onboardNewUser(user);
+      await this.closeTrialOfReturningAccount(user);
     } else if (!user.googleId) {
       // Bind the Google subject on the first login of a pre existing account.
       user.googleId = payloadUser.googleId;
@@ -83,7 +96,22 @@ export class AuthService {
       );
     }
 
+    await this.accessLogService.record(user.id, AccessLogEvent.LOGIN, evidence);
     return this.generateTokens(user);
+  }
+
+  /**
+   * Ends every session of the broker on the server: the version goes up and
+   * all access and refresh tokens issued before stop working.
+   */
+  async logout(user: User, evidence: RequestEvidence): Promise<void> {
+    await this.userRepository.increment({ id: user.id }, "tokenVersion", 1);
+    announceSessionsEnded(user.id);
+    await this.accessLogService.record(
+      user.id,
+      AccessLogEvent.LOGOUT,
+      evidence,
+    );
   }
 
   /**
@@ -118,12 +146,16 @@ export class AuthService {
     }
   }
 
-  async refreshAccessToken(refreshToken: string): Promise<AccessTokenDto> {
+  async refreshAccessToken(
+    refreshToken: string,
+    evidence: RequestEvidence,
+  ): Promise<AccessTokenDto> {
     try {
       const payload = this.jwtService.verify<{
         id: string;
         email: string;
         typ?: string;
+        ver?: number;
       }>(refreshToken, {
         secret: this.refreshSecret,
       });
@@ -132,17 +164,34 @@ export class AuthService {
         throw new UnauthorizedException("Not a refresh token");
       }
 
-      const user = await this.userRepository.findOneBy({ id: payload.id });
+      const user = await this.userRepository.findOneBy({
+        id: payload.id,
+        active: true,
+      });
 
       if (!user) {
         throw new UnauthorizedException("User not found");
       }
 
+      if ((payload.ver ?? 0) !== user.tokenVersion) {
+        throw new UnauthorizedException("Session ended");
+      }
+
       const accessToken = this.jwtService.sign(
-        { id: user.id, email: user.email, typ: "access" },
+        {
+          id: user.id,
+          email: user.email,
+          typ: "access",
+          ver: user.tokenVersion,
+        },
         { expiresIn: this.accessExpirationTime },
       );
 
+      await this.accessLogService.record(
+        user.id,
+        AccessLogEvent.REFRESH,
+        evidence,
+      );
       return { accessToken };
     } catch {
       throw new UnauthorizedException("Invalid or expired refresh token");
@@ -153,6 +202,7 @@ export class AuthService {
     const payload = {
       id: user.id,
       email: user.email,
+      ver: user.tokenVersion ?? 0,
     };
 
     const accessToken = this.jwtService.sign(
@@ -174,6 +224,26 @@ export class AuthService {
       accessToken,
       refreshToken,
     };
+  }
+
+  /**
+   * A Google account that deleted its broker account already had its free
+   * trial and trial credits. The new account starts with the trial over, so
+   * deleting and signing up again is not a way to renew them.
+   */
+  private async closeTrialOfReturningAccount(user: User): Promise<void> {
+    if (!user.googleId) return;
+    const returning = await this.userRepository.existsBy({
+      googleId: deletedGoogleIdOf(user.googleId),
+    });
+    if (!returning) return;
+
+    await this.subscriptionRepository.save(
+      this.subscriptionRepository.create({
+        userId: user.id,
+        trialEndsAt: new Date(),
+      }),
+    );
   }
 
   private async onboardNewUser(user: User): Promise<void> {

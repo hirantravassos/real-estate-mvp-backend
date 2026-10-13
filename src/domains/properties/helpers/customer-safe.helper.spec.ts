@@ -1,4 +1,8 @@
-import { customerAddressOf, scrubThirdPartyData } from "./customer-safe.helper";
+import {
+  customerAddressOf,
+  publicAddressOf,
+  scrubThirdPartyData,
+} from "./customer-safe.helper";
 
 describe("customerAddressOf", () => {
   it("shows the full address of the broker's own properties", () => {
@@ -37,6 +41,34 @@ describe("customerAddressOf", () => {
     expect(
       customerAddressOf({
         address: "Rua Carvalho de Mendonça, 320",
+        address2: "",
+        sourcePortal: "olx",
+      }),
+    ).toBe("Localização com o corretor");
+  });
+});
+
+describe("publicAddressOf", () => {
+  it("never shows the street, number or unit of the broker's own property", () => {
+    const address = publicAddressOf({
+      address: "Rua Carvalho de Mendonça, 320 - Embaré, Santos - SP",
+      address2: "Apto 42, bloco B",
+    });
+    expect(address).toBe("Embaré, Santos - SP");
+    expect(address).not.toContain("320");
+    expect(address).not.toContain("42");
+  });
+
+  it("falls back to a neutral text when the address has no region", () => {
+    expect(publicAddressOf({ address: "Rua A 10", address2: "ap 1" })).toBe(
+      "Localização com o corretor",
+    );
+  });
+
+  it("keeps the hunt area of a portal property", () => {
+    expect(
+      publicAddressOf({
+        address: "Rua B, 5",
         address2: "",
         sourcePortal: "olx",
       }),

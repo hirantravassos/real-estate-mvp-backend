@@ -1,9 +1,11 @@
 import { registerAs } from "@nestjs/config";
 
 export const portalsConfig = registerAs("portals", () => ({
-  /** Encrypts the portal passwords and sessions. Falls back to the JWT secret. */
-  credentialsSecret:
-    process.env.PORTAL_CREDENTIALS_SECRET || process.env.JWT_SECRET || "",
+  /**
+   * Encrypts the portal passwords and sessions. No fallback: without it the
+   * platform accounts cannot be saved nor opened.
+   */
+  credentialsSecret: process.env.PORTAL_CREDENTIALS_SECRET?.trim() ?? "",
   /** A remote Chrome (Browserless and the like), preferred when set. */
   browserWebSocketEndpoint: process.env.PORTAL_BROWSER_WS_ENDPOINT ?? "",
   /** A local Chrome or Chromium, found on its own when left empty. */

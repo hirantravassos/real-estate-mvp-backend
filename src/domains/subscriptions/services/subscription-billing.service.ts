@@ -78,6 +78,7 @@ export class SubscriptionBillingService {
   publicPlans() {
     return {
       trialDays: this.subscriptionService.trialDays,
+      trialCredits: this.subscriptionService.trialCredits,
       graceDays: this.subscriptionService.graceDays,
       plans: this.subscriptionService.plans,
     };
@@ -109,6 +110,7 @@ export class SubscriptionBillingService {
       hasAccess: !this.subscriptionService.billingEnabled || hasAccess(status),
       billingEnabled: this.subscriptionService.billingEnabled,
       trialDays: this.subscriptionService.trialDays,
+      trialCredits: this.subscriptionService.trialCredits,
       graceDays: this.subscriptionService.graceDays,
       trialEndsAt: subscription.trialEndsAt,
       paidThrough: subscription.paidThrough,

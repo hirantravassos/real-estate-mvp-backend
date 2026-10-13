@@ -6,6 +6,7 @@ import {
   AssistantActionKind,
   AssistantActionStatus,
 } from "../enums/assistant.enum";
+import { sealedJsonFieldsTransformer } from "../../../shared/utils/data-cipher.util";
 
 export type AssistantAttachmentSource = "document" | "property_media";
 
@@ -168,7 +169,12 @@ export class AssistantAction extends BaseEntity {
   @Column({ type: "varchar", length: 255, nullable: false })
   title: string;
 
-  @Column({ type: "json", nullable: false })
+  /** The owner CPF or CNPJ of a certificate proposal is sealed at rest. */
+  @Column({
+    type: "json",
+    nullable: false,
+    transformer: sealedJsonFieldsTransformer(["ownerDocumentNumber"]),
+  })
   payload: AssistantActionPayload;
 
   @Column({ type: "json", nullable: true })
