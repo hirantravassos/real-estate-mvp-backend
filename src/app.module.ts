@@ -35,6 +35,7 @@ import { subscriptionsConfig } from "./config/subscriptions.config";
 import { SubscriptionModule } from "./domains/subscriptions/subscription.module";
 import { dailyBriefingConfig } from "./config/daily-briefing.config";
 import { DailyBriefingModule } from "./domains/daily-briefings/daily-briefing.module";
+import { AccountDeletionModule } from "./domains/account-deletions/account-deletion.module";
 import { buildDatabaseOptions } from "./database/database-options";
 
 /** Loose default, only the routes with UserThrottlerGuard are counted. */
@@ -102,6 +103,7 @@ const THROTTLE_LIMIT = 120;
     BrokerPageModule,
     SubscriptionModule,
     DailyBriefingModule,
+    AccountDeletionModule,
   ],
   // providers: [
   //   {

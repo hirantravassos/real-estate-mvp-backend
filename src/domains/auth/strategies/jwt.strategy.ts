@@ -36,7 +36,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException("Not an access token");
     }
 
-    const user = await this.userRepository.findOneBy({ id: payload.id });
+    // A deleted account is anonymized and inactive, its tokens die with it.
+    const user = await this.userRepository.findOneBy({
+      id: payload.id,
+      active: true,
+    });
 
     if (!user) {
       throw new UnauthorizedException("User not found or token invalid");

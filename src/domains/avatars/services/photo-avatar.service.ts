@@ -15,7 +15,6 @@ import {
   CUSTOMER_AVATAR_NECKWEARS,
   CUSTOMER_AVATAR_OUTFIT_COLORS,
   CUSTOMER_AVATAR_OUTFIT_STYLES,
-  CUSTOMER_AVATAR_SKIN_TONES,
   CustomerAvatar,
 } from "../../customers/dtos/customer-avatar.dto";
 import { CustomerRepository } from "../../customers/repositories/customer.repository";
@@ -40,7 +39,6 @@ const AVATAR_SCHEMA = {
     properties: {
       isPerson: { type: "boolean" },
       gender: { type: "string", enum: CUSTOMER_AVATAR_GENDERS },
-      skinTone: { type: "string", enum: CUSTOMER_AVATAR_SKIN_TONES },
       hairStyle: { type: "string", enum: CUSTOMER_AVATAR_HAIR_STYLES },
       hairColor: { type: "string", enum: CUSTOMER_AVATAR_HAIR_COLORS },
       facialHair: { type: "string", enum: CUSTOMER_AVATAR_FACIAL_HAIRS },
@@ -53,7 +51,6 @@ const AVATAR_SCHEMA = {
     required: [
       "isPerson",
       "gender",
-      "skinTone",
       "hairStyle",
       "hairColor",
       "facialHair",
@@ -72,7 +69,6 @@ const INSTRUCTIONS = [
   "Olhe a pessoa principal da foto e escolha, em cada campo, a opção mais parecida.",
   "isPerson é false quando não há um rosto humano claro: logotipo, paisagem, animal, desenho, texto, objeto ou foto escura demais.",
   "gender: feminine ou masculine, pela aparência. Se não der para saber, use o nome como pista.",
-  "skinTone, do mais claro ao mais escuro: porcelain, sand, honey, caramel, cocoa, espresso.",
   "hairStyle: bald (careca ou raspado), short (curto liso ou ondulado), spiky (curto espetado), mohawk (moicano, laterais raspadas), curly (cacheado ou crespo curto), afro (black power volumoso), bob (chanel, na altura do queixo), long (solto, passa dos ombros), ponytail (rabo de cavalo), pigtails (duas marias-chiquinhas), braids (tranças) ou bun (coque).",
   "hairColor: black, brown, blonde, ginger (ruivo claro), auburn (ruivo escuro ou acaju), gray (grisalho ou branco), blue, purple ou pink (rosa e outras cores fantasia). Cabelo coberto: escolha pela sobrancelha.",
   "facialHair: none, stubble (barba por fazer), goatee (cavanhaque), mustache (só bigode) ou beard (barba cheia). Sempre none para feminine.",
@@ -87,6 +83,9 @@ const INSTRUCTIONS = [
 /**
  * Reads the public WhatsApp profile picture and turns it into a character
  * that looks like the person. The picture is never stored, only the look.
+ * The skin tone is never read from the face: it would tell racial origin, a
+ * sensitive data under LGPD art. 11. It comes from the customer id instead,
+ * and the broker can change it by hand.
  */
 @Injectable()
 export class PhotoAvatarService {
@@ -159,7 +158,7 @@ export class PhotoAvatarService {
       images: [image],
     });
 
-    return parsePhotoAvatar(result.text);
+    return parsePhotoAvatar(result.text, job.customerId);
   }
 
   private async downloadAsDataUrl(url: string) {

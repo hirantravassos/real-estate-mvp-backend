@@ -18,6 +18,8 @@ import {
 } from "typeorm";
 import { subscriptionsConfig } from "../../../config/subscriptions.config";
 import { MercadoPagoService } from "../../../infrastructure/payments/services/mercado-pago.service";
+import { CreditTransactionKind } from "../../credits/entities/credit-transaction.entity";
+import { CreditWalletService } from "../../credits/services/credit-wallet.service";
 import { Customer } from "../../customers/entities/customer.entity";
 import { Deal } from "../../deals/entities/deal.entity";
 import { DealStatus } from "../../deals/enums/deal.enum";
@@ -79,6 +81,7 @@ export class SubscriptionService {
     @InjectRepository(SubscriptionPayment)
     private readonly paymentRepository: Repository<SubscriptionPayment>,
     private readonly mercadoPagoService: MercadoPagoService,
+    private readonly walletService: CreditWalletService,
     private readonly dataSource: DataSource,
   ) {
     this.plans = buildSubscriptionPlans(configuration);
@@ -101,6 +104,10 @@ export class SubscriptionService {
     return this.configuration.trialDays;
   }
 
+  get trialCredits() {
+    return this.configuration.trialCredits;
+  }
+
   get graceDays() {
     return this.configuration.graceDays;
   }
@@ -115,20 +122,38 @@ export class SubscriptionService {
     return plan;
   }
 
-  /** The first visit of an account starts its free trial. */
+  /**
+   * The first visit of an account starts its free trial with the gift
+   * credits. Both go in one transaction: a second request racing on the
+   * unique userId rolls back, so the gift is given once.
+   */
   async findOrCreate(userId: string) {
     const existing = await this.subscriptionRepository.findOneBy({ userId });
     if (existing) return existing;
 
+    const trialCredits = this.configuration.trialCredits;
+    if (trialCredits > 0) await this.walletService.findOrCreate(userId);
+
     try {
-      return await this.subscriptionRepository.save(
-        this.subscriptionRepository.create({
-          userId,
-          trialEndsAt: dayjs()
-            .add(this.configuration.trialDays, "day")
-            .toDate(),
-        }),
-      );
+      return await this.dataSource.transaction(async (manager) => {
+        const subscription = await manager.save(
+          manager.create(Subscription, {
+            userId,
+            trialEndsAt: dayjs()
+              .add(this.configuration.trialDays, "day")
+              .toDate(),
+          }),
+        );
+        if (trialCredits > 0) {
+          await this.walletService.applyChange(manager, userId, {
+            kind: CreditTransactionKind.BONUS,
+            amount: trialCredits,
+            description: `Presente do teste grátis: ${trialCredits} créditos de IA`,
+            referenceId: subscription.id,
+          });
+        }
+        return subscription;
+      });
     } catch {
       // Another request created it at the same time.
       return this.subscriptionRepository.findOneByOrFail({ userId });

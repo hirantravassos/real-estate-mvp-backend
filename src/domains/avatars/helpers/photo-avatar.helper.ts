@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import {
   CUSTOMER_AVATAR_EYEWEARS,
   CUSTOMER_AVATAR_FACIAL_HAIRS,
@@ -20,8 +21,22 @@ const oneOf = <T extends string>(
   value: unknown,
 ): T | null => (options.includes(value as T) ? (value as T) : null);
 
-/** Only a clear person becomes a look, anything else keeps the default one. */
-export const parsePhotoAvatar = (text: string): CustomerAvatar | null => {
+/** Same text, same tone: a stable pick that never looks at the person. */
+export const seededSkinTone = (seedText: string) => {
+  const digest = createHash("sha256").update(seedText).digest();
+  return CUSTOMER_AVATAR_SKIN_TONES[
+    digest.readUInt32BE(0) % CUSTOMER_AVATAR_SKIN_TONES.length
+  ];
+};
+
+/**
+ * Only a clear person becomes a look, anything else keeps the default one.
+ * The skin tone is seeded, never read from the photo (LGPD art. 11).
+ */
+export const parsePhotoAvatar = (
+  text: string,
+  skinToneSeed: string,
+): CustomerAvatar | null => {
   let raw: Record<string, unknown>;
   try {
     raw = JSON.parse(text) as Record<string, unknown>;
@@ -31,25 +46,17 @@ export const parsePhotoAvatar = (text: string): CustomerAvatar | null => {
   if (raw.isPerson !== true) return null;
 
   const gender = oneOf(CUSTOMER_AVATAR_GENDERS, raw.gender);
-  const skinTone = oneOf(CUSTOMER_AVATAR_SKIN_TONES, raw.skinTone);
   const hairStyle = oneOf(CUSTOMER_AVATAR_HAIR_STYLES, raw.hairStyle);
   const hairColor = oneOf(CUSTOMER_AVATAR_HAIR_COLORS, raw.hairColor);
   const outfitStyle = oneOf(CUSTOMER_AVATAR_OUTFIT_STYLES, raw.outfitStyle);
   const outfitColor = oneOf(CUSTOMER_AVATAR_OUTFIT_COLORS, raw.outfitColor);
-  if (
-    !gender ||
-    !skinTone ||
-    !hairStyle ||
-    !hairColor ||
-    !outfitStyle ||
-    !outfitColor
-  ) {
+  if (!gender || !hairStyle || !hairColor || !outfitStyle || !outfitColor) {
     return null;
   }
 
   return {
     gender,
-    skinTone,
+    skinTone: seededSkinTone(skinToneSeed),
     hairStyle,
     hairColor,
     facialHair:

@@ -8,8 +8,10 @@ import {
 import type { ConfigType } from "@nestjs/config";
 import {
   DeleteObjectCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutBucketCorsCommand,
   PutObjectCommand,
   S3Client,
@@ -384,5 +386,51 @@ export class StorageService implements OnApplicationBootstrap {
         Key: s3Key,
       }),
     );
+  }
+
+  /** Every folder that holds files of one broker, see the generators above. */
+  userS3KeyPrefixes(userId: string) {
+    return [
+      `documents/${userId}/`,
+      `media/${userId}/`,
+      `assistant/${userId}/`,
+      `inbox/${userId}/`,
+    ];
+  }
+
+  /** Deletes every object under the prefix, a thousand at a time. */
+  async deletePrefix(prefix: string): Promise<number> {
+    if (!prefix.endsWith("/") || prefix.split("/").length < 3) {
+      throw new Error(`Refusing to delete the broad prefix ${prefix}`);
+    }
+
+    let deleted = 0;
+    let continuationToken: string | undefined;
+    do {
+      const page = await this.s3Client.send(
+        new ListObjectsV2Command({
+          Bucket: this.bucketConfiguration.name,
+          Prefix: prefix,
+          ContinuationToken: continuationToken,
+        }),
+      );
+      const keys = (page.Contents ?? [])
+        .map((object) => object.Key)
+        .filter((key): key is string => Boolean(key));
+      if (keys.length > 0) {
+        await this.s3Client.send(
+          new DeleteObjectsCommand({
+            Bucket: this.bucketConfiguration.name,
+            Delete: { Objects: keys.map((key) => ({ Key: key })), Quiet: true },
+          }),
+        );
+        deleted += keys.length;
+      }
+      continuationToken = page.IsTruncated
+        ? page.NextContinuationToken
+        : undefined;
+    } while (continuationToken);
+
+    return deleted;
   }
 }

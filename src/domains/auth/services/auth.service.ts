@@ -10,6 +10,8 @@ import { AccessTokenDto } from "../dtos/access-token.dto";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Kanban } from "../../kanbans/entities/kanban.entity";
+import { Subscription } from "../../subscriptions/entities/subscription.entity";
+import { deletedGoogleIdOf } from "../../account-deletions/helpers/deleted-account.helper";
 
 @Injectable()
 export class AuthService {
@@ -27,6 +29,8 @@ export class AuthService {
     private readonly jwtService: JwtService,
     @InjectRepository(Kanban)
     private readonly kanbanRepository: Repository<Kanban>,
+    @InjectRepository(Subscription)
+    private readonly subscriptionRepository: Repository<Subscription>,
   ) {
     const clientId = this.configService
       .get<string>("auth.googleClientId")
@@ -73,6 +77,7 @@ export class AuthService {
     if (!user) {
       user = await this.userRepository.save(payloadUser);
       await this.onboardNewUser(user);
+      await this.closeTrialOfReturningAccount(user);
     } else if (!user.googleId) {
       // Bind the Google subject on the first login of a pre existing account.
       user.googleId = payloadUser.googleId;
@@ -132,7 +137,10 @@ export class AuthService {
         throw new UnauthorizedException("Not a refresh token");
       }
 
-      const user = await this.userRepository.findOneBy({ id: payload.id });
+      const user = await this.userRepository.findOneBy({
+        id: payload.id,
+        active: true,
+      });
 
       if (!user) {
         throw new UnauthorizedException("User not found");
@@ -174,6 +182,26 @@ export class AuthService {
       accessToken,
       refreshToken,
     };
+  }
+
+  /**
+   * A Google account that deleted its broker account already had its free
+   * trial and trial credits. The new account starts with the trial over, so
+   * deleting and signing up again is not a way to renew them.
+   */
+  private async closeTrialOfReturningAccount(user: User): Promise<void> {
+    if (!user.googleId) return;
+    const returning = await this.userRepository.existsBy({
+      googleId: deletedGoogleIdOf(user.googleId),
+    });
+    if (!returning) return;
+
+    await this.subscriptionRepository.save(
+      this.subscriptionRepository.create({
+        userId: user.id,
+        trialEndsAt: new Date(),
+      }),
+    );
   }
 
   private async onboardNewUser(user: User): Promise<void> {

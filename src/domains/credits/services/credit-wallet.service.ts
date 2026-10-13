@@ -142,8 +142,8 @@ export class CreditWalletService {
     const existing = await this.walletRepository.findOneBy({ userId });
     if (existing) return existing;
 
-    // No welcome credits: the free trial runs without them, credits come
-    // with each paid month of the plan.
+    // Starts empty: the trial gift is added when the trial starts, see
+    // SubscriptionService.findOrCreate, and each paid month adds the plan's.
     try {
       return await this.walletRepository.save(
         this.walletRepository.create({ userId, balance: 0 }),

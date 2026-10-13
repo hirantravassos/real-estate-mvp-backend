@@ -10,6 +10,7 @@ import { User } from "../users/entities/user.entity";
 import { GoogleStrategy } from "./strategies/google.strategy";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { Kanban } from "../kanbans/entities/kanban.entity";
+import { Subscription } from "../subscriptions/entities/subscription.entity";
 
 @Module({
   imports: [
@@ -34,7 +35,7 @@ import { Kanban } from "../kanbans/entities/kanban.entity";
       },
     }),
     PassportModule.register({ session: false }),
-    TypeOrmModule.forFeature([User, Kanban]),
+    TypeOrmModule.forFeature([User, Kanban, Subscription]),
     forwardRef(() => UserModule),
   ],
   controllers: [AuthController],

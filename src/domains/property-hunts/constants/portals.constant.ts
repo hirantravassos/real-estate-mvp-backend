@@ -231,3 +231,11 @@ export const PORTALS: Record<PortalKey, PortalDefinition> = {
 };
 
 export const PORTAL_KEYS = Object.values(PortalKey);
+
+/**
+ * Bringing a portal listing into the broker's catalog copies the
+ * advertiser's photos and contacts. It stays off ("em breve") until the
+ * partnership terms with the advertiser are settled, see
+ * docs/compliance/lgpd-auditoria-2026-10-13.md, item 4.1.
+ */
+export const LISTING_IMPORT_ENABLED = false;
