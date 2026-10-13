@@ -2,11 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { UserService } from "../../users/services/user.service";
 import { PropertyService } from "../../properties/services/property.service";
 import { PropertyMediaService } from "../../properties/services/property-media.service";
-import { publicRegion } from "../helpers/public-region.helper";
-import {
-  customerAddressOf,
-  isFromPortal,
-} from "../../properties/helpers/customer-safe.helper";
+import { publicAddressOf } from "../../properties/helpers/customer-safe.helper";
 
 const MAXIMUM_LISTED_PROPERTIES = 60;
 
@@ -48,10 +44,8 @@ export class BrokerPageService {
         id: property.id,
         kind: property.kind ?? null,
         alias: property.alias,
-        // Portal finds keep the area the hunt read, never the listing's street.
-        region: isFromPortal(property)
-          ? customerAddressOf(property)
-          : publicRegion(property.address),
+        // Only the neighborhood and city, never the street nor the unit.
+        region: publicAddressOf(property),
         price: property.price,
         infoBedrooms: property.infoBedrooms,
         infoBathrooms: property.infoBathrooms,
