@@ -7,12 +7,22 @@ import { CustomerRepository } from "../repositories/customer.repository";
 import { CustomerMapper } from "../mappers/customer.mapper";
 import { User } from "../../users/entities/user.entity";
 import { Customer } from "../entities/customer.entity";
-import { FindOptionsWhere, ILike, Repository } from "typeorm";
+import { FindOptionsWhere, ILike, Raw, Repository } from "typeorm";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
 import { ValidateName } from "../../../shared/decorators/validation/name.decorator";
 import { ValidatePhoneNumber } from "../../../shared/decorators/validation/phone-number.decorator";
 import { ValidateLongText } from "../../../shared/decorators/validation/long-text.decorator";
-import { IsOptional, IsString, IsUUID, ValidateNested } from "class-validator";
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
+  IsArray,
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateNested,
+} from "class-validator";
 import { Type } from "class-transformer";
 import { ValidateCurrency } from "../../../shared/decorators/validation/currency.decorator";
 import dayjs from "dayjs";
@@ -24,6 +34,7 @@ import { ValidateBoolean } from "../../../shared/decorators/validation/boolean.d
 import { Visit } from "../../visits/entities/visit.entity";
 import { CustomerAvatarDto } from "../dtos/customer-avatar.dto";
 import { Kanban } from "../../kanbans/entities/kanban.entity";
+import { CustomerRole } from "../enums/customer.enum";
 
 dayjs.extend(isSameOrAfter);
 
@@ -50,6 +61,15 @@ export class CustomerCreateDto {
   @ValidateNested()
   @Type(() => CustomerAvatarDto)
   avatar?: CustomerAvatarDto | null;
+
+  /** Left out keeps the saved roles; a new contact starts as a buyer. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1, { message: "Escolha ao menos um papel para o contato" })
+  @ArrayMaxSize(Object.values(CustomerRole).length)
+  @ArrayUnique()
+  @IsEnum(CustomerRole, { each: true })
+  roles?: CustomerRole[];
 }
 
 export class CustomerFilterDto extends PaginationRequestDto {
@@ -64,7 +84,15 @@ export class CustomerFilterDto extends PaginationRequestDto {
   @IsOptional()
   @ValidateBoolean()
   lost: boolean | null;
+
+  @IsOptional()
+  @IsEnum(CustomerRole)
+  role: CustomerRole | null;
 }
+
+/** Matches the contacts holding the role among the ones in their set. */
+const hasRole = (role: CustomerRole) =>
+  Raw((column) => `FIND_IN_SET(:role, ${column}) > 0`, { role });
 
 @Injectable()
 export class CustomerService {
@@ -90,6 +118,10 @@ export class CustomerService {
 
     if (dto.kanban) {
       baseWhere.kanban = { id: dto.kanban };
+    }
+
+    if (dto.role) {
+      baseWhere.roles = hasRole(dto.role);
     }
 
     if (dto.search) {
@@ -129,6 +161,10 @@ export class CustomerService {
       user: { id: user.id },
       active: true,
     };
+
+    if (filter.role) {
+      where.roles = hasRole(filter.role);
+    }
 
     const [data, total] = await this.customerRepository.findAndCount({
       where: filter.search

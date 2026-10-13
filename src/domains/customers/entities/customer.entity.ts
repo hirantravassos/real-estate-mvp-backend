@@ -16,6 +16,7 @@ import { Visit } from "../../visits/entities/visit.entity";
 import { ColumnCurrency } from "../../../shared/decorators/columns/column-currency.decorator";
 import { ColumnBoolean } from "../../../shared/decorators/columns/column-boolean.decorator";
 import { CustomerAvatar } from "../dtos/customer-avatar.dto";
+import { CustomerRole, DEFAULT_CUSTOMER_ROLES } from "../enums/customer.enum";
 
 @Entity("customers")
 @Unique(["userId", "phone"])
@@ -60,4 +61,12 @@ export class Customer extends BaseEntity {
 
   @Column({ type: "json", nullable: true })
   avatar: CustomerAvatar | null;
+
+  /** Buyer, seller, partner broker; a contact may hold more than one. */
+  @Column({
+    type: "set",
+    enum: CustomerRole,
+    default: DEFAULT_CUSTOMER_ROLES,
+  })
+  roles: CustomerRole[];
 }
