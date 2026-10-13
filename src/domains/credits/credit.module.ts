@@ -4,6 +4,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { OpenaiModule } from "../../infrastructure/openai/openai.module";
 import { PaymentsModule } from "../../infrastructure/payments/payments.module";
 import { RealtimeModule } from "../../infrastructure/realtime/realtime.module";
+import { NotificationModule } from "../notifications/notification.module";
 import { UserModule } from "../users/user.module";
 import { CreditController } from "./controllers/credit.controller";
 import { CreditPurchase } from "./entities/credit-purchase.entity";
@@ -21,6 +22,7 @@ import { CreditWalletService } from "./services/credit-wallet.service";
     PaymentsModule,
     RealtimeModule,
     UserModule,
+    NotificationModule,
   ],
   controllers: [CreditController],
   providers: [CreditPricingService, CreditWalletService, CreditPurchaseService],

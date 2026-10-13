@@ -26,6 +26,7 @@ import { Conversation } from "../../inbox/entities/conversation.entity";
 import { Message } from "../../inbox/entities/message.entity";
 import { WhatsappConnection } from "../../inbox/entities/whatsapp-connection.entity";
 import { WhatsappConnectionService } from "../../inbox/services/whatsapp-connection.service";
+import { BrokerMailService } from "../../notifications/services/broker-mail.service";
 import { Kanban } from "../../kanbans/entities/kanban.entity";
 import { PropertyContact } from "../../properties/entities/property-contact.entity";
 import { PropertyMedia } from "../../properties/entities/property-media.entity";
@@ -44,6 +45,10 @@ import {
   deletedGoogleIdOf,
 } from "../helpers/deleted-account.helper";
 import { ACCOUNT_DELETION_CONFIRMATION } from "../dtos/account-deletion.dto";
+import {
+  AccountDeletionReason,
+  accountDeletedMail,
+} from "../mails/account-deletion.mails";
 
 /**
  * Everything the broker registered about other people. It is erased for
@@ -93,14 +98,22 @@ export class AccountDeletionService {
     private readonly mercadoPagoService: MercadoPagoService,
     private readonly subscriptionService: SubscriptionService,
     private readonly whatsappConnectionService: WhatsappConnectionService,
+    private readonly brokerMailService: BrokerMailService,
   ) {}
 
-  async deleteAccount(user: User, confirmation: string): Promise<void> {
+  async deleteAccount(
+    user: User,
+    confirmation: string,
+    reason = AccountDeletionReason.REQUESTED,
+  ): Promise<void> {
     if (confirmation !== ACCOUNT_DELETION_CONFIRMATION) {
       throw new BadRequestException(
         `Digite ${ACCOUNT_DELETION_CONFIRMATION} para confirmar a exclusão da conta`,
       );
     }
+
+    // The address is erased below, the confirmation goes to the one kept here.
+    const recipient = { id: user.id, email: user.email, name: user.name };
 
     // A card left running would keep charging a person we can no longer reach.
     await this.stopCardCharges(user.id);
@@ -118,6 +131,9 @@ export class AccountDeletionService {
     announceSessionsEnded(user.id);
     await this.deleteFiles(user.id);
     this.logger.log(`Account ${user.id} deleted and anonymized`);
+    this.brokerMailService.notify(recipient, (context) =>
+      accountDeletedMail(context, reason),
+    );
   }
 
   private async stopCardCharges(userId: string) {

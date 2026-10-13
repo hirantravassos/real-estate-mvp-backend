@@ -1,5 +1,11 @@
 import { OAuth2Client, TokenPayload } from "google-auth-library";
-import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
+import {
+  Inject,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from "@nestjs/common";
+import type { ConfigType } from "@nestjs/config";
 import { User } from "../../users/entities/user.entity";
 import { ConfigService } from "@nestjs/config";
 import { UserRepository } from "../../users/repositories/user.repository";
@@ -16,6 +22,9 @@ import { AccessLogService } from "../../access-logs/services/access-log.service"
 import { AccessLogEvent } from "../../access-logs/entities/access-log.entity";
 import { RequestEvidence } from "../../../shared/utils/request-evidence.util";
 import { announceSessionsEnded } from "../../../shared/utils/session-events.util";
+import { subscriptionsConfig } from "../../../config/subscriptions.config";
+import { BrokerMailService } from "../../notifications/services/broker-mail.service";
+import { welcomeMail } from "../mails/auth.mails";
 
 @Injectable()
 export class AuthService {
@@ -36,6 +45,11 @@ export class AuthService {
     @InjectRepository(Subscription)
     private readonly subscriptionRepository: Repository<Subscription>,
     private readonly accessLogService: AccessLogService,
+    @Inject(subscriptionsConfig.KEY)
+    private readonly subscriptionsConfiguration: ConfigType<
+      typeof subscriptionsConfig
+    >,
+    private readonly brokerMailService: BrokerMailService,
   ) {
     const clientId = this.configService
       .get<string>("auth.googleClientId")
@@ -85,7 +99,14 @@ export class AuthService {
     if (!user) {
       user = await this.userRepository.save(payloadUser);
       await this.onboardNewUser(user);
-      await this.closeTrialOfReturningAccount(user);
+      const returning = await this.closeTrialOfReturningAccount(user);
+      this.brokerMailService.notify(user, (context) =>
+        welcomeMail(context, {
+          trialDays: this.subscriptionsConfiguration.trialDays,
+          trialCredits: this.subscriptionsConfiguration.trialCredits,
+          returning,
+        }),
+      );
     } else if (!user.googleId) {
       // Bind the Google subject on the first login of a pre existing account.
       user.googleId = payloadUser.googleId;
@@ -231,12 +252,12 @@ export class AuthService {
    * trial and trial credits. The new account starts with the trial over, so
    * deleting and signing up again is not a way to renew them.
    */
-  private async closeTrialOfReturningAccount(user: User): Promise<void> {
-    if (!user.googleId) return;
+  private async closeTrialOfReturningAccount(user: User): Promise<boolean> {
+    if (!user.googleId) return false;
     const returning = await this.userRepository.existsBy({
       googleId: deletedGoogleIdOf(user.googleId),
     });
-    if (!returning) return;
+    if (!returning) return false;
 
     await this.subscriptionRepository.save(
       this.subscriptionRepository.create({
@@ -244,6 +265,7 @@ export class AuthService {
         trialEndsAt: new Date(),
       }),
     );
+    return true;
   }
 
   private async onboardNewUser(user: User): Promise<void> {

@@ -12,6 +12,7 @@ import { JwtStrategy } from "./strategies/jwt.strategy";
 import { Kanban } from "../kanbans/entities/kanban.entity";
 import { Subscription } from "../subscriptions/entities/subscription.entity";
 import { AccessLogModule } from "../access-logs/access-log.module";
+import { NotificationModule } from "../notifications/notification.module";
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { AccessLogModule } from "../access-logs/access-log.module";
     TypeOrmModule.forFeature([User, Kanban, Subscription]),
     forwardRef(() => UserModule),
     AccessLogModule,
+    NotificationModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, GoogleStrategy, JwtStrategy],

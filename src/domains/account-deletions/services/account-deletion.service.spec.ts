@@ -3,6 +3,7 @@ import { DataSource, EntityManager } from "typeorm";
 import { StorageService } from "../../../infrastructure/storage/services/storage.service";
 import { MercadoPagoService } from "../../../infrastructure/payments/services/mercado-pago.service";
 import { WhatsappConnectionService } from "../../inbox/services/whatsapp-connection.service";
+import { BrokerMailService } from "../../notifications/services/broker-mail.service";
 import { Subscription } from "../../subscriptions/entities/subscription.entity";
 import { SubscriptionService } from "../../subscriptions/services/subscription.service";
 import { User } from "../../users/entities/user.entity";
@@ -80,12 +81,16 @@ const buildService = (
     disconnect: jest.fn().mockResolvedValue(undefined),
   } as unknown as WhatsappConnectionService;
 
+  const notify = jest.fn();
+  const brokerMailService = { notify } as unknown as BrokerMailService;
+
   const service = new AccountDeletionService(
     dataSource,
     storageService,
     mercadoPagoService,
     subscriptionService,
     whatsappConnectionService,
+    brokerMailService,
   );
   return {
     service,
@@ -95,6 +100,7 @@ const buildService = (
     deletePrefix,
     cancelCardSubscription,
     subscriptionRepository,
+    notify,
   };
 };
 
@@ -171,6 +177,25 @@ describe("AccountDeletionService", () => {
       service.deleteAccount(owner, "EXCLUIR"),
     ).rejects.toBeInstanceOf(BadGatewayException);
     expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it("confirms the deletion to the address the account had before", async () => {
+    const { service, notify } = buildService();
+    await service.deleteAccount(owner, "EXCLUIR");
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify).toHaveBeenCalledWith(
+      { id: OWNER_ID, email: "maria@example.com", name: "Maria Souza" },
+      expect.any(Function),
+    );
+  });
+
+  it("mails nothing when the deletion is refused", async () => {
+    const { service, notify } = buildService({
+      cardActive: true,
+      cardFails: true,
+    });
+    await expect(service.deleteAccount(owner, "EXCLUIR")).rejects.toThrow();
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it("keeps the subscription and payment rows, only scrubbed", async () => {

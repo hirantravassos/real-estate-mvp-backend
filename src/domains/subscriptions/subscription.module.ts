@@ -4,6 +4,7 @@ import { APP_INTERCEPTOR } from "@nestjs/core";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { PaymentsModule } from "../../infrastructure/payments/payments.module";
 import { CreditModule } from "../credits/credit.module";
+import { NotificationModule } from "../notifications/notification.module";
 import { MercadoPagoWebhookController } from "./controllers/mercado-pago-webhook.controller";
 import { SubscriptionController } from "./controllers/subscription.controller";
 import { SubscriptionPayment } from "./entities/subscription-payment.entity";
@@ -11,6 +12,7 @@ import { Subscription } from "./entities/subscription.entity";
 import { UserThrottlerGuard } from "./guards/user-throttler.guard";
 import { SubscriptionAccessInterceptor } from "./interceptors/subscription-access.interceptor";
 import { SubscriptionBillingService } from "./services/subscription-billing.service";
+import { SubscriptionReminderSchedulerService } from "./services/subscription-reminder-scheduler.service";
 import { SubscriptionService } from "./services/subscription.service";
 
 @Module({
@@ -19,11 +21,13 @@ import { SubscriptionService } from "./services/subscription.service";
     TypeOrmModule.forFeature([Subscription, SubscriptionPayment]),
     PaymentsModule,
     CreditModule,
+    NotificationModule,
   ],
   controllers: [SubscriptionController, MercadoPagoWebhookController],
   providers: [
     SubscriptionService,
     SubscriptionBillingService,
+    SubscriptionReminderSchedulerService,
     UserThrottlerGuard,
     { provide: APP_INTERCEPTOR, useClass: SubscriptionAccessInterceptor },
   ],

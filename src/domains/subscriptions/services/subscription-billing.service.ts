@@ -18,6 +18,7 @@ import {
 import { CreditTransactionKind } from "../../credits/entities/credit-transaction.entity";
 import { CreditPurchaseService } from "../../credits/services/credit-purchase.service";
 import { CreditWalletService } from "../../credits/services/credit-wallet.service";
+import { BrokerMailService } from "../../notifications/services/broker-mail.service";
 import { User } from "../../users/entities/user.entity";
 import { SubscriptionPlan } from "../constants/subscription-plans.constant";
 import { SubscriptionCardDto } from "../dtos/subscription.dto";
@@ -34,6 +35,16 @@ import {
   hasAccess,
   nextPeriodStart,
 } from "../helpers/subscription-period.helper";
+import {
+  cardUpdatedMail,
+  PaymentReceivedMailInput,
+  paymentFailedMail,
+  paymentReceivedMail,
+  planChangedMail,
+  subscriptionCanceledMail,
+  subscriptionConfirmedMail,
+  subscriptionThanksMail,
+} from "../mails/subscription.mails";
 import { SubscriptionMapper } from "../mappers/subscription.mapper";
 import { SubscriptionService } from "./subscription.service";
 
@@ -57,6 +68,12 @@ const FAILED_PAYMENT_STATUSES = new Set([
 
 const formatDate = (date: Date) => dayjs(date).format("DD/MM/YYYY");
 
+/** Before these, paying opens a new subscription instead of renewing one. */
+const NEW_SUBSCRIPTION_STATUSES = new Set([
+  SubscriptionAccessStatus.TRIALING,
+  SubscriptionAccessStatus.EXPIRED,
+]);
+
 @Injectable()
 export class SubscriptionBillingService {
   private readonly logger = new Logger(SubscriptionBillingService.name);
@@ -73,6 +90,7 @@ export class SubscriptionBillingService {
     private readonly walletService: CreditWalletService,
     private readonly creditPurchaseService: CreditPurchaseService,
     private readonly dataSource: DataSource,
+    private readonly brokerMailService: BrokerMailService,
   ) {}
 
   publicPlans() {
@@ -332,6 +350,22 @@ export class SubscriptionBillingService {
         );
     }
 
+    if (previousPreapprovalId) {
+      this.brokerMailService.notify(user, (context) =>
+        cardUpdatedMail(context, { plan, nextChargeAt: startDate }),
+      );
+    } else {
+      this.brokerMailService.notify(user, (context) => [
+        subscriptionConfirmedMail(context, {
+          plan,
+          method: SubscriptionPaymentMethod.CARD,
+          amountInBrl: plan.priceInBrl,
+          firstChargeAt: startDate,
+        }),
+        subscriptionThanksMail(context, plan),
+      ]);
+    }
+
     this.subscriptionService.invalidate(user.id);
     return this.summary(user);
   }
@@ -340,11 +374,9 @@ export class SubscriptionBillingService {
   async changePlan(user: User, planKey: SubscriptionPlanKey) {
     const plan = this.subscriptionService.findPlan(planKey);
     const subscription = await this.subscriptionService.findOrCreate(user.id);
+    const cardActive = this.subscriptionService.isCardActive(subscription);
 
-    if (
-      this.subscriptionService.isCardActive(subscription) &&
-      subscription.providerPreapprovalId
-    ) {
+    if (cardActive && subscription.providerPreapprovalId) {
       await this.mercadoPagoService.updateCardSubscriptionAmount(
         subscription.providerPreapprovalId,
         plan.priceInBrl,
@@ -358,6 +390,22 @@ export class SubscriptionBillingService {
       await this.subscriptionRepository.update(subscription.id, {
         planKey: plan.key,
       });
+    }
+
+    // Only a running subscription has a next month to change, picking a
+    // plan during the trial is not worth a mail.
+    if (
+      subscription.planKey !== plan.key &&
+      (cardActive || subscription.paidThrough)
+    ) {
+      const effectiveFrom = cardActive
+        ? (subscription.paidThrough ??
+          this.subscriptionService.timelineOf(subscription)
+            .firstCardChargeDueAt)
+        : subscription.paidThrough;
+      this.brokerMailService.notify(user, (context) =>
+        planChangedMail(context, { plan, effectiveFrom }),
+      );
     }
 
     this.subscriptionService.invalidate(user.id);
@@ -385,6 +433,14 @@ export class SubscriptionBillingService {
         ? "cancelled"
         : subscription.providerPreapprovalStatus,
     });
+
+    const plan = await this.subscriptionService.effectivePlan(subscription);
+    const accessUntil =
+      subscription.paidThrough ??
+      (cardActive ? subscription.trialEndsAt : null);
+    this.brokerMailService.notify(user, (context) =>
+      subscriptionCanceledMail(context, { planName: plan.name, accessUntil }),
+    );
 
     this.subscriptionService.invalidate(user.id);
     return this.summary(user);
@@ -424,17 +480,21 @@ export class SubscriptionBillingService {
       (preapproval.status === "cancelled" || preapproval.status === "paused") &&
       !subscription.canceledAt &&
       subscription.providerPreapprovalStatus !== preapproval.status;
+    const stoppedReason =
+      "A cobrança no cartão foi interrompida pelo Mercado Pago. Cadastre outro cartão ou pague com Pix.";
 
     await this.subscriptionRepository.update(subscription.id, {
       providerPreapprovalStatus: preapproval.status,
       ...(stoppedByProvider
         ? {
             lastPaymentFailedAt: new Date(),
-            lastPaymentFailureReason:
-              "A cobrança no cartão foi interrompida pelo Mercado Pago. Cadastre outro cartão ou pague com Pix.",
+            lastPaymentFailureReason: stoppedReason,
           }
         : {}),
     });
+    if (stoppedByProvider) {
+      this.notifyFirstFailure(subscription, stoppedReason);
+    }
     this.subscriptionService.invalidate(subscription.userId);
   }
 
@@ -493,7 +553,20 @@ export class SubscriptionBillingService {
       lastPaymentFailedAt: new Date(),
       lastPaymentFailureReason: reason,
     });
+    this.notifyFirstFailure(subscription, reason);
     this.subscriptionService.invalidate(subscription.userId);
+  }
+
+  /**
+   * Mercado Pago retries a refused card for days and resends its webhooks,
+   * the broker hears about it once: the failure mark is cleared on payment.
+   */
+  private notifyFirstFailure(subscription: Subscription, reason: string) {
+    if (subscription.lastPaymentFailedAt) return;
+    const graceEndsAt = this.subscriptionService.graceEndOf(subscription);
+    this.brokerMailService.notify(subscription.userId, (context) =>
+      paymentFailedMail(context, { reason, graceEndsAt }),
+    );
   }
 
   /** One paid card month: extends the access and adds the plan credits, once. */
@@ -506,6 +579,7 @@ export class SubscriptionBillingService {
     });
     if (!owner) return;
     await this.walletService.findOrCreate(owner.userId);
+    let receipt: PaymentReceivedMailInput | null = null;
 
     await this.dataSource.transaction(async (manager) => {
       const subscription = await manager.findOne(Subscription, {
@@ -538,7 +612,7 @@ export class SubscriptionBillingService {
         return;
       }
 
-      await this.grantPaidMonth(manager, subscription, {
+      receipt = await this.grantPaidMonth(manager, subscription, {
         plan,
         method: SubscriptionPaymentMethod.CARD,
         amountInBrl: payment.transaction_amount,
@@ -547,6 +621,14 @@ export class SubscriptionBillingService {
       });
     });
 
+    // Sent after the commit and only by the call that settled the charge, so
+    // a resent webhook never mails the receipt twice.
+    const settledReceipt = receipt as PaymentReceivedMailInput | null;
+    if (settledReceipt) {
+      this.brokerMailService.notify(owner.userId, (context) =>
+        paymentReceivedMail(context, settledReceipt),
+      );
+    }
     this.subscriptionService.invalidate(owner.userId);
   }
 
@@ -564,6 +646,8 @@ export class SubscriptionBillingService {
     if (!pending) return;
     await this.walletService.findOrCreate(pending.userId);
     let paid = false;
+    let receipt: PaymentReceivedMailInput | null = null;
+    let opensSubscription = false;
 
     await this.dataSource.transaction(async (manager) => {
       const subscriptionPayment = await manager.findOne(SubscriptionPayment, {
@@ -598,7 +682,10 @@ export class SubscriptionBillingService {
         });
         if (!subscription) return;
 
-        await this.grantPaidMonth(manager, subscription, {
+        opensSubscription = NEW_SUBSCRIPTION_STATUSES.has(
+          this.subscriptionService.statusOf(subscription),
+        );
+        receipt = await this.grantPaidMonth(manager, subscription, {
           plan: this.subscriptionService.findPlan(subscriptionPayment.planKey),
           method: SubscriptionPaymentMethod.PIX,
           amountInBrl: Number(subscriptionPayment.amountInBrl),
@@ -626,7 +713,33 @@ export class SubscriptionBillingService {
     });
 
     if (paid) await this.stopCardAfterPix(pending.subscriptionId);
+    const settledReceipt = receipt as PaymentReceivedMailInput | null;
+    if (settledReceipt)
+      this.notifyPixPaid(pending.userId, settledReceipt, opensSubscription);
     this.subscriptionService.invalidate(pending.userId);
+  }
+
+  /** A first Pix opens the subscription, the next ones renew it. */
+  private notifyPixPaid(
+    userId: string,
+    receipt: PaymentReceivedMailInput,
+    opensSubscription: boolean,
+  ) {
+    if (!opensSubscription) {
+      this.brokerMailService.notify(userId, (context) =>
+        paymentReceivedMail(context, receipt),
+      );
+      return;
+    }
+    this.brokerMailService.notify(userId, (context) => [
+      subscriptionConfirmedMail(context, {
+        plan: receipt.plan,
+        method: SubscriptionPaymentMethod.PIX,
+        amountInBrl: receipt.amountInBrl,
+        paidThrough: receipt.periodEnd,
+      }),
+      subscriptionThanksMail(context, receipt.plan),
+    ]);
   }
 
   /** The broker settled with Pix, the failing card must not charge again. */
@@ -667,7 +780,7 @@ export class SubscriptionBillingService {
       providerPaymentId: string | null;
       existing?: SubscriptionPayment;
     },
-  ) {
+  ): Promise<PaymentReceivedMailInput> {
     const now = new Date();
     const periodStart = nextPeriodStart(
       subscription,
@@ -712,6 +825,15 @@ export class SubscriptionBillingService {
         referenceId: payment.id,
       });
     }
+
+    return {
+      plan: charge.plan,
+      method: charge.method,
+      amountInBrl: charge.amountInBrl,
+      credits: charge.credits,
+      periodStart,
+      periodEnd,
+    };
   }
 
   /**
