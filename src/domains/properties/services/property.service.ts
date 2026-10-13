@@ -10,7 +10,7 @@ import {
   Repository,
 } from "typeorm";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
-import { ValidateBrazilianPhoneNumber } from "../../../shared/decorators/validation/brazilian-phone-number.decorator";
+import { ValidatePhoneNumber } from "../../../shared/decorators/validation/phone-number.decorator";
 import { ValidateLongText } from "../../../shared/decorators/validation/long-text.decorator";
 import {
   IsArray,
@@ -35,7 +35,7 @@ import {
 } from "../mappers/property.mapper";
 
 export class PropertyContactCreateDto {
-  @ValidateBrazilianPhoneNumber()
+  @ValidatePhoneNumber()
   phone: string;
 
   @IsOptional()

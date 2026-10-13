@@ -9,7 +9,7 @@ import {
   MaxLength,
   MinLength,
 } from "class-validator";
-import { ValidateBrazilianPhoneNumber } from "../../../shared/decorators/validation/brazilian-phone-number.decorator";
+import { ValidatePhoneNumber } from "../../../shared/decorators/validation/phone-number.decorator";
 import { SLUG_MAX_LENGTH, SLUG_PATTERN } from "../helpers/user-slug.helper";
 
 const MAXIMUM_TAGS = 20;
@@ -49,7 +49,7 @@ export class UserProfileUpdateDto {
 
   @IsOptional()
   @Transform(trimOrNull)
-  @ValidateBrazilianPhoneNumber({ isOptional: true })
+  @ValidatePhoneNumber({ isOptional: true })
   phone?: string | null;
 
   @IsOptional()

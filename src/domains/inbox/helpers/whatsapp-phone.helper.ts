@@ -2,9 +2,13 @@ const BRAZIL_COUNTRY_CODE = "55";
 
 export const onlyDigits = (value: string) => value.replace(/\D/g, "");
 
-/** "11 91234-5678" becomes "5511912345678", the number WhatsApp expects. */
+/**
+ * "11 91234-5678" becomes "5511912345678", the number WhatsApp expects.
+ * Foreign numbers already carry their code, "+351912345678" is "351912345678".
+ */
 export const toWhatsappNumber = (phone: string) => {
   const digits = onlyDigits(phone);
+  if (phone.trim().startsWith("+")) return digits;
   if (digits.length === 10 || digits.length === 11) {
     return `${BRAZIL_COUNTRY_CODE}${digits}`;
   }
