@@ -31,8 +31,11 @@ export const brokerMarkLines = (broker: {
 };
 
 const formatPhone = (value: string | null | undefined) => {
-  let digits = (value ?? "").replace(/\D/g, "");
+  const trimmed = (value ?? "").trim();
+  let digits = trimmed.replace(/\D/g, "");
   if (digits.length > 11 && digits.startsWith("55")) digits = digits.slice(2);
+  // Foreign numbers keep their country code, as "+351912345678".
+  else if (trimmed.startsWith("+") && digits.length >= 8) return `+${digits}`;
   if (digits.length === 11) {
     return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
   }

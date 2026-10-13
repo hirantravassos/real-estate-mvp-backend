@@ -17,6 +17,7 @@ import {
   MinLength,
 } from "class-validator";
 import { ValidateCurrency } from "../../../shared/decorators/validation/currency.decorator";
+import { normalizePhoneNumber } from "../../../shared/decorators/validation/phone-number.decorator";
 import {
   DealChecklistStatus,
   DealParty,
@@ -209,7 +210,7 @@ export class DealSignerCreateDto {
   email?: string | null;
 
   @IsOptional()
-  @Transform(onlyDigits)
+  @Transform(({ value }: { value: unknown }) => normalizePhoneNumber(value))
   @IsString()
   @MaxLength(20)
   phone?: string | null;
@@ -228,7 +229,7 @@ export class DealPartnerCreateDto {
   name: string;
 
   @IsOptional()
-  @Transform(onlyDigits)
+  @Transform(({ value }: { value: unknown }) => normalizePhoneNumber(value))
   @IsString()
   @MaxLength(20)
   phone?: string | null;
@@ -267,7 +268,7 @@ export class DealPartnerUpdateDto {
   name?: string;
 
   @IsOptional()
-  @Transform(onlyDigits)
+  @Transform(({ value }: { value: unknown }) => normalizePhoneNumber(value))
   @IsString()
   @MaxLength(20)
   phone?: string | null;

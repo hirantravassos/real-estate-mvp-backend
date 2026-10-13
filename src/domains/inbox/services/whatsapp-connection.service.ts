@@ -16,6 +16,10 @@ import {
 } from "../../../infrastructure/evolution/types/evolution.type";
 import { RealtimeGateway } from "../../../infrastructure/realtime/realtime.gateway";
 import { User } from "../../users/entities/user.entity";
+import {
+  normalizePhoneNumber,
+  PHONE_NUMBER_PATTERN,
+} from "../../../shared/decorators/validation/phone-number.decorator";
 import { WhatsappConnection } from "../entities/whatsapp-connection.entity";
 import { WhatsappConnectionStatus } from "../enums/inbox.enum";
 import {
@@ -266,12 +270,18 @@ export class WhatsappConnectionService {
     connection.qrCodeUpdatedAt = new Date();
   }
 
-  /** "(11) 9 1234-5678" becomes "5511912345678", the number WhatsApp pairs with. */
+  /**
+   * "(11) 9 1234-5678" becomes "5511912345678", the number WhatsApp pairs
+   * with, "+351 912 345 678" becomes "351912345678".
+   */
   private pairingNumberOf(phone: string) {
-    const customerPhone = toCustomerPhone(phone);
-    if (!customerPhone) {
+    const normalizedPhone = normalizePhoneNumber(phone);
+    const customerPhone = normalizedPhone.startsWith("+")
+      ? normalizedPhone
+      : toCustomerPhone(normalizedPhone);
+    if (!customerPhone || !PHONE_NUMBER_PATTERN.test(customerPhone)) {
       throw new BadRequestException(
-        "Informe o número do seu WhatsApp com DDD, como (11) 9 1234-5678.",
+        "Informe o número do seu WhatsApp com DDD, como (11) 9 1234-5678, ou com o código do país.",
       );
     }
     return toWhatsappNumber(customerPhone);
