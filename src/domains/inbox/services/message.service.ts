@@ -518,7 +518,15 @@ export class MessageService {
       userId: connection.userId,
       externalId,
     });
-    if (!message || message.direction !== MessageDirection.OUTBOUND) return;
+    if (!message) return;
+
+    // The broker read the chat on the phone, so it is read here too.
+    if (message.direction === MessageDirection.INBOUND) {
+      if (status === MessageStatus.READ || status === MessageStatus.PLAYED) {
+        await this.conversationService.markReadFromPhone(message);
+      }
+      return;
+    }
 
     const currentRank = OUTBOUND_STATUS_RANK[message.status] ?? 0;
     const nextRank = OUTBOUND_STATUS_RANK[status] ?? 0;

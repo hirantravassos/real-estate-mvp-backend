@@ -109,6 +109,7 @@ interface InstanceState {
   lookups: number[];
   connectAttempts: number[];
   lookupLane: Lane;
+  receiptLane: Lane;
   mediaLane: Lane;
   readLane: Lane;
 }
@@ -182,6 +183,18 @@ export class EvolutionThrottleService {
     }
     state.lookups.push(now);
     return state.lookupLane.run(task);
+  }
+
+  /**
+   * Read receipts, which any WhatsApp app sends all the time. They get their
+   * own lane, so a queue of profile pictures never holds them back.
+   */
+  async scheduleReceipt<T>(instanceName: string, task: () => Promise<T>) {
+    const state = this.stateOf(instanceName);
+    if (state.suspended) {
+      throw new ConflictException("O WhatsApp está desconectado.");
+    }
+    return state.receiptLane.run(task);
   }
 
   /** Media downloads, a few at a time so a history import does not burst. */
@@ -458,6 +471,7 @@ export class EvolutionThrottleService {
           this.safety.lookupDelayMinimumMilliseconds,
           this.safety.lookupDelayMaximumMilliseconds,
         ),
+        receiptLane: new Lane(1, 300, 800),
         mediaLane: new Lane(2, 300, 800),
         readLane: new Lane(3, 0, 0),
       };

@@ -392,6 +392,42 @@ export class ConversationService {
     return InboxMapper.toConversationDto(conversation);
   }
 
+  /**
+   * WhatsApp tells the linked devices which messages the broker read on the
+   * phone. Reading a message reads everything before it in the chat. The
+   * counter goes down in the database, a new message may arrive meanwhile.
+   */
+  async markReadFromPhone(message: Message) {
+    const result = await this.messageRepository
+      .createQueryBuilder()
+      .update(Message)
+      .set({ status: MessageStatus.READ })
+      .where("conversationId = :conversationId", {
+        conversationId: message.conversationId,
+      })
+      .andWhere("direction = :direction", {
+        direction: MessageDirection.INBOUND,
+      })
+      .andWhere("status = :status", { status: MessageStatus.RECEIVED })
+      .andWhere("sentAt <= :sentAt", { sentAt: message.sentAt })
+      .execute();
+    const readCount = result.affected ?? 0;
+    if (!readCount) return;
+
+    await this.conversationRepository
+      .createQueryBuilder()
+      .update(Conversation)
+      .set({ unreadCount: () => `GREATEST(unreadCount - ${readCount}, 0)` })
+      .where("id = :id", { id: message.conversationId })
+      .execute();
+
+    const conversation = await this.conversationRepository.findOne({
+      where: { id: message.conversationId },
+      relations: { customer: true },
+    });
+    if (conversation) this.emitUpdated(conversation);
+  }
+
   async remove(user: User, id: string) {
     const conversation = await this.findEntity(user.id, id);
     await this.conversationRepository.update(conversation.id, {
