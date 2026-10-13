@@ -8,6 +8,7 @@ import {
 const ALGORITHM = "aes-256-gcm";
 const VERSION = "v1";
 const INITIALIZATION_VECTOR_BYTES = 12;
+const AUTHENTICATION_TAG_BYTES = 16;
 
 const keyFrom = (secret: string) =>
   createHash("sha256").update(secret).digest();
@@ -41,13 +42,19 @@ export const decryptSecret = (secret: string, sealed: string | null) => {
   if (version !== VERSION || !initializationVector || !authenticationTag) {
     return null;
   }
+  const authenticationTagBuffer = Buffer.from(authenticationTag, "base64");
+  // Reject a truncated tag before it reaches GCM, so integrity is not weakened.
+  if (authenticationTagBuffer.length !== AUTHENTICATION_TAG_BYTES) {
+    return null;
+  }
   try {
     const decipher = createDecipheriv(
       ALGORITHM,
       keyFrom(secret),
       Buffer.from(initializationVector, "base64"),
+      { authTagLength: AUTHENTICATION_TAG_BYTES },
     );
-    decipher.setAuthTag(Buffer.from(authenticationTag, "base64"));
+    decipher.setAuthTag(authenticationTagBuffer);
     return Buffer.concat([
       decipher.update(Buffer.from(encrypted ?? "", "base64")),
       decipher.final(),

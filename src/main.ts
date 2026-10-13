@@ -3,9 +3,25 @@ import { NestExpressApplication } from "@nestjs/platform-express";
 import { ValidationPipe } from "@nestjs/common";
 import { AppModule } from "./app.module.js";
 import { GlobalExceptionFilter } from "./shared/filters/global-exception.filter.js";
+import type { Request, Response, NextFunction } from "express";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Behind the hosting proxy, so request.ip and the throttler read the real
+  // client address from the platform hop instead of a spoofable header.
+  app.set("trust proxy", 1);
+  app.disable("x-powered-by");
+
+  app.use((_request: Request, response: Response, next: NextFunction) => {
+    response.setHeader("X-Content-Type-Options", "nosniff");
+    response.setHeader(
+      "Strict-Transport-Security",
+      "max-age=31536000; includeSubDomains",
+    );
+    response.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    next();
+  });
 
   // WhatsApp webhooks carry message thumbnails, bigger than the 100 KB default.
   app.useBodyParser("json", { limit: "10mb" });

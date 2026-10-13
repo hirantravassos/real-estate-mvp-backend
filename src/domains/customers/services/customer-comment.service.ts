@@ -66,20 +66,26 @@ export class CustomerCommentService {
         );
         throw new NotFoundException("Customer not found");
       });
+
+    // Blocks the upsert by client id takeover: an existing comment id must
+    // already belong to this broker's customer before save may touch it.
+    if (id) {
+      await this.findOne(user, customerId, id);
+    }
+
     const entity = CustomerCommentMapper.toEntity(dto, id);
     entity.customer = customer;
     return this.customerCommentRepository.save(entity);
   }
 
   async remove(user: User, customerId: string, id: string) {
+    // A nested relation filter here is silently reduced by TypeORM to the join
+    // key, dropping the user scope, so resolve ownership first and delete by id.
+    const comment = await this.findOne(user, customerId, id);
+
     return this.customerCommentRepository.update(
-      {
-        id,
-        customer: { user: { id: user.id }, id: customerId },
-      },
-      {
-        active: false,
-      },
+      { id: comment.id },
+      { active: false },
     );
   }
 }

@@ -368,6 +368,17 @@ export class PropertyService {
   }
 
   async save(user: User, dto: PropertyCreateDto, id?: string) {
+    if (id) {
+      const owned = await this.propertyRepository.findOne({
+        where: { id, user: { id: user.id } },
+        select: { id: true },
+      });
+
+      if (!owned) {
+        throw new NotFoundException("Property not found");
+      }
+    }
+
     const entity = PropertyMapper.toEntity(dto, id);
     entity.user = user;
 

@@ -1,10 +1,9 @@
 import { registerAs } from "@nestjs/config";
 
 export const authConfig = registerAs("auth", () => ({
-  jwtSecret: process.env.JWT_SECRET || "change-me-to-a-secure-secret",
+  jwtSecret: process.env.JWT_SECRET,
   jwtExpirationTime: parseInt(process.env.JWT_EXPIRATION_TIME || "3600", 10),
-  jwtRefreshSecret:
-    process.env.JWT_REFRESH_SECRET || "change-me-to-a-secure-refresh-secret",
+  jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
   jwtRefreshExpirationTime: parseInt(
     process.env.JWT_REFRESH_EXPIRATION_TIME || "604800",
     10,

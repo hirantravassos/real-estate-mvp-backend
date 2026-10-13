@@ -10,6 +10,7 @@ import { IsNull, Not, Repository } from "typeorm";
 import { CreateVisitDto } from "../dtos/visit.dto";
 import { User } from "../../users/entities/user.entity";
 import { Customer } from "../../customers/entities/customer.entity";
+import { Property } from "../../properties/entities/property.entity";
 import { VisitMapper, VisitResponseDto } from "../mappers/visit.mapper";
 
 @Injectable()
@@ -21,6 +22,8 @@ export class VisitService {
     private readonly visitRepository: Repository<Visit>,
     @InjectRepository(Customer)
     private readonly customerRepository: Repository<Customer>,
+    @InjectRepository(Property)
+    private readonly propertyRepository: Repository<Property>,
   ) {}
 
   async save(
@@ -28,12 +31,34 @@ export class VisitService {
     dto: CreateVisitDto,
     visitId?: string,
   ): Promise<Visit> {
+    if (visitId) {
+      const owned = await this.visitRepository.findOne({
+        where: { id: visitId, user: { id: user.id } },
+        select: { id: true },
+      });
+
+      if (!owned) {
+        throw new NotFoundException("Visit not found for this user");
+      }
+    }
+
     const customer = await this.customerRepository.findOne({
       where: { id: dto.customerId, user: { id: user.id } },
     });
 
     if (!customer) {
       throw new NotFoundException("Cliente não encontrado.");
+    }
+
+    if (dto.propertyId) {
+      const ownedProperty = await this.propertyRepository.findOne({
+        where: { id: dto.propertyId, user: { id: user.id } },
+        select: { id: true },
+      });
+
+      if (!ownedProperty) {
+        throw new NotFoundException("Imóvel não encontrado.");
+      }
     }
 
     const startsAt = new Date(dto.startsAt);

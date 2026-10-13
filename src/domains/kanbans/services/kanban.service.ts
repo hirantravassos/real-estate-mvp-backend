@@ -51,6 +51,17 @@ export class KanbanService {
   }
 
   async save(user: User, dto: KanbanCreateDto, id?: string) {
+    if (id) {
+      const owned = await this.kanbanRepository.findOne({
+        where: { id, user: { id: user.id } },
+        select: { id: true },
+      });
+
+      if (!owned) {
+        throw new NotFoundException("Kanban not found");
+      }
+    }
+
     const entity = KanbanMapper.toEntity(dto, id);
 
     entity.user = user;

@@ -49,6 +49,14 @@ export class AuthService {
       throw new Error("JWT_REFRESH_SECRET is not defined in the configuration");
     }
 
+    const accessSecret = this.configService.get<string>("jwt.secret");
+
+    if (refreshSecret === accessSecret) {
+      throw new Error(
+        "JWT_REFRESH_SECRET must differ from JWT_SECRET so the two token kinds are not interchangeable",
+      );
+    }
+
     this.googleClientId = clientId;
     this.googleClient = new OAuth2Client(clientId);
     this.refreshSecret = refreshSecret;
@@ -65,6 +73,14 @@ export class AuthService {
     if (!user) {
       user = await this.userRepository.save(payloadUser);
       await this.onboardNewUser(user);
+    } else if (!user.googleId) {
+      // Bind the Google subject on the first login of a pre existing account.
+      user.googleId = payloadUser.googleId;
+      await this.userRepository.save(user);
+    } else if (user.googleId !== payloadUser.googleId) {
+      throw new UnauthorizedException(
+        "This email is linked to a different Google account",
+      );
     }
 
     return this.generateTokens(user);
@@ -88,6 +104,10 @@ export class AuthService {
         throw new Error("Google payload has no email");
       }
 
+      if (payload.email_verified !== true) {
+        throw new Error("Google email is not verified");
+      }
+
       return payload;
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
@@ -100,12 +120,17 @@ export class AuthService {
 
   async refreshAccessToken(refreshToken: string): Promise<AccessTokenDto> {
     try {
-      const payload = this.jwtService.verify<{ id: string; email: string }>(
-        refreshToken,
-        {
-          secret: this.refreshSecret,
-        },
-      );
+      const payload = this.jwtService.verify<{
+        id: string;
+        email: string;
+        typ?: string;
+      }>(refreshToken, {
+        secret: this.refreshSecret,
+      });
+
+      if (payload.typ !== "refresh") {
+        throw new UnauthorizedException("Not a refresh token");
+      }
 
       const user = await this.userRepository.findOneBy({ id: payload.id });
 
@@ -114,7 +139,7 @@ export class AuthService {
       }
 
       const accessToken = this.jwtService.sign(
-        { id: user.id, email: user.email },
+        { id: user.id, email: user.email, typ: "access" },
         { expiresIn: this.accessExpirationTime },
       );
 
@@ -130,14 +155,20 @@ export class AuthService {
       email: user.email,
     };
 
-    const accessToken = this.jwtService.sign(payload, {
-      expiresIn: this.accessExpirationTime,
-    });
+    const accessToken = this.jwtService.sign(
+      { ...payload, typ: "access" },
+      {
+        expiresIn: this.accessExpirationTime,
+      },
+    );
 
-    const refreshToken = this.jwtService.sign(payload, {
-      secret: this.refreshSecret,
-      expiresIn: this.refreshExpirationTime,
-    });
+    const refreshToken = this.jwtService.sign(
+      { ...payload, typ: "refresh" },
+      {
+        secret: this.refreshSecret,
+        expiresIn: this.refreshExpirationTime,
+      },
+    );
 
     return {
       accessToken,
