@@ -1,6 +1,7 @@
 import { ConflictException } from "@nestjs/common";
 import { Repository } from "typeorm";
 import { DocumentService } from "../../documents/services/document.service";
+import { BrokerMailService } from "../../notifications/services/broker-mail.service";
 import { Deal } from "../entities/deal.entity";
 import { DealSigner } from "../entities/deal-signer.entity";
 import {
@@ -39,6 +40,7 @@ const buildService = (affected = 1) => {
     {} as DocumentService,
     {} as DealService,
     {} as DealActivityService,
+    { notify: jest.fn() } as unknown as BrokerMailService,
   );
   return { service, update };
 };

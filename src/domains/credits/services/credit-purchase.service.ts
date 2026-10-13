@@ -10,6 +10,7 @@ import {
   MercadoPagoPayment,
   MercadoPagoService,
 } from "../../../infrastructure/payments/services/mercado-pago.service";
+import { BrokerMailService } from "../../notifications/services/broker-mail.service";
 import { User } from "../../users/entities/user.entity";
 import { findCreditPackage } from "../constants/credit-packages.constant";
 import {
@@ -17,6 +18,7 @@ import {
   CreditPurchaseStatus,
 } from "../entities/credit-purchase.entity";
 import { CreditTransactionKind } from "../entities/credit-transaction.entity";
+import { creditPurchasePaidMail } from "../mails/credit.mails";
 import { CreditMapper } from "../mappers/credit.mapper";
 import { CreditWalletService } from "./credit-wallet.service";
 
@@ -38,6 +40,7 @@ export class CreditPurchaseService {
     private readonly mercadoPagoService: MercadoPagoService,
     private readonly walletService: CreditWalletService,
     private readonly dataSource: DataSource,
+    private readonly brokerMailService: BrokerMailService,
   ) {}
 
   get paymentsEnabled() {
@@ -112,6 +115,7 @@ export class CreditPurchaseService {
   async settle(payment: MercadoPagoPayment) {
     const purchaseId = payment.external_reference;
     if (!purchaseId) return;
+    let paidPurchase: CreditPurchase | null = null;
 
     await this.dataSource.transaction(async (manager) => {
       const purchase = await manager.findOne(CreditPurchase, {
@@ -142,6 +146,7 @@ export class CreditPurchaseService {
           description: `Compra de ${purchase.credits} créditos via Pix`,
           referenceId: purchase.id,
         });
+        paidPurchase = purchase;
         return;
       }
 
@@ -159,6 +164,17 @@ export class CreditPurchaseService {
         await manager.save(purchase);
       }
     });
+
+    // Only the call that credited the wallet mails, after the commit.
+    const settled = paidPurchase as CreditPurchase | null;
+    if (settled) {
+      this.brokerMailService.notify(settled.userId, (context) =>
+        creditPurchasePaidMail(context, {
+          credits: settled.credits,
+          amountInBrl: Number(settled.amountInBrl),
+        }),
+      );
+    }
   }
 
   private findWithQrCode(where: { id: string; userId: string }) {

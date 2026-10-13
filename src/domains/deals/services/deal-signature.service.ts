@@ -24,6 +24,11 @@ import {
 import { DealGovbrCopyDto, DealSignDto } from "../dtos/deal.dto";
 import { RequestEvidence } from "../helpers/deal-upload.helper";
 import { DealMapper } from "../mappers/deal.mapper";
+import {
+  contractSignedMail,
+  govbrCopySubmittedMail,
+} from "../mails/deal.mails";
+import { BrokerMailService } from "../../notifications/services/broker-mail.service";
 import { DealActivityService } from "./deal-activity.service";
 import { DealService } from "./deal.service";
 
@@ -63,6 +68,7 @@ export class DealSignatureService {
     private readonly documentService: DocumentService,
     private readonly dealService: DealService,
     private readonly activityService: DealActivityService,
+    private readonly brokerMailService: BrokerMailService,
   ) {}
 
   async getSigningView(token: string) {
@@ -180,6 +186,9 @@ export class DealSignatureService {
       message: `${firstNameOf(signer.name)} enviou o contrato assinado pelo gov.br`,
     });
     this.activityService.notifyBroker(deal.userId, deal.id);
+    this.brokerMailService.notify(deal.userId, (context) =>
+      govbrCopySubmittedMail(context, deal.id),
+    );
 
     return this.getSigningView(token);
   }
@@ -263,6 +272,9 @@ export class DealSignatureService {
       actor: DealEventActor.SYSTEM,
       message: "Contrato assinado por todos! 🎉",
     });
+    this.brokerMailService.notify(deal.userId, (context) =>
+      contractSignedMail(context, deal.id),
+    );
 
     const current = await this.dealRepository.findOneBy({ id: deal.id });
     if (current?.stage === DealStage.CONTRACT) {

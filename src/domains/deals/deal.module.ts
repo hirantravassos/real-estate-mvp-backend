@@ -18,6 +18,7 @@ import { DealActivityService } from "./services/deal-activity.service";
 import { DealSignatureService } from "./services/deal-signature.service";
 import { DealPortalService } from "./services/deal-portal.service";
 import { DealPartnerService } from "./services/deal-partner.service";
+import { NotificationModule } from "../notifications/notification.module";
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { DealPartnerService } from "./services/deal-partner.service";
     DocumentModule,
     PropertyModule,
     RealtimeModule,
+    NotificationModule,
   ],
   controllers: [DealController, DealPortalController],
   providers: [

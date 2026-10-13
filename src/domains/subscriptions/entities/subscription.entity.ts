@@ -62,4 +62,16 @@ export class Subscription extends BaseEntity {
   /** Last time the card charges were read back from Mercado Pago. */
   @Column({ type: "datetime", nullable: true })
   lastSyncedAt: Date | null;
+
+  /** The trial ending reminder went out, a trial ends only once. */
+  @Column({ type: "datetime", nullable: true })
+  trialReminderSentAt: Date | null;
+
+  /** The paid month end the Pix renewal reminder was sent for. */
+  @Column({ type: "datetime", nullable: true })
+  renewalReminderSentFor: Date | null;
+
+  /** The access end the erasure warning was sent for. */
+  @Column({ type: "datetime", nullable: true })
+  erasureWarningSentFor: Date | null;
 }
