@@ -78,7 +78,7 @@ export const evolutionConfig = registerAs("evolution", () => ({
       "WHATSAPP_PAUSE_MS",
       2 * 60 * 1000,
     ),
-    /** Questions about other numbers (profile pictures, read receipts). */
+    /** Questions about other numbers, such as profile pictures. */
     lookupsPerHour: numberFromEnvironment("WHATSAPP_LOOKUPS_PER_HOUR", 120),
     lookupDelayMinimumMilliseconds: numberFromEnvironment(
       "WHATSAPP_LOOKUP_DELAY_MINIMUM_MS",

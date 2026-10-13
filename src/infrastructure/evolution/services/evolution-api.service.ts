@@ -244,7 +244,7 @@ export class EvolutionApiService {
   async markAsRead(instanceName: string, keys: EvolutionMessageKey[]) {
     if (!keys.length) return;
     await this.throttleService
-      .scheduleLookup(instanceName, () =>
+      .scheduleReceipt(instanceName, () =>
         this.request(`/chat/markMessageAsRead/${instanceName}`, {
           method: "POST",
           body: {
