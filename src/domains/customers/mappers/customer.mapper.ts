@@ -22,6 +22,9 @@ export class CustomerMapper {
     if (dto?.budget) {
       entity.budget = dto.budget;
     }
+    if (dto?.roles) {
+      entity.roles = [...new Set(dto.roles)];
+    }
     if (dto?.avatar !== undefined) {
       entity.avatar = dto.avatar ?? null;
     }
@@ -37,6 +40,7 @@ export class CustomerMapper {
       kanban: entity.kanban,
       budget: entity.budget,
       lost: entity.lost,
+      roles: entity.roles ?? [],
       avatar: entity.avatar ?? null,
       comments: this.toComments(entity.comments),
       visits: this.toVisit(entity.visits),
@@ -53,6 +57,7 @@ export class CustomerMapper {
         name: entity.name,
         phone: entity.phone,
         lost: entity.lost,
+        roles: entity.roles ?? [],
         budget: entity.budget,
         avatar: entity.avatar ?? null,
         kanban: this.toKanban(entity.kanban),

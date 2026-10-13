@@ -7,6 +7,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, EntityManager, Repository } from "typeorm";
 import { User } from "../../users/entities/user.entity";
 import { Customer } from "../../customers/entities/customer.entity";
+import { CustomerRole } from "../../customers/enums/customer.enum";
 import { DocumentOwnerType } from "../../documents/entities/document.entity";
 import { DocumentService } from "../../documents/services/document.service";
 import { Deal } from "../entities/deal.entity";
@@ -60,14 +61,23 @@ export class DealPartnerService {
     await this.assertShareFits(deal.id, dto.commissionShare ?? null);
 
     const customerId = dto.customerId ?? null;
+    let customer: Customer | null = null;
     if (customerId) {
-      const customer = await this.customerRepository.findOne({
+      customer = await this.customerRepository.findOne({
         where: { id: customerId, userId: user.id, active: true },
       });
       if (!customer) throw new NotFoundException("Contato não encontrado.");
     }
 
     await this.dataSource.transaction(async (manager) => {
+      if (customer && !customer.roles.includes(CustomerRole.PARTNER)) {
+        await manager.update(
+          Customer,
+          { id: customer.id, userId: user.id },
+          { roles: [...customer.roles, CustomerRole.PARTNER] },
+        );
+      }
+
       const partnerRepository = manager.getRepository(DealPartner);
       const partner = await partnerRepository.save(
         partnerRepository.create({
