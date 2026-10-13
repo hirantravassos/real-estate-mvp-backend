@@ -10,7 +10,7 @@ import { Customer } from "../entities/customer.entity";
 import { FindOptionsWhere, ILike, Repository } from "typeorm";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
 import { ValidateName } from "../../../shared/decorators/validation/name.decorator";
-import { ValidateBrazilianPhoneNumber } from "../../../shared/decorators/validation/brazilian-phone-number.decorator";
+import { ValidatePhoneNumber } from "../../../shared/decorators/validation/phone-number.decorator";
 import { ValidateLongText } from "../../../shared/decorators/validation/long-text.decorator";
 import { IsOptional, IsString, IsUUID, ValidateNested } from "class-validator";
 import { Type } from "class-transformer";
@@ -31,7 +31,7 @@ export class CustomerCreateDto {
   @ValidateName()
   name: string;
 
-  @ValidateBrazilianPhoneNumber()
+  @ValidatePhoneNumber()
   phone: string;
 
   @IsOptional()
