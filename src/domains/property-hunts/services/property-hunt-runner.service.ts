@@ -12,7 +12,7 @@ import { BrowserContext, Page } from "playwright-core";
 import { In, Repository } from "typeorm";
 import { portalsConfig } from "../../../config/portals.config";
 import { RealtimeGateway } from "../../../infrastructure/realtime/realtime.gateway";
-import { PORTALS } from "../constants/portals.constant";
+import { PORTAL_SEARCH_ENABLED, PORTALS } from "../constants/portals.constant";
 import { PropertyHunt, PortalProgress } from "../entities/property-hunt.entity";
 import { PropertyMatch } from "../entities/property-match.entity";
 import {
@@ -158,7 +158,8 @@ export class PropertyHuntRunnerService implements OnApplicationBootstrap {
 
       if (hunt.includeCatalog) await this.searchCatalog(state);
 
-      const portals = [...hunt.portals];
+      // Hunts saved before the portal search was turned off skip the portals.
+      const portals = PORTAL_SEARCH_ENABLED ? [...hunt.portals] : [];
       const workers = Array.from(
         { length: Math.min(PARALLEL_PORTALS, portals.length) },
         async () => {

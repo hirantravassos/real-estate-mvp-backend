@@ -15,7 +15,10 @@ import { Customer } from "../../customers/entities/customer.entity";
 import { CustomerCommentService } from "../../customers/services/customer-comment.service";
 import { ConversationService } from "../../inbox/services/conversation.service";
 import { User } from "../../users/entities/user.entity";
-import { PORTAL_KEYS } from "../constants/portals.constant";
+import {
+  PORTAL_KEYS,
+  PORTAL_SEARCH_ENABLED,
+} from "../constants/portals.constant";
 import {
   PropertyHuntCreateDto,
   PropertyHuntFilterDto,
@@ -60,7 +63,8 @@ export class PropertyHuntService {
       pricePerListing: this.huntAiService.pricePerListing,
       interpretPrice: this.pricingService.featurePrice("hunt_criteria"),
       conversationPrice: this.pricingService.featurePrice("hunt_conversation"),
-      portals: PORTAL_KEYS,
+      portalSearchEnabled: PORTAL_SEARCH_ENABLED,
+      portals: PORTAL_SEARCH_ENABLED ? PORTAL_KEYS : [],
     };
   }
 
@@ -77,10 +81,13 @@ export class PropertyHuntService {
   }
 
   async create(user: User, dto: PropertyHuntCreateDto) {
-    const portals = [...new Set(dto.portals)];
+    // While the portal search is off, a hunt only looks in the catalog.
+    const portals = PORTAL_SEARCH_ENABLED ? [...new Set(dto.portals)] : [];
     if (!portals.length && !dto.includeCatalog) {
       throw new BadRequestException(
-        "Escolha pelo menos um portal ou a sua carteira.",
+        PORTAL_SEARCH_ENABLED
+          ? "Escolha pelo menos um portal ou a sua carteira."
+          : "A busca nos portais chega em breve. Por enquanto, a caça procura na sua carteira.",
       );
     }
     if (portals.length) {

@@ -1,3 +1,4 @@
+import { SkipThrottle } from "@nestjs/throttler";
 import {
   Body,
   Controller,
@@ -32,6 +33,8 @@ const NOTIFICATION_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
  * read back from their API, so a forged call cannot add credits nor open
  * the app. With MERCADO_PAGO_WEBHOOK_SECRET set, the signature is checked too.
  */
+/** Provider servers post in bursts from few addresses, the token or the signature guards them. */
+@SkipThrottle()
 @Controller("webhooks/mercado-pago")
 export class MercadoPagoWebhookController {
   private readonly logger = new Logger(MercadoPagoWebhookController.name);

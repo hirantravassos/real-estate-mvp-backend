@@ -399,7 +399,7 @@ export class MessageService {
         .findMessages(connection.instanceName, chatJid, limit)
         .catch((error: unknown) => {
           this.logger.warn(
-            `History of ${chatJid} not read from Evolution: ${String(error)}`,
+            `History of conversation ${conversation.id} not read from Evolution: ${String(error)}`,
           );
           return [];
         });

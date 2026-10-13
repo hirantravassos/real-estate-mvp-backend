@@ -74,7 +74,8 @@ export class InfosimplesService {
       raw = JSON.parse(text) as InfosimplesRawResponse;
     } catch {
       this.logger.error(
-        `Infosimples ${path} answered ${response.status}: ${text.substring(0, 500)}`,
+        // The body may echo the CPF or CNPJ queried, only its size is logged.
+        `Infosimples ${path} answered ${response.status} with ${text.length} characters that are not JSON`,
       );
       throw new ServiceUnavailableException(
         "O serviço de certidões respondeu de um jeito inesperado.",

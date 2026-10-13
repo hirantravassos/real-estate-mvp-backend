@@ -11,6 +11,7 @@ import { GoogleStrategy } from "./strategies/google.strategy";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { Kanban } from "../kanbans/entities/kanban.entity";
 import { Subscription } from "../subscriptions/entities/subscription.entity";
+import { AccessLogModule } from "../access-logs/access-log.module";
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { Subscription } from "../subscriptions/entities/subscription.entity";
     PassportModule.register({ session: false }),
     TypeOrmModule.forFeature([User, Kanban, Subscription]),
     forwardRef(() => UserModule),
+    AccessLogModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, GoogleStrategy, JwtStrategy],

@@ -1,4 +1,4 @@
-import { Logger } from "@nestjs/common";
+import { Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import {
   OnGatewayConnection,
@@ -6,6 +6,11 @@ import {
   WebSocketServer,
 } from "@nestjs/websockets";
 import { Server, Socket } from "socket.io";
+import { UserRepository } from "../../domains/users/repositories/user.repository";
+import {
+  SESSIONS_ENDED_EVENT,
+  sessionEvents,
+} from "../../shared/utils/session-events.util";
 
 export type RealtimeEvent =
   | "connection.updated"
@@ -33,13 +38,32 @@ const userRoom = (userId: string) => `user:${userId}`;
     credentials: true,
   },
 })
-export class RealtimeGateway implements OnGatewayConnection {
+export class RealtimeGateway
+  implements OnGatewayConnection, OnModuleInit, OnModuleDestroy
+{
   private readonly logger = new Logger(RealtimeGateway.name);
 
   @WebSocketServer()
   private readonly server: Server;
 
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly userRepository: UserRepository,
+  ) {}
+
+  private readonly endSessions = (userId: string) => {
+    const room = userRoom(userId);
+    this.server?.to(room).emit("session.expired");
+    this.server?.in(room).disconnectSockets(true);
+  };
+
+  onModuleInit() {
+    sessionEvents.on(SESSIONS_ENDED_EVENT, this.endSessions);
+  }
+
+  onModuleDestroy() {
+    sessionEvents.off(SESSIONS_ENDED_EVENT, this.endSessions);
+  }
 
   async handleConnection(socket: Socket) {
     const authentication = socket.handshake.auth as { token?: unknown };
@@ -52,7 +76,23 @@ export class RealtimeGateway implements OnGatewayConnection {
     }
 
     try {
-      const payload = await this.jwtService.verifyAsync<{ id: string }>(token);
+      const payload = await this.jwtService.verifyAsync<{
+        id: string;
+        typ?: string;
+        ver?: number;
+      }>(token);
+      if (payload.typ && payload.typ !== "access") {
+        throw new Error("Not an access token");
+      }
+      // Same checks as the HTTP guard: a deleted account or a logged out
+      // session never joins the room.
+      const user = await this.userRepository.findOneBy({
+        id: payload.id,
+        active: true,
+      });
+      if (!user || (payload.ver ?? 0) !== user.tokenVersion) {
+        throw new Error("Session ended");
+      }
       await socket.join(userRoom(payload.id));
     } catch {
       this.logger.warn("Socket refused, invalid token");

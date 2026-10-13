@@ -11,11 +11,12 @@ import {
   UseInterceptors,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
+import { Throttle } from "@nestjs/throttler";
 import type { Request } from "express";
 import { DealPortalService } from "../services/deal-portal.service";
 import { DealSignatureService } from "../services/deal-signature.service";
 import { DealPartnerService } from "../services/deal-partner.service";
-import { DealSignDto } from "../dtos/deal.dto";
+import { DealGovbrCopyDto, DealSignDto } from "../dtos/deal.dto";
 import { CustomerAvatarDto } from "../../customers/dtos/customer-avatar.dto";
 import {
   dealContractUploadOptions,
@@ -24,9 +25,16 @@ import {
   requireFile,
 } from "../helpers/deal-upload.helper";
 
+/** Uploads and signatures per address and minute on these public links. */
+const PUBLIC_WRITES_PER_MINUTE = 10;
+const publicWriteLimit = {
+  default: { limit: PUBLIC_WRITES_PER_MINUTE, ttl: 60_000 },
+};
+
 /**
  * Public routes for the customer area, the partner area and the signing page. No login, the
- * long random token in the link is the key.
+ * long random token in the link is the key. The global throttler covers the
+ * reads, the writes get a tighter limit.
  */
 @Controller()
 export class DealPortalController {
@@ -42,6 +50,7 @@ export class DealPortalController {
   }
 
   @Post("portal/:token/checklist/:itemId/documents")
+  @Throttle(publicWriteLimit)
   @UseInterceptors(FileInterceptor("file", dealDocumentUploadOptions))
   uploadChecklistDocument(
     @Param("token") token: string,
@@ -56,6 +65,7 @@ export class DealPortalController {
   }
 
   @Put("portal/:token/avatar")
+  @Throttle(publicWriteLimit)
   updateCustomerAvatar(
     @Param("token") token: string,
     @Body() dto: CustomerAvatarDto,
@@ -77,6 +87,7 @@ export class DealPortalController {
   }
 
   @Post("partners/:token/checklist/:itemId/documents")
+  @Throttle(publicWriteLimit)
   @UseInterceptors(FileInterceptor("file", dealDocumentUploadOptions))
   uploadPartnerChecklistDocument(
     @Param("token") token: string,
@@ -109,6 +120,7 @@ export class DealPortalController {
   }
 
   @Post("signatures/:token/sign")
+  @Throttle(publicWriteLimit)
   sign(
     @Param("token") token: string,
     @Body() dto: DealSignDto,
@@ -122,14 +134,17 @@ export class DealPortalController {
   }
 
   @Post("signatures/:token/govbr")
+  @Throttle(publicWriteLimit)
   @UseInterceptors(FileInterceptor("file", dealContractUploadOptions))
   submitGovbrCopy(
     @Param("token") token: string,
+    @Body() dto: DealGovbrCopyDto,
     @Req() request: Request,
     @UploadedFile() file?: Express.Multer.File,
   ) {
     return this.signatureService.submitGovbrCopy(
       token,
+      dto,
       requireFile(file),
       readRequestEvidence(request),
     );

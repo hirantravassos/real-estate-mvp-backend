@@ -17,11 +17,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new Error("JWT_SECRET is not defined in the configuration");
     }
 
+    // Only the Authorization header: a token in the URL ends up in logs,
+    // browser history and Referer headers.
     super({
-      jwtFromRequest: ExtractJwt.fromExtractors([
-        ExtractJwt.fromAuthHeaderAsBearerToken(),
-        ExtractJwt.fromUrlQueryParameter("token"),
-      ]),
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: jwtSecret,
     });
@@ -31,6 +30,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     id: string;
     email: string;
     typ?: string;
+    ver?: number;
   }): Promise<User> {
     if (payload.typ && payload.typ !== "access") {
       throw new UnauthorizedException("Not an access token");
@@ -44,6 +44,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     if (!user) {
       throw new UnauthorizedException("User not found or token invalid");
+    }
+
+    // A logout raised the version: every token issued before it is dead.
+    if ((payload.ver ?? 0) !== user.tokenVersion) {
+      throw new UnauthorizedException("Session ended");
     }
 
     return user;

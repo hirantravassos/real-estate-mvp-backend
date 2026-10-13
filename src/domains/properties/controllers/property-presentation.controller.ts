@@ -1,7 +1,13 @@
 import { Controller, Get, Param } from "@nestjs/common";
+import { SkipThrottle } from "@nestjs/throttler";
 import { PropertyService } from "../services/property.service";
 import { PropertyMediaService } from "../services/property-media.service";
 
+/**
+ * Read by the site's server to render public pages: every visitor arrives
+ * from the same server address, so a per address limit would block them.
+ */
+@SkipThrottle()
 @Controller("properties")
 export class PropertyPresentationController {
   constructor(

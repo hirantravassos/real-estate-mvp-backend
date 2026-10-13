@@ -27,6 +27,8 @@ import {
   DealStatus,
 } from "../enums/deal.enum";
 
+const SHA256_PATTERN = /^[a-f0-9]{64}$/;
+
 const trimText = ({ value }: { value: unknown }) =>
   typeof value === "string" ? value.trim() : value;
 
@@ -352,7 +354,19 @@ export class DealSignDto {
   @Matches(/^\d{11}$/, { message: "CPF deve ter 11 números" })
   documentNumber: string;
 
+  /** Fingerprint of the contract the signer read, it must still be in force. */
+  @IsString()
+  @Matches(SHA256_PATTERN, { message: "Versão do contrato inválida" })
+  contractSha256: string;
+
   @IsBoolean()
   @Equals(true, { message: "É preciso aceitar o contrato para assinar" })
   accepted: boolean;
+}
+
+/** The gov.br copy also names the contract version it signed. */
+export class DealGovbrCopyDto {
+  @IsString()
+  @Matches(SHA256_PATTERN, { message: "Versão do contrato inválida" })
+  contractSha256: string;
 }

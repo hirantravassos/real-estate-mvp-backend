@@ -1,3 +1,4 @@
+import { SkipThrottle } from "@nestjs/throttler";
 import {
   Body,
   Controller,
@@ -11,6 +12,8 @@ import type { EvolutionWebhookPayload } from "../../../infrastructure/evolution/
 import { EvolutionWebhookService } from "../services/evolution-webhook.service";
 
 /** Evolution posts here. The token in the path is the broker's secret. */
+/** Provider servers post in bursts from few addresses, the token or the signature guards them. */
+@SkipThrottle()
 @Controller("webhooks/evolution")
 export class EvolutionWebhookController {
   constructor(private readonly webhookService: EvolutionWebhookService) {}

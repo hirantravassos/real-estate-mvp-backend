@@ -5,6 +5,7 @@ import {
   Logger,
 } from "@nestjs/common";
 import { DataSource, EntityManager, In, Not } from "typeorm";
+import { announceSessionsEnded } from "../../../shared/utils/session-events.util";
 import { StorageService } from "../../../infrastructure/storage/services/storage.service";
 import { MercadoPagoService } from "../../../infrastructure/payments/services/mercado-pago.service";
 import { AssistantAction } from "../../assistant/entities/assistant-action.entity";
@@ -114,6 +115,7 @@ export class AccountDeletionService {
     });
 
     this.subscriptionService.invalidate(user.id);
+    announceSessionsEnded(user.id);
     await this.deleteFiles(user.id);
     this.logger.log(`Account ${user.id} deleted and anonymized`);
   }

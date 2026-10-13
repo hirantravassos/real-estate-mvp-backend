@@ -10,5 +10,6 @@ import { AccountDeletionService } from "./services/account-deletion.service";
   imports: [PaymentsModule, StorageModule, InboxModule, SubscriptionModule],
   controllers: [AccountDeletionController],
   providers: [AccountDeletionService],
+  exports: [AccountDeletionService],
 })
 export class AccountDeletionModule {}

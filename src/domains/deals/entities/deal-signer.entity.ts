@@ -6,6 +6,7 @@ import {
   DealSignerStatus,
 } from "../enums/deal.enum";
 import { Deal } from "./deal.entity";
+import { sealedPersonalDataTransformer } from "../../../shared/utils/data-cipher.util";
 
 /** Someone who must sign the contract, with the evidence of how they did. */
 @Entity("deal_signers")
@@ -57,7 +58,13 @@ export class DealSigner extends BaseEntity {
   @Column({ type: "varchar", length: 255, nullable: true })
   signedName: string | null;
 
-  @Column({ type: "varchar", length: 14, nullable: true })
+  /** The CPF typed at signing, sealed at rest (LGPD art. 46). */
+  @Column({
+    type: "varchar",
+    length: 255,
+    nullable: true,
+    transformer: sealedPersonalDataTransformer,
+  })
   signedDocumentNumber: string | null;
 
   @Column({ type: "varchar", length: 64, nullable: true })

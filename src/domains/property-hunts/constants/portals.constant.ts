@@ -239,3 +239,13 @@ export const PORTAL_KEYS = Object.values(PortalKey);
  * docs/compliance/lgpd-auditoria-2026-10-13.md, item 4.1.
  */
 export const LISTING_IMPORT_ENABLED = false;
+
+/**
+ * Hunting on the listing portals opens them with the platform accounts and
+ * reads the advertisers' contacts. Off ("em breve") until it runs on terms
+ * agreed with the portals; hunts look only in the broker's own catalog.
+ */
+export const PORTAL_SEARCH_ENABLED = false;
+
+/** The paid AI search of owner ads reads the portals the same way. */
+export const OWNER_CONTACT_SEARCH_ENABLED = false;
