@@ -19,6 +19,32 @@ import { randomUUID } from "crypto";
 import * as path from "path";
 import { bucketConfig } from "../../../config/bucket.config";
 
+const APPLICATION_OCTET_STREAM = "application/octet-stream";
+
+/**
+ * Types we are willing to serve inline on the bucket origin, keyed by the
+ * trusted file extension. Anything else is forced to a download. HTML, SVG and
+ * other active types are deliberately absent.
+ */
+const INLINE_SAFE_CONTENT_TYPES: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  gif: "image/gif",
+  pdf: "application/pdf",
+  mp4: "video/mp4",
+  webm: "video/webm",
+  ogg: "audio/ogg",
+  oga: "audio/ogg",
+  mp3: "audio/mpeg",
+  wav: "audio/wav",
+  m4a: "audio/mp4",
+};
+
+const extensionOf = (s3Key: string): string =>
+  path.extname(s3Key).replace(".", "").toLowerCase();
+
 const ALLOWED_DOCUMENT_MIME_TYPES = new Set([
   "application/pdf",
   "image/jpeg",
@@ -317,12 +343,22 @@ export class StorageService implements OnApplicationBootstrap {
     s3Key: string,
     options: { downloadFileName?: string; expiresInSeconds?: number } = {},
   ): Promise<string> {
+    // The stored Content-Type comes from the sender (WhatsApp, uploads) and
+    // must never be honored for an inline response, or an attacker uploads
+    // text/html or image/svg+xml and runs script on the bucket origin. We pin
+    // both the type and the disposition from the trusted key extension.
+    const safeType = INLINE_SAFE_CONTENT_TYPES[extensionOf(s3Key)];
     const command = new GetObjectCommand({
       Bucket: this.bucketConfiguration.name,
       Key: s3Key,
+      ResponseContentType: options.downloadFileName
+        ? APPLICATION_OCTET_STREAM
+        : (safeType ?? APPLICATION_OCTET_STREAM),
       ResponseContentDisposition: options.downloadFileName
         ? `attachment; filename*=UTF-8''${encodeURIComponent(options.downloadFileName)}`
-        : undefined,
+        : safeType
+          ? "inline"
+          : "attachment",
     });
 
     return getSignedUrl(this.s3Client, command, {

@@ -11,10 +11,11 @@ import { CustomerCommentService } from "./services/customer-comment.service";
 import { Visit } from "../visits/entities/visit.entity";
 import { CustomerDocumentController } from "./controllers/customer-document.controller";
 import { DocumentModule } from "../documents/document.module";
+import { Kanban } from "../kanbans/entities/kanban.entity";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Customer, CustomerComment, Visit]),
+    TypeOrmModule.forFeature([Customer, CustomerComment, Visit, Kanban]),
     DocumentModule,
   ],
   controllers: [

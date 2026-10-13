@@ -248,7 +248,11 @@ export class MercadoPagoService {
    */
   isWebhookSignatureValid(input: WebhookSignatureInput) {
     const secret = this.configuration.mercadoPagoWebhookSecret;
-    if (!secret) return true;
+    if (!secret) {
+      // Fail closed in production: an unsigned webhook is never trusted when a
+      // secret should be configured. Local and staging stay permissive.
+      return process.env.NODE_ENV !== "production";
+    }
     if (!input.signatureHeader) return false;
 
     const parts = Object.fromEntries(

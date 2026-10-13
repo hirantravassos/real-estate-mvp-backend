@@ -23,6 +23,7 @@ import { CustomerComment } from "../entities/customer-comments.entity";
 import { ValidateBoolean } from "../../../shared/decorators/validation/boolean.decorator";
 import { Visit } from "../../visits/entities/visit.entity";
 import { CustomerAvatarDto } from "../dtos/customer-avatar.dto";
+import { Kanban } from "../../kanbans/entities/kanban.entity";
 
 dayjs.extend(isSameOrAfter);
 
@@ -73,6 +74,8 @@ export class CustomerService {
     private readonly customerCommentRepository: Repository<CustomerComment>,
     @InjectRepository(Visit)
     private readonly visitRepository: Repository<Visit>,
+    @InjectRepository(Kanban)
+    private readonly kanbanRepository: Repository<Kanban>,
   ) {}
 
   async findAll(user: User, dto: CustomerFilterDto) {
@@ -173,12 +176,47 @@ export class CustomerService {
   }
 
   async save(user: User, dto: CustomerCreateDto, id?: string) {
+    if (id) {
+      await this.ensureOwnedCustomer(user, id);
+    }
+
+    if (dto.kanbanId) {
+      await this.ensureOwnedKanban(user, dto.kanbanId);
+    }
+
     const entity = CustomerMapper.toEntity(dto, id);
     entity.user = user;
     try {
       return await this.customerRepository.save(entity);
     } catch {
       throw new ConflictException("Telefone já cadastrado para este usuário");
+    }
+  }
+
+  /**
+   * Blocks the upsert by client id takeover: a PATCH only reaches save when the
+   * row already belongs to the authenticated broker, otherwise TypeORM would
+   * overwrite another tenant's customer and move its ownership.
+   */
+  private async ensureOwnedCustomer(user: User, id: string): Promise<void> {
+    const owned = await this.customerRepository.findOne({
+      where: { id, user: { id: user.id } },
+      select: { id: true },
+    });
+
+    if (!owned) {
+      throw new NotFoundException("Customer not found");
+    }
+  }
+
+  private async ensureOwnedKanban(user: User, kanbanId: string): Promise<void> {
+    const owned = await this.kanbanRepository.findOne({
+      where: { id: kanbanId, user: { id: user.id }, active: true },
+      select: { id: true },
+    });
+
+    if (!owned) {
+      throw new NotFoundException("Kanban not found");
     }
   }
 
