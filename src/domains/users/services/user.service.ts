@@ -65,6 +65,18 @@ export class UserService {
     return this.findById(id);
   }
 
+  /** Marks the welcome tour as seen, finished or skipped, only the first time. */
+  async completeTutorial(id: string): Promise<User> {
+    const user = await this.findById(id);
+    if (!user.tutorialCompletedAt) {
+      await this.userRepository.update(
+        { id },
+        { tutorialCompletedAt: new Date() },
+      );
+    }
+    return this.findByIdWithSlug(id);
+  }
+
   /** The broker with the address of their public page, made on first use. */
   async findByIdWithSlug(id: string): Promise<User> {
     const user = await this.findById(id);

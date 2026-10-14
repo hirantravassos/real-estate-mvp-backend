@@ -84,4 +84,8 @@ export class User extends BaseEntity {
   /** Free notes the AI always reads, written and edited by the broker. */
   @Column({ type: "text", nullable: true })
   aiMemory: string | null;
+
+  /** When the broker finished or skipped the welcome tour, null shows it. */
+  @Column({ type: "datetime", nullable: true })
+  tutorialCompletedAt: Date | null;
 }

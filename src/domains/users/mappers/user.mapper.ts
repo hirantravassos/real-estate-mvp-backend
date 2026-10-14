@@ -21,6 +21,11 @@ export class UserMapper {
         currentVersion: CURRENT_TERMS_VERSION,
       },
       slug: user.slug ?? null,
+      tutorial: {
+        completedAt: user.tutorialCompletedAt
+          ? DateHelper.formatUtcToIso(user.tutorialCompletedAt)
+          : null,
+      },
       profile: {
         city: user.city ?? null,
         phone: user.phone ?? null,

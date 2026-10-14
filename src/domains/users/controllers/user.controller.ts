@@ -51,6 +51,13 @@ export class UserController {
     return UserMapper.toDto(entity);
   }
 
+  /** No body: it only stamps the time, for the broker in the token. */
+  @Post("me/tutorial")
+  async completeTutorial(@GetUser() user: User): Promise<UserResponseDto> {
+    const entity = await this.userService.completeTutorial(user.id);
+    return UserMapper.toDto(entity);
+  }
+
   @Post("me/terms")
   async acceptTerms(
     @GetUser() user: User,
