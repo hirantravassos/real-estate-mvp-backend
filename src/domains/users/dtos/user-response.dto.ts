@@ -13,6 +13,10 @@ export class UserResponseDto {
   };
   /** Address of the public page, /corretor/{slug}. */
   slug!: string | null;
+  /** The welcome tour, completedAt null means it was never finished. */
+  tutorial!: {
+    completedAt: string | null;
+  };
   profile!: {
     city: string | null;
     phone: string | null;
