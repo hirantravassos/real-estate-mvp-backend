@@ -16,6 +16,7 @@ import {
 } from "../../../infrastructure/evolution/types/evolution.type";
 import { RealtimeGateway } from "../../../infrastructure/realtime/realtime.gateway";
 import { User } from "../../users/entities/user.entity";
+import { UserService } from "../../users/services/user.service";
 import {
   normalizePhoneNumber,
   PHONE_NUMBER_PATTERN,
@@ -25,6 +26,7 @@ import { WhatsappConnectionStatus } from "../enums/inbox.enum";
 import {
   numberFromJid,
   toCustomerPhone,
+  toProfilePhone,
   toWhatsappNumber,
 } from "../helpers/whatsapp-phone.helper";
 import { InboxMapper } from "../mappers/inbox.mapper";
@@ -47,6 +49,7 @@ export class WhatsappConnectionService {
     private readonly throttleService: EvolutionThrottleService,
     private readonly realtimeGateway: RealtimeGateway,
     private readonly historySyncService: WhatsappHistorySyncService,
+    private readonly userService: UserService,
   ) {}
 
   async status(user: User) {
@@ -56,6 +59,9 @@ export class WhatsappConnectionService {
 
     if (connection && this.evolutionApiService.isConfigured) {
       connection = await this.syncState(connection);
+    }
+    if (connection?.status === WhatsappConnectionStatus.CONNECTED) {
+      await this.syncProfilePhone(connection, user.phone);
     }
 
     return InboxMapper.toConnectionDto(
@@ -194,6 +200,7 @@ export class WhatsappConnectionService {
         connection.profilePictureUrl = update.profilePictureUrl;
       }
       this.historySyncService.handleOpened(connection.id);
+      await this.syncProfilePhone(connection);
     } else if (update.state === "connecting") {
       this.throttleService.suspend(connection.instanceName);
       connection.status = WhatsappConnectionStatus.CONNECTING;
@@ -254,6 +261,24 @@ export class WhatsappConnectionService {
       await this.handleConnectionUpdate(connection, { state });
     }
     return connection;
+  }
+
+  /**
+   * The profile shows the connected WhatsApp number, so a customer who taps
+   * the page's button lands on the same chat the inbox reads. A number
+   * linked later replaces it, a disconnect keeps the last one.
+   */
+  private async syncProfilePhone(
+    connection: WhatsappConnection,
+    currentPhone?: string | null,
+  ) {
+    const phone = toProfilePhone(connection.phone);
+    if (!phone || phone === currentPhone) return;
+    await this.userService
+      .syncWhatsappPhone(connection.userId, phone)
+      .catch((error: unknown) => {
+        this.logger.warn(`Profile phone sync failed: ${String(error)}`);
+      });
   }
 
   private applyQrCode(

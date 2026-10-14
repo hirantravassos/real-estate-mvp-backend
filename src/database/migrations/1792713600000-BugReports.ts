@@ -6,8 +6,8 @@ import { MigrationInterface, QueryRunner } from "typeorm";
  * keeps two servers from mailing twice). Every step checks first, so it can
  * run again.
  */
-export class BugReports1792627200000 implements MigrationInterface {
-  name = "BugReports1792627200000";
+export class BugReports1792713600000 implements MigrationInterface {
+  name = "BugReports1792713600000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     if (!(await queryRunner.hasTable("bug_reports"))) {

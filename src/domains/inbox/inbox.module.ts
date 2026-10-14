@@ -12,6 +12,7 @@ import { DocumentModule } from "../documents/document.module";
 import { Kanban } from "../kanbans/entities/kanban.entity";
 import { Property } from "../properties/entities/property.entity";
 import { PropertyModule } from "../properties/property.module";
+import { UserModule } from "../users/user.module";
 import { ConversationController } from "./controllers/conversation.controller";
 import { EvolutionWebhookController } from "./controllers/evolution-webhook.controller";
 import { MessageController } from "./controllers/message.controller";
@@ -25,6 +26,7 @@ import { InboxAiService } from "./services/inbox-ai.service";
 import { InboxSyncService } from "./services/inbox-sync.service";
 import { MessageAttachmentService } from "./services/message-attachment.service";
 import { MessageService } from "./services/message.service";
+import { ProfileCardSenderService } from "./services/profile-card-sender.service";
 import { PropertyPresentationSenderService } from "./services/property-presentation-sender.service";
 import { WhatsappConnectionService } from "./services/whatsapp-connection.service";
 import { WhatsappHistorySyncService } from "./services/whatsapp-history-sync.service";
@@ -48,6 +50,7 @@ import { WhatsappHistorySyncService } from "./services/whatsapp-history-sync.ser
     forwardRef(() => DealModule),
     DocumentModule,
     PropertyModule,
+    UserModule,
   ],
   controllers: [
     WhatsappConnectionController,
@@ -64,6 +67,7 @@ import { WhatsappHistorySyncService } from "./services/whatsapp-history-sync.ser
     InboxAiService,
     InboxSyncService,
     PropertyPresentationSenderService,
+    ProfileCardSenderService,
     EvolutionWebhookService,
   ],
   exports: [

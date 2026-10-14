@@ -35,6 +35,7 @@ import {
 import { DealMapper } from "../mappers/deal.mapper";
 import { DealActivityService } from "./deal-activity.service";
 import { DealService } from "./deal.service";
+import { profileImagePathOf } from "../../users/helpers/profile-image.helper";
 
 /** How long a confirmed number keeps the area open, the tab forgets it sooner. */
 const SESSION_HOURS = 12;
@@ -103,7 +104,7 @@ export class DealPartnerAreaService {
       partnerFirstName: firstNameOf(partner.name),
       broker: {
         name: deal.user.name,
-        profileImage: deal.user.profileImage,
+        profileImage: profileImagePathOf(deal.user.profileImage),
         avatar: deal.user.avatar ?? null,
       },
       phoneRegistered: Boolean(partner.phone),

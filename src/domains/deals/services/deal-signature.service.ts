@@ -31,6 +31,7 @@ import {
 import { BrokerMailService } from "../../notifications/services/broker-mail.service";
 import { DealActivityService } from "./deal-activity.service";
 import { DealService } from "./deal.service";
+import { profileImagePathOf } from "../../users/helpers/profile-image.helper";
 
 const CLEARED_SIGNATURE = {
   status: DealSignerStatus.PENDING,
@@ -91,7 +92,10 @@ export class DealSignatureService {
         signedContractSha256: signer.signedContractSha256,
       },
       dealStatus: deal.status,
-      broker: { name: deal.user.name, profileImage: deal.user.profileImage },
+      broker: {
+        name: deal.user.name,
+        profileImage: profileImagePathOf(deal.user.profileImage),
+      },
       property: DealMapper.toProperty(deal.property),
       contract: contractDocument
         ? {
