@@ -6,8 +6,8 @@ import { MigrationInterface, QueryRunner } from "typeorm";
  * request body. A deleted account leaves its rows unlinked, the six months
  * purge removes them. Every step checks first, so it can run again.
  */
-export class AuditLogs1792454400000 implements MigrationInterface {
-  name = "AuditLogs1792454400000";
+export class AuditLogs1792540800000 implements MigrationInterface {
+  name = "AuditLogs1792540800000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     if (!(await queryRunner.hasTable("audit_logs"))) {

@@ -26,18 +26,15 @@ import { factsFromSnapshot } from "../helpers/match-facts.helper";
 import { MINIMUM_MATCH_SCORE, scoreMatch } from "../helpers/match-score.helper";
 import {
   collectListingLinks,
-  humanPause,
   isChallenge,
-  isLoginWall,
   ListingPage,
+  politePause,
   readListingPage,
-  revealContacts,
 } from "../helpers/page-reader.helper";
 import { truncate } from "../helpers/text.helper";
 import { PropertyHuntMapper } from "../mappers/property-hunt.mapper";
 import { CatalogMatcherService } from "./catalog-matcher.service";
 import { HuntAiService, ListingAnalysis } from "./hunt-ai.service";
-import { PortalAccountService, PortalSession } from "./portal-account.service";
 import { PortalBrowserService } from "./portal-browser.service";
 
 /** Listings sent to the AI in one call. */
@@ -58,8 +55,9 @@ interface RunState {
 
 /**
  * Runs the hunts in the background, one queue per server: the catalog
- * first, then every chosen portal, browsing signed in, reading each listing
- * with the AI and keeping the ones that fit. Progress goes live to the app.
+ * first, then every chosen portal, signed out, reading the public page of
+ * each listing with the AI and keeping the ones that fit. Progress goes
+ * live to the app.
  */
 @Injectable()
 export class PropertyHuntRunnerService implements OnApplicationBootstrap {
@@ -76,7 +74,6 @@ export class PropertyHuntRunnerService implements OnApplicationBootstrap {
     private readonly matchRepository: Repository<PropertyMatch>,
     private readonly catalogMatcher: CatalogMatcherService,
     private readonly huntAiService: HuntAiService,
-    private readonly accountService: PortalAccountService,
     private readonly browserService: PortalBrowserService,
     private readonly realtimeGateway: RealtimeGateway,
   ) {}
@@ -158,7 +155,6 @@ export class PropertyHuntRunnerService implements OnApplicationBootstrap {
 
       if (hunt.includeCatalog) await this.searchCatalog(state);
 
-      // Hunts saved before the portal search was turned off skip the portals.
       const portals = PORTAL_SEARCH_ENABLED ? [...hunt.portals] : [];
       const workers = Array.from(
         { length: Math.min(PARALLEL_PORTALS, portals.length) },
@@ -256,21 +252,20 @@ export class PropertyHuntRunnerService implements OnApplicationBootstrap {
     }
 
     const definition = PORTALS[portal];
-    const session = await this.accountService.sessionFor(portal);
     let context: BrowserContext | null = null;
-    let reconnected = false;
 
     try {
-      context = await this.browserService.newContext(session?.storageState);
-      let page = await context.newPage();
+      // A fresh context with no cookies: the public page, as anyone sees it.
+      context = await this.browserService.newContext();
+      const page = await context.newPage();
       progress.status = PortalProgressStatus.SEARCHING;
-      progress.authenticated = Boolean(session?.storageState);
+      progress.authenticated = false;
       await this.persist(state);
 
       await page.goto(definition.buildSearchUrl(hunt.criteria), {
         waitUntil: "domcontentloaded",
       });
-      await humanPause(this.configuration.pageDelayMilliseconds);
+      await politePause(this.configuration.pageDelayMilliseconds);
 
       if (await isChallenge(page)) {
         progress.status = PortalProgressStatus.FAILED;
@@ -299,29 +294,9 @@ export class PropertyHuntRunnerService implements OnApplicationBootstrap {
       let batch: { page: ListingPage; portal: PortalKey }[] = [];
       for (const link of links) {
         if (state.cancelled || state.outOfCredits) break;
-        await humanPause(this.configuration.pageDelayMilliseconds);
-        const opened = await this.openListing(page, link);
-        if (!opened) continue;
+        await politePause(this.configuration.pageDelayMilliseconds);
+        if (!(await this.openListing(page, link))) continue;
 
-        if (session && (await isLoginWall(page, definition))) {
-          if (reconnected) continue;
-          reconnected = true;
-          const storageState = await this.accountService.reconnect(
-            session.account,
-          );
-          if (!storageState) {
-            progress.authenticated = false;
-            progress.message =
-              "A sessão do portal expirou, seguimos sem login.";
-            continue;
-          }
-          await this.browserService.release(context);
-          context = await this.browserService.newContext(storageState);
-          page = await context.newPage();
-          if (!(await this.openListing(page, link))) continue;
-        }
-
-        await revealContacts(page);
         batch.push({ page: await readListingPage(page), portal });
         if (batch.length >= ANALYSIS_BATCH_SIZE) {
           await this.analyze(state, progress, batch);
@@ -332,9 +307,6 @@ export class PropertyHuntRunnerService implements OnApplicationBootstrap {
         await this.analyze(state, progress, batch);
       }
 
-      if (session && progress.authenticated) {
-        await this.keepSession(session, context);
-      }
       progress.status = PortalProgressStatus.DONE;
     } catch (error) {
       if (error instanceof OutOfCreditsError) {
@@ -362,13 +334,6 @@ export class PropertyHuntRunnerService implements OnApplicationBootstrap {
     } catch {
       return false;
     }
-  }
-
-  private async keepSession(session: PortalSession, context: BrowserContext) {
-    const storageState = JSON.stringify(await context.storageState());
-    await this.accountService
-      .storeSession(session.account, storageState)
-      .catch(() => undefined);
   }
 
   private async analyze(
@@ -419,12 +384,6 @@ export class PropertyHuntRunnerService implements OnApplicationBootstrap {
         if ((analysis.wishScore ?? 0) >= 60) highlights.push(analysis.wishNote);
         else warnings.push(analysis.wishNote);
       }
-      if (
-        !analysis.snapshot.advertiser.phones.length &&
-        !analysis.snapshot.advertiser.emails.length
-      ) {
-        warnings.push("Contato do anunciante só pelo portal");
-      }
 
       matches.push(
         this.matchRepository.create({
@@ -437,9 +396,7 @@ export class PropertyHuntRunnerService implements OnApplicationBootstrap {
           externalUrl: truncate(analysis.page.url, 1024),
           title: truncate(analysis.title, 255),
           listing: analysis.snapshot,
-          coverImageUrl: analysis.snapshot.photos[0]
-            ? truncate(analysis.snapshot.photos[0], 1024)
-            : null,
+          coverImageUrl: null,
           price:
             analysis.snapshot.price === null
               ? null

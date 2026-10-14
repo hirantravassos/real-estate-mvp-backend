@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { FindOptionsWhere, IsNull, Not, Repository } from "typeorm";
 import { RealtimeGateway } from "../../../infrastructure/realtime/realtime.gateway";
@@ -16,7 +11,6 @@ import {
   PropertyMatchPinDto,
   PropertyMatchUpdateDto,
 } from "../dtos/property-hunt.dto";
-import { LISTING_IMPORT_ENABLED } from "../constants/portals.constant";
 import { PropertyMatch } from "../entities/property-match.entity";
 import {
   PropertyMatchOrigin,
@@ -24,7 +18,6 @@ import {
 } from "../enums/property-hunt.enum";
 import { PropertyHuntMapper } from "../mappers/property-hunt.mapper";
 import { truncate } from "../helpers/text.helper";
-import { ListingImportService } from "./listing-import.service";
 
 /**
  * The properties a hunt found and the soft links between properties and
@@ -40,7 +33,6 @@ export class PropertyMatchService {
     private readonly customerRepository: Repository<Customer>,
     @InjectRepository(Property)
     private readonly propertyRepository: Repository<Property>,
-    private readonly listingImportService: ListingImportService,
     private readonly realtimeGateway: RealtimeGateway,
   ) {}
 
@@ -173,50 +165,6 @@ export class PropertyMatchService {
     );
     this.notify(user.id, match);
     return PropertyHuntMapper.toMatchDto({ ...match, customer });
-  }
-
-  /** Saves a portal listing in the catalog, with its photos and contacts. */
-  async importToCatalog(user: User, id: string) {
-    if (!LISTING_IMPORT_ENABLED) {
-      throw new ForbiddenException(
-        "Trazer anúncios de portais para o catálogo chega em breve.",
-      );
-    }
-    const match = await this.findEntity(user.id, id);
-    if (match.propertyId) {
-      return { propertyId: match.propertyId, mediaCount: 0, created: false };
-    }
-    if (match.origin !== PropertyMatchOrigin.PORTAL || !match.listing) {
-      throw new BadRequestException(
-        "Só anúncios de portais podem ser trazidos.",
-      );
-    }
-
-    const { property, mediaCount } =
-      await this.listingImportService.importMatch(user, match);
-    await this.matchRepository.update(
-      { id: match.id },
-      {
-        propertyId: property.id,
-        status:
-          match.status === PropertyMatchStatus.NEW
-            ? PropertyMatchStatus.FAVORITE
-            : match.status,
-      },
-    );
-    // Other customers with the same listing point to the new property too.
-    if (match.externalUrl) {
-      await this.matchRepository.update(
-        {
-          userId: user.id,
-          externalUrl: match.externalUrl,
-          propertyId: Not(property.id),
-        },
-        { propertyId: property.id },
-      );
-    }
-    this.notify(user.id, match);
-    return { propertyId: property.id, mediaCount, created: true };
   }
 
   async remove(user: User, id: string) {

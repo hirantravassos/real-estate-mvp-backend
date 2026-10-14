@@ -7,13 +7,8 @@ export interface PortalDefinition {
   key: PortalKey;
   label: string;
   homeUrl: string;
-  loginUrl: string;
   /** Recognizes the link of a single listing among the search results. */
   listingUrlPattern: RegExp;
-  /** Shown next to the login form, how this portal signs people in. */
-  loginHint: string;
-  /** Some portals only send a code by email, without a password. */
-  passwordless: boolean;
   /** Best effort search link, the AI reads and filters what comes back. */
   buildSearchUrl: (criteria: HuntCriteria) => string;
 }
@@ -45,10 +40,7 @@ export const PORTALS: Record<PortalKey, PortalDefinition> = {
     key: PortalKey.ZAP_IMOVEIS,
     label: "ZAP Imóveis",
     homeUrl: "https://www.zapimoveis.com.br/",
-    loginUrl: "https://www.zapimoveis.com.br/login/",
     listingUrlPattern: /zapimoveis\.com\.br\/imovel\/[^?#]+/i,
-    loginHint: "Use o mesmo e-mail e senha da sua conta ZAP / Grupo OLX.",
-    passwordless: false,
     buildSearchUrl: (criteria) => {
       const transaction = criteria.transaction === "rent" ? "aluguel" : "venda";
       const kind = kindSlug(criteria.kind, {
@@ -81,10 +73,7 @@ export const PORTALS: Record<PortalKey, PortalDefinition> = {
     key: PortalKey.VIVA_REAL,
     label: "Viva Real",
     homeUrl: "https://www.vivareal.com.br/",
-    loginUrl: "https://www.vivareal.com.br/login/",
     listingUrlPattern: /vivareal\.com\.br\/imovel\/[^?#]+/i,
-    loginHint: "Use o mesmo e-mail e senha da sua conta Viva Real / Grupo OLX.",
-    passwordless: false,
     buildSearchUrl: (criteria) => {
       const transaction = criteria.transaction === "rent" ? "aluguel" : "venda";
       const kind = kindSlug(criteria.kind, {
@@ -116,11 +105,7 @@ export const PORTALS: Record<PortalKey, PortalDefinition> = {
     key: PortalKey.QUINTO_ANDAR,
     label: "QuintoAndar",
     homeUrl: "https://www.quintoandar.com.br/",
-    loginUrl: "https://www.quintoandar.com.br/login",
     listingUrlPattern: /quintoandar\.com\.br\/imovel\/\d+/i,
-    loginHint:
-      "O QuintoAndar costuma mandar um código por e-mail. Deixe a senha em branco se não tiver uma.",
-    passwordless: true,
     buildSearchUrl: (criteria) => {
       const transaction =
         criteria.transaction === "rent" ? "alugar" : "comprar";
@@ -147,10 +132,7 @@ export const PORTALS: Record<PortalKey, PortalDefinition> = {
     key: PortalKey.OLX,
     label: "OLX",
     homeUrl: "https://www.olx.com.br/",
-    loginUrl: "https://conta.olx.com.br/acesso",
     listingUrlPattern: /olx\.com\.br\/[^?#]*imoveis\/[^?#/]+-\d{6,}/i,
-    loginHint: "Use o e-mail e a senha da sua conta OLX.",
-    passwordless: false,
     buildSearchUrl: (criteria) => {
       const transaction = criteria.transaction === "rent" ? "aluguel" : "venda";
       const kind = kindSlug(criteria.kind, {
@@ -179,10 +161,7 @@ export const PORTALS: Record<PortalKey, PortalDefinition> = {
     key: PortalKey.CHAVES_NA_MAO,
     label: "Chaves na Mão",
     homeUrl: "https://www.chavesnamao.com.br/",
-    loginUrl: "https://www.chavesnamao.com.br/login/",
     listingUrlPattern: /chavesnamao\.com\.br\/imovel\/[^?#]+/i,
-    loginHint: "Use o e-mail e a senha da sua conta Chaves na Mão.",
-    passwordless: false,
     buildSearchUrl: (criteria) => {
       const transaction =
         criteria.transaction === "rent" ? "para-alugar" : "a-venda";
@@ -208,10 +187,7 @@ export const PORTALS: Record<PortalKey, PortalDefinition> = {
     key: PortalKey.IMOVELWEB,
     label: "Imovelweb",
     homeUrl: "https://www.imovelweb.com.br/",
-    loginUrl: "https://www.imovelweb.com.br/login",
     listingUrlPattern: /imovelweb\.com\.br\/propriedades\/[^?#]+/i,
-    loginHint: "Use o e-mail e a senha da sua conta Imovelweb.",
-    passwordless: false,
     buildSearchUrl: (criteria) => {
       const transaction = criteria.transaction === "rent" ? "aluguel" : "venda";
       const kind = kindSlug(criteria.kind, {
@@ -233,19 +209,20 @@ export const PORTALS: Record<PortalKey, PortalDefinition> = {
 export const PORTAL_KEYS = Object.values(PortalKey);
 
 /**
- * Bringing a portal listing into the broker's catalog copies the
- * advertiser's photos and contacts. It stays off ("em breve") until the
- * partnership terms with the advertiser are settled, see
- * docs/compliance/lgpd-auditoria-2026-10-13.md, item 4.1.
+ * Hunting on the listing portals reads only the public pages, signed out:
+ * no platform account, no "ver telefone" click. The broker opens the listing
+ * on the portal, in their own browser, to talk to the advertiser.
  */
-export const LISTING_IMPORT_ENABLED = false;
+export const PORTAL_SEARCH_ENABLED = true;
 
 /**
- * Hunting on the listing portals opens them with the platform accounts and
- * reads the advertisers' contacts. Off ("em breve") until it runs on terms
- * agreed with the portals; hunts look only in the broker's own catalog.
+ * The paid AI search of owner ads. Off: it needs the advertiser's phone,
+ * which the platform no longer collects. The free links stay.
  */
-export const PORTAL_SEARCH_ENABLED = false;
-
-/** The paid AI search of owner ads reads the portals the same way. */
 export const OWNER_CONTACT_SEARCH_ENABLED = false;
+
+/**
+ * Days a portal suggestion and a listing shortcut are kept. Listings go
+ * stale, and the Privacy Policy promises this limit.
+ */
+export const LISTING_RETENTION_DAYS = 90;

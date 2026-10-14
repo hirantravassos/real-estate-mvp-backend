@@ -15,10 +15,8 @@ import { User } from "../../users/entities/user.entity";
 import { PORTALS } from "../constants/portals.constant";
 import { PortalKey } from "../enums/property-hunt.enum";
 import { ListingPage } from "../helpers/page-reader.helper";
-import { brazilianPhoneDigits, truncate } from "../helpers/text.helper";
+import { truncate, withoutPersonalContacts } from "../helpers/text.helper";
 import {
-  ADVERTISER_KINDS,
-  AdvertiserKind,
   HUNT_AMENITIES,
   HUNT_TRANSACTIONS,
   HuntAmenity,
@@ -31,6 +29,8 @@ const TRANSCRIPT_MESSAGES = 60;
 const TRANSCRIPT_CHARACTER_LIMIT = 9000;
 const LISTING_TEXT_LIMIT = 6000;
 const LISTING_STRUCTURED_DATA_LIMIT = 2500;
+/** The short description kept with a found listing. */
+const LISTING_DESCRIPTION_LIMIT = 400;
 
 const nullable = (type: string, extra: Record<string, unknown> = {}) => ({
   type: [type, "null"],
@@ -145,7 +145,6 @@ const LISTINGS_SCHEMA = {
             price: nullable("number"),
             maintenanceFee: nullable("number"),
             propertyTax: nullable("number"),
-            address: nullable("string"),
             neighborhood: nullable("string"),
             city: nullable("string"),
             state: nullable("string"),
@@ -162,26 +161,6 @@ const LISTINGS_SCHEMA = {
               items: { type: "string", enum: HUNT_AMENITIES },
             },
             description: nullable("string"),
-            advertiser: {
-              type: "object",
-              properties: {
-                name: nullable("string"),
-                kind: { type: "string", enum: ADVERTISER_KINDS },
-                phones: { type: "array", items: { type: "string" } },
-                emails: { type: "array", items: { type: "string" } },
-                creci: nullable("string"),
-                company: nullable("string"),
-              },
-              required: [
-                "name",
-                "kind",
-                "phones",
-                "emails",
-                "creci",
-                "company",
-              ],
-              additionalProperties: false,
-            },
             wishScore: nullable("integer"),
             wishNote: nullable("string"),
           },
@@ -194,7 +173,6 @@ const LISTINGS_SCHEMA = {
             "price",
             "maintenanceFee",
             "propertyTax",
-            "address",
             "neighborhood",
             "city",
             "state",
@@ -208,7 +186,6 @@ const LISTINGS_SCHEMA = {
             "beachDistanceEstimated",
             "amenities",
             "description",
-            "advertiser",
             "wishScore",
             "wishNote",
           ],
@@ -262,7 +239,6 @@ interface RawListing {
   price?: number | null;
   maintenanceFee?: number | null;
   propertyTax?: number | null;
-  address?: string | null;
   neighborhood?: string | null;
   city?: string | null;
   state?: string | null;
@@ -276,14 +252,6 @@ interface RawListing {
   beachDistanceEstimated?: boolean;
   amenities?: string[];
   description?: string | null;
-  advertiser?: {
-    name?: string | null;
-    kind?: string;
-    phones?: string[];
-    emails?: string[];
-    creci?: string | null;
-    company?: string | null;
-  };
   wishScore?: number | null;
   wishNote?: string | null;
 }
@@ -402,8 +370,8 @@ export class HuntAiService {
         "area é a área útil em m². floor é o andar, quando informado.",
         "beachDistanceMeters: use a distância escrita no anúncio (300 m da praia é 300, 2 quadras é 200, frente mar ou pé na areia é 50) e marque beachDistanceEstimated false quando o anúncio disser a distância em metros. Se o anúncio não disser mas o endereço permitir estimar com segurança, estime e marque true. Senão, null.",
         "amenities: só os itens da lista que o anúncio cita de fato.",
-        "description é a descrição escrita pelo anunciante, limpa, com até 1200 caracteres.",
-        "advertiser: quem anuncia. kind é owner (proprietário, particular, direto com o dono), broker (corretor autônomo), agency (imobiliária) ou unknown. phones e emails só do anunciante, nunca as centrais de atendimento do portal. creci quando aparecer.",
+        "neighborhood, city e state dizem onde fica; nunca a rua nem o número.",
+        `description resume o imóvel em até ${LISTING_DESCRIPTION_LIMIT} caracteres, com as suas palavras: só características do imóvel, sem nomes, telefones, e-mails, CRECI nem qualquer dado de quem anuncia.`,
         criteria.extraWishes.length
           ? `wishScore de 0 a 100 diz o quanto o imóvel atende estes desejos do cliente: ${criteria.extraWishes.join("; ")}. wishNote explica em até 100 caracteres.`
           : "wishScore e wishNote são sempre null.",
@@ -413,17 +381,14 @@ export class HuntAiService {
       ].join("\n"),
       input: pages
         .map(({ page, portal }, position) =>
+          // The advertiser's contacts are taken out before the AI reads it.
           [
             `### Anúncio ${position + 1} (${PORTALS[portal].label})`,
-            `Link: ${page.url}`,
-            `Título da página: ${truncate(page.title, 200)}`,
-            page.contacts.length
-              ? `Contatos achados na página: ${page.contacts.join(" | ")}`
-              : "",
+            `Título da página: ${truncate(withoutPersonalContacts(page.title), 200)}`,
             page.structuredData
-              ? `Dados estruturados:\n${truncate(page.structuredData, LISTING_STRUCTURED_DATA_LIMIT)}`
+              ? `Dados estruturados:\n${truncate(withoutPersonalContacts(page.structuredData), LISTING_STRUCTURED_DATA_LIMIT)}`
               : "",
-            `Texto da página:\n${truncate(page.text, LISTING_TEXT_LIMIT)}`,
+            `Texto da página:\n${truncate(withoutPersonalContacts(page.text), LISTING_TEXT_LIMIT)}`,
           ]
             .filter(Boolean)
             .join("\n"),
@@ -567,22 +532,6 @@ const toAnalysis = (
   portal: PortalKey,
   raw: RawListing,
 ): ListingAnalysis => {
-  const advertiser = raw.advertiser ?? {};
-  const phones = [
-    ...new Set(
-      (advertiser.phones ?? [])
-        .map((phone) => brazilianPhoneDigits(phone))
-        .filter((phone): phone is string => Boolean(phone)),
-    ),
-  ].slice(0, 4);
-  const emails = [
-    ...new Set(
-      (advertiser.emails ?? [])
-        .map((email) => email.trim().toLowerCase())
-        .filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)),
-    ),
-  ].slice(0, 3);
-
   const snapshot: ListingSnapshot = {
     kind: kindOf(raw.kind),
     transaction: HUNT_TRANSACTIONS.includes(raw.transaction as HuntTransaction)
@@ -594,7 +543,6 @@ const toAnalysis = (
         ? 0
         : positiveNumber(raw.maintenanceFee, 1_000_000),
     propertyTax: positiveNumber(raw.propertyTax, 10_000_000),
-    address: cleanText(raw.address, 255),
     neighborhood: cleanText(raw.neighborhood, 120),
     city: cleanText(raw.city, 120),
     state: cleanText(raw.state, 2)?.toUpperCase() ?? null,
@@ -608,26 +556,19 @@ const toAnalysis = (
     beachDistanceMeters: positiveNumber(raw.beachDistanceMeters, 200_000),
     beachDistanceEstimated: Boolean(raw.beachDistanceEstimated),
     amenities: amenitiesOf(raw.amenities),
-    description: cleanText(raw.description, 1500),
-    photos: page.photos,
-    videos: page.videos,
-    advertiser: {
-      name: cleanText(advertiser.name, 120),
-      kind: ADVERTISER_KINDS.includes(advertiser.kind as AdvertiserKind)
-        ? (advertiser.kind as AdvertiserKind)
-        : "unknown",
-      phones,
-      emails,
-      creci: cleanText(advertiser.creci, 40),
-      company: cleanText(advertiser.company, 120),
-    },
+    description: cleanText(
+      withoutPersonalContacts(raw.description),
+      LISTING_DESCRIPTION_LIMIT,
+    ),
   };
 
   return {
     page,
     portal,
     isListing: raw.isListing !== false,
-    title: cleanText(raw.title, 120) ?? truncate(page.title, 120),
+    title:
+      cleanText(withoutPersonalContacts(raw.title), 120) ??
+      truncate(withoutPersonalContacts(page.title), 120),
     snapshot,
     wishScore:
       typeof raw.wishScore === "number"

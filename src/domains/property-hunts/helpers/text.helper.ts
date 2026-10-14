@@ -21,10 +21,19 @@ export const truncate = (value: string | null | undefined, length: number) =>
     ? `${(value ?? "").substring(0, length - 1)}…`
     : (value ?? "");
 
-/** Digits of a Brazilian phone without the country code, or null if it is not one. */
-export const brazilianPhoneDigits = (value: string | null | undefined) => {
-  let digits = (value ?? "").replace(/\D/g, "");
-  if (digits.startsWith("55") && digits.length >= 12) digits = digits.slice(2);
-  if (digits.startsWith("0")) digits = digits.replace(/^0+/, "");
-  return digits.length === 10 || digits.length === 11 ? digits : null;
-};
+const CONTACT_PATTERNS = [
+  /\b[\w.+-]+@[\w-]+(\.[\w-]+)+\b/g,
+  /(https?:\/\/)?(wa\.me|api\.whatsapp\.com|chat\.whatsapp\.com)\/\S*/gi,
+  /\bcreci\b[\s:.\-/nº°]*[a-z]{0,2}[\s\-/]*\d[\d.\-/ ]{2,}[a-z]?/gi,
+  /(\+?55[\s.-]?)?\(?\b\d{2}\)?[\s.-]?9?\d{4}[\s.-]?\d{4}\b/g,
+];
+
+/**
+ * Takes emails, WhatsApp links, CRECI numbers and phones out of a listing
+ * text, so the advertiser's contacts never reach the AI nor the database.
+ */
+export const withoutPersonalContacts = (value: string | null | undefined) =>
+  CONTACT_PATTERNS.reduce(
+    (text, pattern) => text.replace(pattern, "[contato no portal]"),
+    value ?? "",
+  );

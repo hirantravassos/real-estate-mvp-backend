@@ -13,6 +13,13 @@ import { portalsConfig } from "../../../config/portals.config";
 
 /** Closes the browser after this long without any tab open. */
 const IDLE_CLOSE_MILLISECONDS = 3 * 60 * 1000;
+/**
+ * A remote browser (Browserless) ends each session after its TIMEOUT. A
+ * connection older than this is opened again before a new job, so a hunt
+ * never starts on a session about to expire.
+ */
+const REMOTE_SESSION_MAX_MILLISECONDS = 4 * 60 * 1000;
+const REMOTE_CONNECT_TIMEOUT_MILLISECONDS = 30_000;
 
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
@@ -39,13 +46,14 @@ const playwrightBrowsers = () => {
 };
 
 /**
- * One shared Chrome for every hunt and login. Each job gets its own
- * context (cookies and tabs), closed as soon as the job ends.
+ * One shared Chrome for every hunt. Each job gets its own clean context
+ * (no cookies, never signed in), closed as soon as the job ends.
  */
 @Injectable()
 export class PortalBrowserService implements OnApplicationShutdown {
   private readonly logger = new Logger(PortalBrowserService.name);
   private browser: Browser | null = null;
+  private connectedAt = 0;
   private launching: Promise<Browser> | null = null;
   private openContexts = 0;
   private idleTimer: NodeJS.Timeout | null = null;
@@ -62,7 +70,7 @@ export class PortalBrowserService implements OnApplicationShutdown {
     );
   }
 
-  async newContext(storageState?: string | null): Promise<BrowserContext> {
+  async newContext(): Promise<BrowserContext> {
     const browser = await this.ensureBrowser();
     this.openContexts += 1;
     this.clearIdleTimer();
@@ -73,7 +81,6 @@ export class PortalBrowserService implements OnApplicationShutdown {
         timezoneId: "America/Sao_Paulo",
         viewport: { width: 1366, height: 900 },
         userAgent: USER_AGENT,
-        storageState: parseStorageState(storageState),
       });
       context.setDefaultTimeout(20_000);
       context.setDefaultNavigationTimeout(45_000);
@@ -100,6 +107,11 @@ export class PortalBrowserService implements OnApplicationShutdown {
   }
 
   private async ensureBrowser() {
+    if (this.browser?.isConnected() && this.isRemoteSessionStale()) {
+      const stale = this.browser;
+      this.browser = null;
+      await stale.close().catch(() => undefined);
+    }
     if (this.browser?.isConnected()) return this.browser;
     if (!this.launching) {
       this.launching = this.launch().finally(() => {
@@ -107,14 +119,26 @@ export class PortalBrowserService implements OnApplicationShutdown {
       });
     }
     this.browser = await this.launching;
+    this.connectedAt = Date.now();
     return this.browser;
+  }
+
+  /** Only between jobs: a tab still open would lose its page. */
+  private isRemoteSessionStale() {
+    return (
+      Boolean(this.configuration.browserWebSocketEndpoint) &&
+      this.openContexts === 0 &&
+      Date.now() - this.connectedAt > REMOTE_SESSION_MAX_MILLISECONDS
+    );
   }
 
   private async launch() {
     const endpoint = this.configuration.browserWebSocketEndpoint;
     if (endpoint) {
       this.logger.log("Connecting to the remote browser");
-      return chromium.connectOverCDP(endpoint);
+      return chromium.connectOverCDP(endpoint, {
+        timeout: REMOTE_CONNECT_TIMEOUT_MILLISECONDS,
+      });
     }
 
     const executablePath = this.executablePath();
@@ -161,17 +185,3 @@ export class PortalBrowserService implements OnApplicationShutdown {
     this.idleTimer = null;
   }
 }
-
-type StorageState = Exclude<
-  Parameters<Browser["newContext"]>[0],
-  undefined
->["storageState"];
-
-const parseStorageState = (value?: string | null): StorageState => {
-  if (!value) return undefined;
-  try {
-    return JSON.parse(value) as StorageState;
-  } catch {
-    return undefined;
-  }
-};

@@ -3,7 +3,6 @@ import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
-  IsEmail,
   IsEnum,
   IsIn,
   IsInt,
@@ -13,7 +12,6 @@ import {
   IsString,
   IsUUID,
   Length,
-  Matches,
   MaxLength,
   Min,
   ValidateNested,
@@ -30,25 +28,6 @@ import type {
 
 const trimmed = ({ value }: { value: unknown }) =>
   typeof value === "string" ? value.trim() : value;
-
-export class PortalAccountSaveDto {
-  @Transform(trimmed)
-  @IsEmail({}, { message: "Use o e-mail da conta do portal." })
-  @MaxLength(255)
-  login: string;
-
-  /** Left empty on portals that only send a code. */
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  password?: string | null;
-}
-
-export class PortalAccountCodeDto {
-  @Transform(trimmed)
-  @Matches(/^[0-9A-Za-z]{4,10}$/, { message: "Digite o código que chegou." })
-  code: string;
-}
 
 export class HuntInterpretDto {
   @Transform(trimmed)
@@ -237,4 +216,10 @@ export class PropertyMatchPinDto {
   @IsUUID()
   @IsNotEmpty()
   propertyId: string;
+}
+
+export class ListingShortcutCreateDto {
+  @IsUUID()
+  @IsNotEmpty()
+  matchId: string;
 }

@@ -81,13 +81,11 @@ export class PropertyHuntService {
   }
 
   async create(user: User, dto: PropertyHuntCreateDto) {
-    // While the portal search is off, a hunt only looks in the catalog.
+    // With the portal search off, a hunt only looks in the catalog.
     const portals = PORTAL_SEARCH_ENABLED ? [...new Set(dto.portals)] : [];
     if (!portals.length && !dto.includeCatalog) {
       throw new BadRequestException(
-        PORTAL_SEARCH_ENABLED
-          ? "Escolha pelo menos um portal ou a sua carteira."
-          : "A busca nos portais chega em breve. Por enquanto, a caça procura na sua carteira.",
+        "Escolha pelo menos um portal ou a sua carteira.",
       );
     }
     if (portals.length) {

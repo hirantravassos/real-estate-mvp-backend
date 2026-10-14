@@ -3,4 +3,4 @@
  * with LEGAL_VERSION on the frontend whenever the texts change, so every
  * broker is asked to accept the new version before using the app again.
  */
-export const CURRENT_TERMS_VERSION = "2026-10-13.2";
+export const CURRENT_TERMS_VERSION = "2026-10-14.1";
