@@ -43,6 +43,8 @@ import { AccountDeletionModule } from "./domains/account-deletions/account-delet
 import { DataRetentionModule } from "./domains/data-retention/data-retention.module";
 import { AuditLogModule } from "./domains/audit-logs/audit-log.module";
 import { AdminModule } from "./domains/admin/admin.module";
+import { BugReportModule } from "./domains/bug-reports/bug-report.module";
+import { bugReportConfig } from "./config/bug-report.config";
 import { buildDatabaseOptions } from "./database/database-options";
 
 /** Loose default, only the routes with UserThrottlerGuard are counted. */
@@ -70,6 +72,7 @@ const THROTTLE_LIMIT = 240;
         dailyBriefingConfig,
         dataRetentionConfig,
         adminConfig,
+        bugReportConfig,
       ],
       envFilePath: ".env",
     }),
@@ -116,6 +119,7 @@ const THROTTLE_LIMIT = 240;
     DataRetentionModule,
     AuditLogModule,
     AdminModule,
+    BugReportModule,
   ],
   // Per broker when signed in, per address otherwise (request.ip is the
   // real client behind the proxy, see trust proxy in main.ts). Webhooks and

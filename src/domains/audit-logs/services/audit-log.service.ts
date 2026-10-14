@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import dayjs from "dayjs";
 import {
+  Between,
   FindOptionsWhere,
   In,
   LessThan,
@@ -113,6 +114,15 @@ export class AuditLogService {
       order: { createdAt: "DESC" },
       skip: pagination.skip,
       take: pagination.limit,
+    });
+  }
+
+  /** What one broker did in a time window, newest first, for a bug report. */
+  findForUserBetween(userId: string, from: Date, to: Date, limit: number) {
+    return this.auditLogRepository.find({
+      where: { userId, createdAt: Between(from, to) },
+      order: { createdAt: "DESC" },
+      take: limit,
     });
   }
 

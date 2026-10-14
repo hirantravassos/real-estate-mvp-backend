@@ -396,6 +396,7 @@ export class StorageService implements OnApplicationBootstrap {
       `assistant/${userId}/`,
       `inbox/${userId}/`,
       `profile-images/${userId}/`,
+      `bug-reports/${userId}/`,
     ];
   }
 
