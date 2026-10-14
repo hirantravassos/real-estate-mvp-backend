@@ -8,11 +8,18 @@ import {
 } from "@nestjs/common";
 import type { ConfigType } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
+import { createHash } from "crypto";
+import dayjs from "dayjs";
 import { BrowserContext, Page } from "playwright-core";
-import { In, Repository } from "typeorm";
+import { In, LessThan, MoreThanOrEqual, Repository } from "typeorm";
 import { portalsConfig } from "../../../config/portals.config";
 import { RealtimeGateway } from "../../../infrastructure/realtime/realtime.gateway";
-import { PORTAL_SEARCH_ENABLED, PORTALS } from "../constants/portals.constant";
+import {
+  LISTING_REUSE_DAYS,
+  PORTAL_SEARCH_ENABLED,
+  PORTALS,
+} from "../constants/portals.constant";
+import { HuntedListing } from "../entities/hunted-listing.entity";
 import { PropertyHunt, PortalProgress } from "../entities/property-hunt.entity";
 import { PropertyMatch } from "../entities/property-match.entity";
 import {
@@ -31,13 +38,12 @@ import {
   isLoginWall,
   ListingPage,
   readListingPage,
-  revealContacts,
 } from "../helpers/page-reader.helper";
 import { truncate } from "../helpers/text.helper";
 import { PropertyHuntMapper } from "../mappers/property-hunt.mapper";
+import type { ListingSnapshot } from "../types/hunt-criteria.type";
 import { CatalogMatcherService } from "./catalog-matcher.service";
 import { HuntAiService, ListingAnalysis } from "./hunt-ai.service";
-import { PortalAccountService, PortalSession } from "./portal-account.service";
 import { PortalBrowserService } from "./portal-browser.service";
 
 /** Listings sent to the AI in one call. */
@@ -46,6 +52,29 @@ const ANALYSIS_BATCH_SIZE = 3;
 const PARALLEL_PORTALS = 3;
 
 class OutOfCreditsError extends Error {}
+
+/** A listing read from its public page, waiting for the AI. */
+interface ReadListing {
+  /** The link found on the results, the key of the reuse. */
+  link: string;
+  page: ListingPage;
+  portal: PortalKey;
+}
+
+/** What a match needs, from a fresh analysis or a reused one. */
+interface ListingFit {
+  portal: PortalKey;
+  url: string;
+  title: string;
+  snapshot: ListingSnapshot;
+  wishScore: number | null;
+  wishNote: string | null;
+  reused: boolean;
+}
+
+const hashUrl = (url: string) => createHash("sha256").update(url).digest("hex");
+
+const reuseCutoff = () => dayjs().subtract(LISTING_REUSE_DAYS, "day").toDate();
 
 interface RunState {
   hunt: PropertyHunt;
@@ -58,8 +87,11 @@ interface RunState {
 
 /**
  * Runs the hunts in the background, one queue per server: the catalog
- * first, then every chosen portal, browsing signed in, reading each listing
- * with the AI and keeping the ones that fit. Progress goes live to the app.
+ * first, then every chosen portal, reading only the public pages anyone can
+ * open (no login, no "ver telefone" clicks, never past a captcha), checking
+ * each listing with the AI and keeping the ones that fit. Listings already
+ * read for this broker in the last days are reused for free. Progress goes
+ * live to the app, and everything found stays private to the broker.
  */
 @Injectable()
 export class PropertyHuntRunnerService implements OnApplicationBootstrap {
@@ -74,9 +106,10 @@ export class PropertyHuntRunnerService implements OnApplicationBootstrap {
     private readonly huntRepository: Repository<PropertyHunt>,
     @InjectRepository(PropertyMatch)
     private readonly matchRepository: Repository<PropertyMatch>,
+    @InjectRepository(HuntedListing)
+    private readonly listingRepository: Repository<HuntedListing>,
     private readonly catalogMatcher: CatalogMatcherService,
     private readonly huntAiService: HuntAiService,
-    private readonly accountService: PortalAccountService,
     private readonly browserService: PortalBrowserService,
     private readonly realtimeGateway: RealtimeGateway,
   ) {}
@@ -91,6 +124,10 @@ export class PropertyHuntRunnerService implements OnApplicationBootstrap {
           finishedAt: new Date(),
         },
       )
+      .catch(() => undefined);
+    // The advertiser data of old reads is not needed anymore.
+    await this.listingRepository
+      .delete({ analyzedAt: LessThan(reuseCutoff()) })
       .catch(() => undefined);
     const queued = await this.huntRepository
       .find({
@@ -256,15 +293,14 @@ export class PropertyHuntRunnerService implements OnApplicationBootstrap {
     }
 
     const definition = PORTALS[portal];
-    const session = await this.accountService.sessionFor(portal);
     let context: BrowserContext | null = null;
-    let reconnected = false;
 
     try {
-      context = await this.browserService.newContext(session?.storageState);
-      let page = await context.newPage();
+      // A fresh visitor, without cookies nor login: only the public pages.
+      context = await this.browserService.newContext();
+      const page = await context.newPage();
       progress.status = PortalProgressStatus.SEARCHING;
-      progress.authenticated = Boolean(session?.storageState);
+      progress.authenticated = false;
       await this.persist(state);
 
       await page.goto(definition.buildSearchUrl(hunt.criteria), {
@@ -285,44 +321,29 @@ export class PropertyHuntRunnerService implements OnApplicationBootstrap {
           definition,
           this.configuration.listingsPerPortal * 2,
         )
-      )
-        .filter((link) => !state.knownUrls.has(link))
+      ).filter((link) => !state.knownUrls.has(link));
+
+      const reused = await this.reuseListings(state, progress, portal, links);
+      const fresh = links
+        .filter((link) => !reused.has(link))
         .slice(0, this.configuration.listingsPerPortal);
 
-      progress.found = links.length;
+      progress.found = reused.size + fresh.length;
       progress.status = PortalProgressStatus.READING;
-      if (!links.length) {
+      if (!progress.found) {
         progress.message = "Nenhum anúncio novo com esses filtros.";
       }
       await this.persist(state);
 
-      let batch: { page: ListingPage; portal: PortalKey }[] = [];
-      for (const link of links) {
+      let batch: ReadListing[] = [];
+      for (const link of fresh) {
         if (state.cancelled || state.outOfCredits) break;
         await humanPause(this.configuration.pageDelayMilliseconds);
-        const opened = await this.openListing(page, link);
-        if (!opened) continue;
+        if (!(await this.openListing(page, link))) continue;
+        // A listing behind a login is not public, it is left alone.
+        if (await isLoginWall(page, definition)) continue;
 
-        if (session && (await isLoginWall(page, definition))) {
-          if (reconnected) continue;
-          reconnected = true;
-          const storageState = await this.accountService.reconnect(
-            session.account,
-          );
-          if (!storageState) {
-            progress.authenticated = false;
-            progress.message =
-              "A sessão do portal expirou, seguimos sem login.";
-            continue;
-          }
-          await this.browserService.release(context);
-          context = await this.browserService.newContext(storageState);
-          page = await context.newPage();
-          if (!(await this.openListing(page, link))) continue;
-        }
-
-        await revealContacts(page);
-        batch.push({ page: await readListingPage(page), portal });
+        batch.push({ link, page: await readListingPage(page), portal });
         if (batch.length >= ANALYSIS_BATCH_SIZE) {
           await this.analyze(state, progress, batch);
           batch = [];
@@ -330,10 +351,6 @@ export class PropertyHuntRunnerService implements OnApplicationBootstrap {
       }
       if (batch.length && !state.outOfCredits) {
         await this.analyze(state, progress, batch);
-      }
-
-      if (session && progress.authenticated) {
-        await this.keepSession(session, context);
       }
       progress.status = PortalProgressStatus.DONE;
     } catch (error) {
@@ -364,17 +381,57 @@ export class PropertyHuntRunnerService implements OnApplicationBootstrap {
     }
   }
 
-  private async keepSession(session: PortalSession, context: BrowserContext) {
-    const storageState = JSON.stringify(await context.storageState());
-    await this.accountService
-      .storeSession(session.account, storageState)
-      .catch(() => undefined);
+  /**
+   * Listings this broker's hunts read in the last days skip the page and the
+   * AI: they are scored again against this hunt, without spending credits.
+   */
+  private async reuseListings(
+    state: RunState,
+    progress: PortalProgress,
+    portal: PortalKey,
+    links: string[],
+  ) {
+    const reused = new Set<string>();
+    if (!links.length) return reused;
+    const { hunt } = state;
+
+    const cached = await this.listingRepository
+      .find({
+        where: {
+          userId: hunt.userId,
+          urlHash: In(links.map(hashUrl)),
+          analyzedAt: MoreThanOrEqual(reuseCutoff()),
+          active: true,
+        },
+      })
+      .catch(() => [] as HuntedListing[]);
+
+    const fits: ListingFit[] = [];
+    for (const listing of cached) {
+      if (!links.includes(listing.url)) continue;
+      reused.add(listing.url);
+      if (!listing.isListing || !listing.snapshot) continue;
+      fits.push({
+        portal,
+        url: listing.url,
+        title: listing.title,
+        snapshot: listing.snapshot,
+        wishScore: null,
+        wishNote: null,
+        reused: true,
+      });
+    }
+
+    progress.analyzed += reused.size;
+    progress.reused = (progress.reused ?? 0) + reused.size;
+    await this.saveFits(state, progress, fits);
+    return reused;
   }
 
   private async analyze(
     state: RunState,
     progress: PortalProgress,
-    batch: { page: ListingPage; portal: PortalKey }[],
+    batch: ReadListing[],
   ) {
     const { hunt } = state;
     let analyses: ListingAnalysis[];
@@ -402,26 +459,92 @@ export class PropertyHuntRunnerService implements OnApplicationBootstrap {
     }
 
     progress.analyzed += batch.length;
-    const matches: PropertyMatch[] = [];
+    await this.remember(hunt.userId, batch, analyses);
+
+    const fits: ListingFit[] = [];
     for (const analysis of analyses) {
       state.knownUrls.add(analysis.page.url);
       if (!analysis.isListing) continue;
+      fits.push({
+        portal: analysis.portal,
+        url: analysis.page.url,
+        title: analysis.title,
+        snapshot: analysis.snapshot,
+        wishScore: analysis.wishScore,
+        wishNote: analysis.wishNote,
+        reused: false,
+      });
+    }
+    await this.saveFits(state, progress, fits);
+  }
+
+  /** Keeps every paid read, fit or not, so the next hunts reuse it. */
+  private async remember(
+    userId: string,
+    batch: ReadListing[],
+    analyses: ListingAnalysis[],
+  ) {
+    const analyzedAt = new Date();
+    const rows = analyses.flatMap((analysis) => {
+      const read = batch.find((item) => item.page === analysis.page);
+      if (!read) return [];
+      return [
+        {
+          userId,
+          portal: read.portal,
+          url: truncate(read.link, 1024),
+          urlHash: hashUrl(read.link),
+          isListing: analysis.isListing,
+          title: truncate(analysis.title || read.page.title || "Anúncio", 255),
+          snapshot: analysis.isListing ? analysis.snapshot : null,
+          analyzedAt,
+          active: true,
+        },
+      ];
+    });
+    if (!rows.length) return;
+    await this.listingRepository
+      .upsert(rows, {
+        conflictPaths: ["userId", "urlHash"],
+        skipUpdateIfNoValuesChanged: true,
+      })
+      .catch((error) =>
+        this.logger.warn(`Listing reuse not saved: ${String(error)}`),
+      );
+  }
+
+  /** Scores the listings against the hunt and keeps the ones that fit. */
+  private async saveFits(
+    state: RunState,
+    progress: PortalProgress,
+    fits: ListingFit[],
+  ) {
+    const { hunt } = state;
+    const matches: PropertyMatch[] = [];
+    for (const fit of fits) {
+      // Reused reads were not checked against this hunt's extra wishes.
       const score = scoreMatch(
-        factsFromSnapshot(analysis.snapshot),
+        factsFromSnapshot(fit.snapshot),
         hunt.criteria,
-        analysis.wishScore,
+        fit.wishScore,
       );
       if (score.score < MINIMUM_MATCH_SCORE) continue;
 
       const highlights = [...score.highlights];
       const warnings = [...score.warnings];
-      if (analysis.wishNote) {
-        if ((analysis.wishScore ?? 0) >= 60) highlights.push(analysis.wishNote);
-        else warnings.push(analysis.wishNote);
+      if (fit.wishNote) {
+        if ((fit.wishScore ?? 0) >= 60) highlights.push(fit.wishNote);
+        else warnings.push(fit.wishNote);
+      }
+      if (fit.reused) {
+        highlights.push("Lido numa caçada recente, sem custo");
+        if (hunt.criteria.extraWishes.length) {
+          warnings.push("Desejos extras não conferidos neste anúncio");
+        }
       }
       if (
-        !analysis.snapshot.advertiser.phones.length &&
-        !analysis.snapshot.advertiser.emails.length
+        !fit.snapshot.advertiser.phones.length &&
+        !fit.snapshot.advertiser.emails.length
       ) {
         warnings.push("Contato do anunciante só pelo portal");
       }
@@ -433,17 +556,15 @@ export class PropertyHuntRunnerService implements OnApplicationBootstrap {
           customerId: hunt.customerId,
           propertyId: null,
           origin: PropertyMatchOrigin.PORTAL,
-          portal: analysis.portal,
-          externalUrl: truncate(analysis.page.url, 1024),
-          title: truncate(analysis.title, 255),
-          listing: analysis.snapshot,
-          coverImageUrl: analysis.snapshot.photos[0]
-            ? truncate(analysis.snapshot.photos[0], 1024)
+          portal: fit.portal,
+          externalUrl: truncate(fit.url, 1024),
+          title: truncate(fit.title, 255),
+          listing: fit.snapshot,
+          coverImageUrl: fit.snapshot.photos[0]
+            ? truncate(fit.snapshot.photos[0], 1024)
             : null,
           price:
-            analysis.snapshot.price === null
-              ? null
-              : analysis.snapshot.price.toFixed(2),
+            fit.snapshot.price === null ? null : fit.snapshot.price.toFixed(2),
           score: score.score,
           highlights: highlights.slice(0, 11),
           warnings: warnings.slice(0, 6),
@@ -489,6 +610,7 @@ export class PropertyHuntRunnerService implements OnApplicationBootstrap {
         authenticated: false,
         found: 0,
         analyzed: 0,
+        reused: 0,
         matched: 0,
         message: null,
       };

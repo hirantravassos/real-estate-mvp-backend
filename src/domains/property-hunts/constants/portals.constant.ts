@@ -233,19 +233,27 @@ export const PORTALS: Record<PortalKey, PortalDefinition> = {
 export const PORTAL_KEYS = Object.values(PortalKey);
 
 /**
- * Bringing a portal listing into the broker's catalog copies the
- * advertiser's photos and contacts. It stays off ("em breve") until the
- * partnership terms with the advertiser are settled, see
- * docs/compliance/lgpd-auditoria-2026-10-13.md, item 4.1.
+ * Keeps a portal listing in the broker's catalog as a private property: the
+ * facts, the advertiser and the link, never a copy of the photos, and it can
+ * never reach the public page nor the shared link (`isFromPortal`). See
+ * docs/compliance/caca-imoveis-portais-2026-10-14.md.
  */
-export const LISTING_IMPORT_ENABLED = false;
+export const LISTING_IMPORT_ENABLED = true;
 
 /**
- * Hunting on the listing portals opens them with the platform accounts and
- * reads the advertisers' contacts. Off ("em breve") until it runs on terms
- * agreed with the portals; hunts look only in the broker's own catalog.
+ * Hunting on the listing portals reads only the public pages, as any
+ * visitor: no platform login, no "ver telefone" clicks, and it stops at any
+ * captcha. What it finds stays private to the broker who ran the hunt. See
+ * docs/compliance/caca-imoveis-portais-2026-10-14.md.
  */
-export const PORTAL_SEARCH_ENABLED = false;
+export const PORTAL_SEARCH_ENABLED = true;
+
+/**
+ * Days a listing read by the AI is reused by the next hunts of the same
+ * broker without paying again. Older reads are deleted, they carry the
+ * advertiser's contacts.
+ */
+export const LISTING_REUSE_DAYS = 14;
 
 /** The paid AI search of owner ads reads the portals the same way. */
 export const OWNER_CONTACT_SEARCH_ENABLED = false;

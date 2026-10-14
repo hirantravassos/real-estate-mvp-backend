@@ -1,10 +1,15 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { User } from "../../users/entities/user.entity";
 import { Property } from "../entities/property.entity";
 import {
   Between,
   FindOptionsWhere,
   ILike,
+  IsNull,
   LessThanOrEqual,
   MoreThanOrEqual,
   Repository,
@@ -25,7 +30,7 @@ import { Transform, Type } from "class-transformer";
 import { ValidateCurrency } from "../../../shared/decorators/validation/currency.decorator";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 import { InjectRepository } from "@nestjs/typeorm";
-import { publicAddressOf } from "../helpers/customer-safe.helper";
+import { isFromPortal, publicAddressOf } from "../helpers/customer-safe.helper";
 import {
   PropertyConciergeServiceEnum,
   PropertyFurnitureEnum,
@@ -388,20 +393,37 @@ export class PropertyService {
     return await this.propertyRepository.save(entity);
   }
 
-  /** Shows or hides the property on the broker's public page. */
+  /**
+   * Shows or hides the property on the broker's public page. A property a
+   * hunt found on a portal is someone else's listing: it stays private.
+   */
   async setLandingVisibility(user: User, id: string, visible: boolean) {
-    const result = await this.propertyRepository.update(
-      { id, user: { id: user.id }, active: true },
+    const property = await this.propertyRepository.findOne({
+      where: { id, user: { id: user.id }, active: true },
+      select: { id: true, sourcePortal: true },
+    });
+    if (!property) throw new NotFoundException("Property not found");
+    if (visible && isFromPortal(property)) {
+      throw new BadRequestException(
+        "Imóveis garimpados nos portais ficam só no seu sistema, não vão para a sua página.",
+      );
+    }
+    await this.propertyRepository.update(
+      { id: property.id },
       { showOnLanding: visible },
     );
-    if (!result.affected) throw new NotFoundException("Property not found");
     return this.findOne(user, id);
   }
 
-  /** What the broker's public page lists, newest first. */
+  /** What the broker's public page lists, newest first, never a portal one. */
   async findForLanding(userId: string, limit: number) {
     return this.propertyRepository.find({
-      where: { userId, active: true, showOnLanding: true },
+      where: {
+        userId,
+        active: true,
+        showOnLanding: true,
+        sourcePortal: IsNull(),
+      },
       order: { createdAt: "DESC" },
       take: limit,
     });
@@ -423,6 +445,8 @@ export class PropertyService {
       .catch(() => {
         throw new NotFoundException("Property not found");
       });
+    // A portal listing kept by a hunt never gets a public link.
+    if (isFromPortal(entity)) throw new NotFoundException("Property not found");
 
     const dto = PropertyMapper.toDto(entity);
     // The customer never sees the private notes nor the portal it came from.

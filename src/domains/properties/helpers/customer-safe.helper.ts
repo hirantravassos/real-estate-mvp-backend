@@ -16,6 +16,8 @@ export interface PropertySourceDetails {
   };
   /** The advertiser's own text, as written on the portal. */
   description: string | null;
+  /** Links to the photos on the portal, never copied to our storage. */
+  photos?: string[];
   videos: string[];
 }
 

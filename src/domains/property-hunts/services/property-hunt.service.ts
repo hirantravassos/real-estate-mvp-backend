@@ -141,6 +141,7 @@ export class PropertyHuntService {
           authenticated: false,
           found: 0,
           analyzed: 0,
+          reused: 0,
           matched: 0,
           message: null,
         })),

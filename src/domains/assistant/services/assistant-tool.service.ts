@@ -634,7 +634,9 @@ export class AssistantToolService {
           : null,
         parkingSpaces: property.infoParkingSpaceUnits,
         condominiumFee: formatBrl(property.infoMaintenanceFee),
-        publicLink: this.publicLinkOf(property.id),
+        publicLink: isFromPortal(property)
+          ? null
+          : this.publicLinkOf(property.id),
       })),
     };
   }

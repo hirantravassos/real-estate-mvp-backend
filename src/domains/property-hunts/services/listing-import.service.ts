@@ -1,17 +1,9 @@
 import { Injectable, Logger, OnApplicationBootstrap } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import dayjs from "dayjs";
-import sharp from "sharp";
 import { IsNull, Not, Repository } from "typeorm";
-import {
-  ALLOWED_MEDIA_IMAGE_TYPES,
-  StorageService,
-} from "../../../infrastructure/storage/services/storage.service";
 import { PropertyContact } from "../../properties/entities/property-contact.entity";
-import {
-  PropertyMedia,
-  PropertyMediaType,
-} from "../../properties/entities/property-media.entity";
+import { PropertyMedia } from "../../properties/entities/property-media.entity";
 import { Property } from "../../properties/entities/property.entity";
 import {
   PropertySourceDetails,
@@ -23,22 +15,13 @@ import {
   PropertyLiftEnum,
 } from "../../properties/mappers/property.mapper";
 import { User } from "../../users/entities/user.entity";
-import { PORTALS } from "../constants/portals.constant";
-import { WhatsappConnection } from "../../inbox/entities/whatsapp-connection.entity";
-import { brokerMarkLines, stampBrokerMark } from "../helpers/watermark.helper";
 import { PropertyMatch } from "../entities/property-match.entity";
 import { AMENITY_LABELS } from "../helpers/match-score.helper";
 import { truncate } from "../helpers/text.helper";
 import { ListingSnapshot } from "../types/hunt-criteria.type";
 
-const MAXIMUM_PHOTOS = 25;
-const MAXIMUM_PHOTO_BYTES = 15 * 1024 * 1024;
-const MAXIMUM_VIDEO_BYTES = 200 * 1024 * 1024;
-const DOWNLOAD_TIMEOUT_MILLISECONDS = 25_000;
-const PARALLEL_DOWNLOADS = 4;
-
-const USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
+/** Links to the listing's own photos, shown to the broker from the portal. */
+const MAXIMUM_PHOTO_LINKS = 25;
 
 const ADVERTISER_KIND_LABELS = {
   owner: "proprietário",
@@ -48,9 +31,11 @@ const ADVERTISER_KIND_LABELS = {
 } as const;
 
 /**
- * Turns a portal listing into a property of the broker's catalog, with the
- * photos and videos copied to our storage, so it stays even after the
- * listing leaves the portal.
+ * Keeps a portal listing in the broker's catalog as a private property. The
+ * photos are third party works (Lei 9.610/1998, art. 7, VII and art. 29,
+ * IX): they are never copied to our storage nor stamped, only their links
+ * are kept, shown to the broker from the portal. The property never reaches
+ * the public page nor the shared link, see `isFromPortal`.
  */
 @Injectable()
 export class ListingImportService implements OnApplicationBootstrap {
@@ -63,9 +48,6 @@ export class ListingImportService implements OnApplicationBootstrap {
     private readonly mediaRepository: Repository<PropertyMedia>,
     @InjectRepository(PropertyMatch)
     private readonly matchRepository: Repository<PropertyMatch>,
-    private readonly storageService: StorageService,
-    @InjectRepository(WhatsappConnection)
-    private readonly connectionRepository: Repository<WhatsappConnection>,
   ) {}
 
   async importMatch(user: User, match: PropertyMatch) {
@@ -73,31 +55,7 @@ export class ListingImportService implements OnApplicationBootstrap {
     const property = await this.propertyRepository.save(
       this.toProperty(user, match, listing),
     );
-
-    const markLines = await this.brokerMarkOf(user);
-    const media = await this.copyMedia(
-      user.id,
-      property.id,
-      match,
-      listing,
-      markLines,
-    );
-    return { property, mediaCount: media };
-  }
-
-  /** Every imported photo carries the broker's name and contact. */
-  private async brokerMarkOf(user: User) {
-    const connection = user.phone
-      ? null
-      : await this.connectionRepository
-          .findOne({ where: { userId: user.id } })
-          .catch(() => null);
-    return brokerMarkLines({
-      name: user.name,
-      creci: user.creci,
-      phone: user.phone ?? connection?.phone ?? null,
-      email: user.email,
-    });
+    return { property, mediaCount: 0 };
   }
 
   private toProperty(
@@ -119,6 +77,7 @@ export class ListingImportService implements OnApplicationBootstrap {
     property.sourcePortal = match.portal;
     property.sourceUrl = match.externalUrl;
     property.sourceDetails = this.sourceDetailsOf(listing);
+    property.showOnLanding = false;
 
     property.infoBedrooms = listing.bedrooms;
     property.infoSuiteBedrooms = listing.suites;
@@ -184,7 +143,7 @@ export class ListingImportService implements OnApplicationBootstrap {
       listing.advertiser.company,
     ]);
     return [
-      "🔒 Garimpado pela caça com IA. Link, anunciante e contatos do anúncio ficam no painel Origem do anúncio, só para você.",
+      "🔒 Garimpado pela caça com IA. Imóvel privado: não vai para a sua página nem para link público. Fotos, link, anunciante e contatos ficam no painel Origem do anúncio, só para você.",
       listing.amenities.length
         ? `Diferenciais: ${listing.amenities.map((amenity) => AMENITY_LABELS[amenity]).join(", ")}`
         : null,
@@ -205,6 +164,7 @@ export class ListingImportService implements OnApplicationBootstrap {
       state: listing.state,
       advertiser: listing.advertiser,
       description: listing.description,
+      photos: listing.photos.slice(0, MAXIMUM_PHOTO_LINKS),
       videos: listing.videos,
     };
   }
@@ -253,132 +213,5 @@ export class ListingImportService implements OnApplicationBootstrap {
         listing.advertiser.company,
       ]) || "Imóvel garimpado"
     );
-  }
-
-  private async copyMedia(
-    userId: string,
-    propertyId: string,
-    match: PropertyMatch,
-    listing: ListingSnapshot,
-    markLines: string[],
-  ) {
-    const referer = match.portal ? PORTALS[match.portal].homeUrl : undefined;
-    const sources = [
-      ...listing.photos.slice(0, MAXIMUM_PHOTOS).map((url) => ({
-        url,
-        type: PropertyMediaType.IMAGE,
-      })),
-      ...listing.videos
-        .filter((video) => /\.(mp4|webm|mov)(\?|$)/i.test(video))
-        .slice(0, 3)
-        .map((url) => ({ url, type: PropertyMediaType.VIDEO })),
-    ];
-
-    const saved: PropertyMedia[] = [];
-    for (let start = 0; start < sources.length; start += PARALLEL_DOWNLOADS) {
-      const chunk = sources.slice(start, start + PARALLEL_DOWNLOADS);
-      const results = await Promise.all(
-        chunk.map((source, offset) =>
-          this.copyOne(
-            userId,
-            propertyId,
-            source,
-            start + offset,
-            markLines,
-            referer,
-          ),
-        ),
-      );
-      saved.push(...results.filter((media): media is PropertyMedia => !!media));
-    }
-
-    const cover = saved.find((media) => media.type === PropertyMediaType.IMAGE);
-    if (cover) {
-      cover.isCover = true;
-      await this.mediaRepository.save(cover);
-    }
-    return saved.length;
-  }
-
-  private async copyOne(
-    userId: string,
-    propertyId: string,
-    source: { url: string; type: PropertyMediaType },
-    order: number,
-    markLines: string[],
-    referer?: string,
-  ) {
-    try {
-      const response = await fetch(source.url, {
-        headers: {
-          "User-Agent": USER_AGENT,
-          Accept: source.type === PropertyMediaType.IMAGE ? "image/*" : "*/*",
-          ...(referer ? { Referer: referer } : {}),
-        },
-        signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MILLISECONDS),
-      });
-      if (!response.ok) return null;
-
-      const limit =
-        source.type === PropertyMediaType.IMAGE
-          ? MAXIMUM_PHOTO_BYTES
-          : MAXIMUM_VIDEO_BYTES;
-      const declaredSize = Number(response.headers.get("content-length") ?? 0);
-      if (declaredSize > limit) return null;
-
-      let buffer: Buffer = Buffer.from(await response.arrayBuffer());
-      if (buffer.length > limit || buffer.length < 2000) return null;
-      let mimeType = (response.headers.get("content-type") ?? "")
-        .split(";")[0]
-        .trim()
-        .toLowerCase();
-
-      if (source.type === PropertyMediaType.IMAGE) {
-        if (!ALLOWED_MEDIA_IMAGE_TYPES.has(mimeType)) {
-          buffer = await sharp(buffer).jpeg({ quality: 85 }).toBuffer();
-          mimeType = "image/jpeg";
-        }
-        const { width } = await sharp(buffer).metadata();
-        if (!width || width < 300) return null;
-
-        try {
-          buffer = await stampBrokerMark(buffer, markLines);
-          mimeType = "image/jpeg";
-        } catch (error) {
-          // A photo without the mark is better than a lost photo.
-          this.logger.error(`Broker mark not stamped: ${String(error)}`);
-        }
-      } else if (!mimeType.startsWith("video/")) {
-        return null;
-      }
-
-      const extension = mimeType.split("/")[1]?.replace("jpeg", "jpg") ?? "bin";
-      const s3Key = this.storageService.generateMediaS3Key(
-        userId,
-        propertyId,
-        `garimpo-${order + 1}.${extension}`,
-      );
-      await this.storageService.uploadBuffer(s3Key, buffer, mimeType);
-
-      return await this.mediaRepository.save(
-        this.mediaRepository.create({
-          userId,
-          propertyId,
-          type: source.type,
-          displayName:
-            source.type === PropertyMediaType.IMAGE
-              ? `Foto ${order + 1}`
-              : "Vídeo",
-          s3Key,
-          mimeType,
-          sizeBytes: buffer.length,
-          sortOrder: order,
-          isCover: false,
-        }),
-      );
-    } catch (error) {
-      this.logger.debug(`Could not copy ${source.url}: ${String(error)}`);
-      return null;
-    }
   }
 }

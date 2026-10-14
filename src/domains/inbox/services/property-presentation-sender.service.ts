@@ -19,6 +19,7 @@ import { ConversationService } from "./conversation.service";
 import { InboxAiService } from "./inbox-ai.service";
 import { MessageService } from "./message.service";
 import { WhatsappConnectionService } from "./whatsapp-connection.service";
+import { isFromPortal } from "../../properties/helpers/customer-safe.helper";
 
 /** Above this, or when not mp4, a video goes as a file so WhatsApp accepts it. */
 const MAXIMUM_WHATSAPP_VIDEO_BYTES = 64 * 1024 * 1024;
@@ -54,7 +55,7 @@ export class PropertyPresentationSenderService {
       conversationId,
     );
     const property = await this.propertyService.findOne(user, dto.propertyId);
-    const link = this.linkOf(property.id);
+    const link = this.linkOf(property);
 
     const media = await this.propertyMediaService.findForMessaging(
       user.id,
@@ -181,8 +182,10 @@ export class PropertyPresentationSenderService {
       : `${item.displayName}${extension}`;
   }
 
-  private linkOf(propertyId: string) {
-    return `${this.applicationConfiguration.frontendUrl}/p/${propertyId}`;
+  /** A property found on a portal has no public page, so no link. */
+  private linkOf(property: { id: string; sourcePortal?: string | null }) {
+    if (isFromPortal(property)) return null;
+    return `${this.applicationConfiguration.frontendUrl}/p/${property.id}`;
   }
 
   private firstNameOf(conversation: Conversation) {

@@ -16,6 +16,7 @@ import { Property } from "../properties/entities/property.entity";
 import { PortalAccountController } from "./controllers/portal-account.controller";
 import { PropertyHuntController } from "./controllers/property-hunt.controller";
 import { PropertyMatchController } from "./controllers/property-match.controller";
+import { HuntedListing } from "./entities/hunted-listing.entity";
 import { PortalAccount } from "./entities/portal-account.entity";
 import { PropertyHunt } from "./entities/property-hunt.entity";
 import { PropertyMatch } from "./entities/property-match.entity";
@@ -35,6 +36,7 @@ import { PropertyMatchService } from "./services/property-match.service";
     ConfigModule,
     TypeOrmModule.forFeature([
       PortalAccount,
+      HuntedListing,
       PropertyHunt,
       PropertyMatch,
       Property,

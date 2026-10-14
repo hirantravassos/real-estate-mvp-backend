@@ -43,6 +43,7 @@ import {
 import { renderDocx } from "../helpers/docx-renderer.helper";
 import { formatDay } from "../helpers/assistant-format.helper";
 import { renderPdf } from "../helpers/pdf-renderer.helper";
+import { isFromPortal } from "../../properties/helpers/customer-safe.helper";
 
 const MAXIMUM_BLOCKS = 200;
 const MAXIMUM_PROPERTY_BLOCKS = 20;
@@ -327,7 +328,9 @@ export class AssistantDocumentService {
     return {
       title: this.propertyTitle(property),
       facts: describePropertyFacts(PropertyMapper.toDto(property)),
-      link: `${this.applicationConfiguration.frontendUrl}/p/${property.id}`,
+      link: isFromPortal(property)
+        ? null
+        : `${this.applicationConfiguration.frontendUrl}/p/${property.id}`,
       photo: await this.coverPhotoOf(user, property.id),
     };
   }

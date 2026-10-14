@@ -88,7 +88,8 @@ const describeAmenities = (property: PropertyDto) => {
 export const formatPropertyPitch = (
   property: PropertyDto,
   customerFirstName: string | null,
-  link: string,
+  /** Null for a property found on a portal, it has no public page. */
+  link: string | null,
 ) => {
   const sections: string[] = [];
   const greeting = customerFirstName ? `Oi, ${customerFirstName}! ` : "Oi! ";
@@ -124,7 +125,7 @@ export const formatPropertyPitch = (
   if (tax) pricing.push(`IPTU ${tax}`);
   sections.push(pricing.join("\n"));
 
-  sections.push(`Veja todas as fotos e detalhes:\n🔗 ${link}`);
+  if (link) sections.push(`Veja todas as fotos e detalhes:\n🔗 ${link}`);
   sections.push("Quer agendar uma visita? 😊");
 
   return sections.join("\n\n");

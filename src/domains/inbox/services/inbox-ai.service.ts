@@ -153,7 +153,7 @@ export class InboxAiService {
     user: User,
     conversation: Conversation,
     property: PropertyDto,
-    link: string,
+    link: string | null,
     instruction?: string | null,
   ) {
     const [customerContext, transcript] = await Promise.all([
@@ -169,7 +169,9 @@ export class InboxAiService {
         "Escreva uma apresentação personalizada do imóvel para este cliente, para ir junto com as fotos e vídeos.",
         "Conecte os pontos fortes do imóvel com o que o cliente procura, citado na conversa ou na ficha dele.",
         "Use parágrafos curtos, cite os números principais (área, dormitórios, vagas, valor) e termine convidando para uma visita.",
-        `Inclua este link exatamente como está, numa linha própria: ${link}`,
+        link
+          ? `Inclua este link exatamente como está, numa linha própria: ${link}`
+          : "Não inclua nenhum link nem endereço completo.",
         "Responda somente com a mensagem, entre 600 e 1200 caracteres.",
       ].join("\n"),
       input: [
@@ -190,9 +192,10 @@ export class InboxAiService {
         .join("\n\n"),
     });
 
-    const text = result.text.includes(link)
-      ? result.text
-      : `${result.text}\n\n🔗 ${link}`;
+    const text =
+      !link || result.text.includes(link)
+        ? result.text
+        : `${result.text}\n\n🔗 ${link}`;
 
     return {
       text,

@@ -31,6 +31,7 @@ import { Kanban } from "../../kanbans/entities/kanban.entity";
 import { PropertyContact } from "../../properties/entities/property-contact.entity";
 import { PropertyMedia } from "../../properties/entities/property-media.entity";
 import { Property } from "../../properties/entities/property.entity";
+import { HuntedListing } from "../../property-hunts/entities/hunted-listing.entity";
 import { PortalAccount } from "../../property-hunts/entities/portal-account.entity";
 import { PropertyHunt } from "../../property-hunts/entities/property-hunt.entity";
 import { PropertyMatch } from "../../property-hunts/entities/property-match.entity";
@@ -67,6 +68,7 @@ const THIRD_PARTY_ENTITIES = [
   PropertyLegalProfile,
   PropertyMatch,
   PropertyHunt,
+  HuntedListing,
   PortalAccount,
   Visit,
   Deal,

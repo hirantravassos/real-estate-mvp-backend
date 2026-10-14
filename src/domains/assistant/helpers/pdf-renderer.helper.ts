@@ -270,11 +270,13 @@ const drawProperty = (pdf: Pdf, property: RenderedProperty) => {
   property.facts.forEach((fact) => {
     body(pdf).text(`• ${printable(fact)}`, left, pdf.y, { width });
   });
-  pdf
-    .moveDown(0.3)
-    .fillColor(COLORS.brand)
-    .text(property.link, left, pdf.y, { link: property.link, underline: true })
-    .moveDown(1.2);
+  if (property.link) {
+    pdf.moveDown(0.3).fillColor(COLORS.brand).text(property.link, left, pdf.y, {
+      link: property.link,
+      underline: true,
+    });
+  }
+  pdf.moveDown(1.2);
 };
 
 const drawSignatures = (pdf: Pdf, names: string[]) => {

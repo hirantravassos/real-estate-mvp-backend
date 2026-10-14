@@ -14,7 +14,8 @@ export type DocumentBlockType =
 export interface RenderedProperty {
   title: string;
   facts: string[];
-  link: string;
+  /** Null for a property found on a portal, it has no public page. */
+  link: string | null;
   /** JPEG of the cover photo, when there is one. */
   photo: { buffer: Buffer; width: number; height: number } | null;
 }

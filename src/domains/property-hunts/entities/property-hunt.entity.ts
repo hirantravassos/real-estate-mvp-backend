@@ -17,6 +17,8 @@ export interface PortalProgress {
   authenticated: boolean;
   found: number;
   analyzed: number;
+  /** Read in a recent hunt of the same broker, reused without credits. */
+  reused?: number;
   matched: number;
   message: string | null;
 }

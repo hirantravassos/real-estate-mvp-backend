@@ -274,23 +274,25 @@ const renderProperty = (property: RenderedProperty): Paragraph[] => {
       new Paragraph({ bullet: { level: 0 }, children: [text(fact)] }),
     ),
   );
-  paragraphs.push(
-    new Paragraph({
-      spacing: { before: 80, after: 240 },
-      children: [
-        new ExternalHyperlink({
-          link: property.link,
-          children: [
-            new TextRun({
-              text: property.link,
-              style: "Hyperlink",
-              color: BRAND,
-              underline: {},
-            }),
-          ],
-        }),
-      ],
-    }),
-  );
+  if (property.link) {
+    paragraphs.push(
+      new Paragraph({
+        spacing: { before: 80, after: 240 },
+        children: [
+          new ExternalHyperlink({
+            link: property.link,
+            children: [
+              new TextRun({
+                text: property.link,
+                style: "Hyperlink",
+                color: BRAND,
+                underline: {},
+              }),
+            ],
+          }),
+        ],
+      }),
+    );
+  }
   return paragraphs;
 };
