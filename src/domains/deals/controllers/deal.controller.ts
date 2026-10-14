@@ -7,6 +7,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   UploadedFile,
   UseGuards,
@@ -29,6 +30,7 @@ import {
   DealMessageDto,
   DealMilestoneCreateDto,
   DealMilestoneUpdateDto,
+  DealCommissionSplitDto,
   DealPartnerCreateDto,
   DealPartnerUpdateDto,
   DealPortalDto,
@@ -278,6 +280,16 @@ export class DealController {
     @Param("signerId", ParseUUIDPipe) signerId: string,
   ) {
     return this.signatureService.resetSignature(user, id, signerId);
+  }
+
+  /** The whole commission and each partner's share, in one go. */
+  @Put(":id/commission")
+  splitCommission(
+    @GetUser() user: User,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: DealCommissionSplitDto,
+  ) {
+    return this.partnerService.splitCommission(user, id, dto);
   }
 
   @Post(":id/partners")

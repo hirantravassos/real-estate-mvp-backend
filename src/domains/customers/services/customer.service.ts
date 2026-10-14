@@ -129,6 +129,11 @@ export class CustomerService {
         { ...baseWhere, name: ILike(`%${dto.search}%`) },
         { ...baseWhere, phone: ILike(`%${dto.search}%`) },
       ];
+      // Phones are kept as digits, "(11) 9 1234" still finds them.
+      const searchDigits = dto.search.replace(/\D/g, "");
+      if (searchDigits.length >= 3 && searchDigits !== dto.search) {
+        where.push({ ...baseWhere, phone: ILike(`%${searchDigits}%`) });
+      }
     }
 
     const [data, total] = await this.customerRepository

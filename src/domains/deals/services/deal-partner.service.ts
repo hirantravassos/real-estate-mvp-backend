@@ -22,7 +22,11 @@ import {
   DealSignerStatus,
   DealStatus,
 } from "../enums/deal.enum";
-import { DealPartnerCreateDto, DealPartnerUpdateDto } from "../dtos/deal.dto";
+import {
+  DealCommissionSplitDto,
+  DealPartnerCreateDto,
+  DealPartnerUpdateDto,
+} from "../dtos/deal.dto";
 import { DealMapper } from "../mappers/deal.mapper";
 import { DealActivityService } from "./deal-activity.service";
 import { createPublicToken, DealService } from "./deal.service";
@@ -149,6 +153,80 @@ export class DealPartnerService {
         { name: partner.name, phone: partner.phone, email: partner.email },
       );
     }
+
+    return this.dealService.findOne(user, dealId);
+  }
+
+  /**
+   * Saves the whole commission and every partner's share together, so the
+   * broker can move points from one partner to another without the sum
+   * passing 100% halfway.
+   */
+  async splitCommission(
+    user: User,
+    dealId: string,
+    dto: DealCommissionSplitDto,
+  ) {
+    const deal = await this.findOwnedDealOrThrow(user.id, dealId);
+    this.dealService.assertOpen(deal);
+
+    const partners = await this.partnerRepository.find({
+      where: { dealId: deal.id, active: true },
+    });
+    const partnersById = new Map(
+      partners.map((partner) => [partner.id, partner]),
+    );
+    const sharesById = new Map(
+      partners.map((partner) => [
+        partner.id,
+        Number(partner.commissionShare ?? 0),
+      ]),
+    );
+    for (const item of dto.partners) {
+      if (!partnersById.has(item.partnerId)) {
+        throw new NotFoundException("Parceria não encontrada.");
+      }
+      sharesById.set(item.partnerId, item.commissionShare ?? 0);
+    }
+
+    const partnersShare = [...sharesById.values()].reduce(
+      (total, share) => total + share,
+      0,
+    );
+    if (partnersShare > 100) {
+      throw new BadRequestException(
+        "A soma das parcerias passou de 100% da comissão.",
+      );
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      if (dto.commissionPercentage !== undefined) {
+        await manager.update(
+          Deal,
+          { id: deal.id, userId: user.id },
+          {
+            commissionPercentage: toShareOrNull(dto.commissionPercentage),
+          },
+        );
+      }
+      for (const item of dto.partners) {
+        await manager.update(
+          DealPartner,
+          { id: item.partnerId, dealId: deal.id, active: true },
+          { commissionShare: toShareOrNull(item.commissionShare) },
+        );
+      }
+      await this.activityService.record(
+        {
+          dealId: deal.id,
+          kind: DealEventKind.PARTNER,
+          actor: DealEventActor.BROKER,
+          message: "Divisão da comissão atualizada",
+          visibleToCustomer: false,
+        },
+        manager,
+      );
+    });
 
     return this.dealService.findOne(user, dealId);
   }

@@ -66,6 +66,11 @@ import { WhatsappHistorySyncService } from "./services/whatsapp-history-sync.ser
     PropertyPresentationSenderService,
     EvolutionWebhookService,
   ],
-  exports: [WhatsappConnectionService, ConversationService, MessageService],
+  exports: [
+    WhatsappConnectionService,
+    ConversationService,
+    MessageService,
+    MessageAttachmentService,
+  ],
 })
 export class InboxModule {}

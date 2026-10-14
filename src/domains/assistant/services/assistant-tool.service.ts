@@ -32,7 +32,16 @@ import {
 } from "../../documents/entities/document.entity";
 import { Conversation } from "../../inbox/entities/conversation.entity";
 import { Message } from "../../inbox/entities/message.entity";
-import { MessageDirection } from "../../inbox/enums/inbox.enum";
+import {
+  MessageDirection,
+  MessageMediaStatus,
+  MessageType,
+} from "../../inbox/enums/inbox.enum";
+import {
+  DEAL_STAGE_LABELS,
+  DealParty,
+  DealStatus,
+} from "../../deals/enums/deal.enum";
 import {
   formatBrl,
   KIND_LABEL,
@@ -57,6 +66,7 @@ import {
   AssistantAction,
   AssistantActionPayload,
   AssistantAttachment,
+  DealDocumentLink,
 } from "../entities/assistant-action.entity";
 import { AssistantReference } from "../entities/assistant-message.entity";
 import {
@@ -66,6 +76,7 @@ import {
 } from "../enums/assistant.enum";
 import {
   DEFAULT_TIMEZONE,
+  FILE_MESSAGE_TYPES,
   formatDay,
   formatWhen,
   inTimezone,
@@ -94,6 +105,14 @@ export interface AssistantToolContext {
 }
 
 const CONVERSATION_MESSAGES = 25;
+const CONVERSATION_FILES = 40;
+const DEAL_DOCUMENTS_PER_PROPOSAL = 20;
+const DEAL_PARTIES = new Set<string>(Object.values(DealParty));
+const FILE_KIND_LABEL: Partial<Record<MessageType, string>> = {
+  [MessageType.IMAGE]: "foto",
+  [MessageType.VIDEO]: "vídeo",
+  [MessageType.DOCUMENT]: "documento",
+};
 const CUSTOMER_MESSAGES = 15;
 const MAXIMUM_VISIT_RANGE_DAYS = 92;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -207,6 +226,12 @@ export class AssistantToolService {
         return this.getConversation(user, parameters, context);
       case "list_files":
         return this.listFiles(user, parameters);
+      case "list_conversation_files":
+        return this.listConversationFiles(user, parameters, context);
+      case "list_deals":
+        return this.listDeals(user, parameters);
+      case "propose_deal_documents":
+        return this.proposeDealDocuments(user, parameters, context);
       case "generate_document":
         return this.generateDocument(user, parameters, context);
       case "propose_whatsapp_message":
@@ -741,6 +766,243 @@ export class AssistantToolService {
       name: this.conversationName(conversation),
       messages: transcriptOf(messages, this.timezone),
     };
+  }
+
+  /** Files of a chat, so the model can name them and keep them somewhere. */
+  private async listConversationFiles(
+    user: User,
+    parameters: ToolArguments,
+    context: AssistantToolContext,
+  ) {
+    const conversationId = textOf(parameters.conversationId);
+    const customerId = textOf(parameters.customerId);
+    let conversation: Conversation;
+    if (conversationId) {
+      conversation = await this.findConversation(
+        user,
+        requireId(conversationId, "conversa"),
+      );
+    } else if (customerId) {
+      const customer = await this.findCustomer(
+        user,
+        requireId(customerId, "cliente"),
+      );
+      const found = await this.conversationRepository.findOne({
+        where: { userId: user.id, customerId: customer.id, active: true },
+        relations: { customer: true },
+      });
+      if (!found) {
+        throw new NotFoundException("Esse cliente não tem conversa.");
+      }
+      conversation = found;
+    } else {
+      throw new BadRequestException("Informe a conversa ou o cliente.");
+    }
+
+    const days = limitOf(parameters.days, 90, 365);
+    const messages = await this.messageRepository.find({
+      where: {
+        conversationId: conversation.id,
+        userId: user.id,
+        type: In([...FILE_MESSAGE_TYPES]),
+        sentAt: Between(dayjs().subtract(days, "day").toDate(), new Date()),
+      },
+      order: { sentAt: "DESC" },
+      take: CONVERSATION_FILES,
+    });
+
+    this.remember(context, this.conversationReference(conversation));
+
+    return {
+      conversationId: conversation.id,
+      customerId: conversation.customerId,
+      name: this.conversationName(conversation),
+      files: messages.map((message) => ({
+        messageId: message.id,
+        kind: FILE_KIND_LABEL[message.type] ?? "arquivo",
+        fileName: message.fileName?.trim() || null,
+        caption: message.body ? shorten(message.body, 200) : null,
+        mimeType: message.mimeType,
+        size:
+          message.sizeBytes === null
+            ? null
+            : describeSize(Number(message.sizeBytes)),
+        sentBy:
+          message.direction === MessageDirection.INBOUND
+            ? "contato"
+            : "corretor",
+        date: formatWhen(message.sentAt, this.timezone),
+        available: message.mediaStatus === MessageMediaStatus.READY,
+      })),
+    };
+  }
+
+  /** Sales with their paperwork checklist, to know where each file goes. */
+  private async listDeals(user: User, parameters: ToolArguments) {
+    const customerId = textOf(parameters.customerId);
+    const includeClosed = booleanOf(parameters.includeClosed) ?? false;
+    const where: FindOptionsWhere<Deal> = { userId: user.id, active: true };
+    if (customerId) where.customerId = requireId(customerId, "cliente");
+    if (!includeClosed) where.status = DealStatus.OPEN;
+
+    const deals = await this.dealRepository.find({
+      where,
+      relations: { customer: true, property: true },
+      order: { updatedAt: "DESC" },
+      take: 10,
+    });
+    const items = deals.length
+      ? await this.checklistRepository.find({
+          where: { dealId: In(deals.map((deal) => deal.id)), active: true },
+          order: { sortOrder: "ASC" },
+        })
+      : [];
+    const files = await this.documentsOf(
+      user,
+      DocumentOwnerType.DEAL_ITEM,
+      items.map((item) => item.id),
+    );
+    const filesByItem = new Map<string, number>();
+    files.forEach((file) =>
+      filesByItem.set(file.ownerId, (filesByItem.get(file.ownerId) ?? 0) + 1),
+    );
+
+    return {
+      deals: deals.map((deal) => ({
+        dealId: deal.id,
+        title: this.dealTitleOf(deal),
+        customerId: deal.customerId,
+        stage: DEAL_STAGE_LABELS[deal.stage],
+        status: deal.status,
+        checklist: items
+          .filter((item) => item.dealId === deal.id)
+          .map((item) => ({
+            checklistItemId: item.id,
+            title: item.title,
+            party: item.party,
+            status: item.status,
+            files: filesByItem.get(item.id) ?? 0,
+          })),
+      })),
+    };
+  }
+
+  /**
+   * Prepares keeping chat files in the sale checklist. Every file and item
+   * is checked now, so the card the broker confirms is the real outcome.
+   */
+  private async proposeDealDocuments(
+    user: User,
+    parameters: ToolArguments,
+    context: AssistantToolContext,
+  ) {
+    const deal = await this.dealRepository.findOne({
+      where: {
+        id: requireId(parameters.dealId, "venda"),
+        userId: user.id,
+        active: true,
+      },
+      relations: { customer: true, property: true },
+    });
+    if (!deal) throw new NotFoundException("Venda não encontrada.");
+    if (deal.status !== DealStatus.OPEN) {
+      throw new BadRequestException("Esta venda está encerrada.");
+    }
+
+    const requested = (Array.isArray(parameters.files) ? parameters.files : [])
+      .filter(
+        (file): file is ToolArguments => typeof file === "object" && !!file,
+      )
+      .slice(0, DEAL_DOCUMENTS_PER_PROPOSAL);
+    if (!requested.length) {
+      throw new BadRequestException("Informe ao menos um arquivo.");
+    }
+
+    const items = await this.checklistRepository.find({
+      where: { dealId: deal.id, active: true },
+    });
+    const itemsById = new Map(items.map((item) => [item.id, item]));
+
+    const links: DealDocumentLink[] = [];
+    const seenMessages = new Set<string>();
+    for (const file of requested) {
+      const messageId = requireId(file.messageId, "arquivo");
+      if (seenMessages.has(messageId)) continue;
+      seenMessages.add(messageId);
+
+      const message = await this.messageRepository.findOne({
+        where: { id: messageId, userId: user.id },
+      });
+      if (!message || !FILE_MESSAGE_TYPES.has(message.type)) {
+        throw new NotFoundException(`Arquivo ${messageId} não encontrado.`);
+      }
+      if (message.type === MessageType.VIDEO) {
+        throw new BadRequestException(
+          "Vídeos não entram nos documentos da venda.",
+        );
+      }
+      if (message.mediaStatus !== MessageMediaStatus.READY) {
+        throw new BadRequestException(
+          `O arquivo ${message.fileName ?? messageId} ainda não foi baixado do WhatsApp.`,
+        );
+      }
+      const fileName =
+        message.fileName?.trim() ||
+        `${FILE_KIND_LABEL[message.type] ?? "arquivo"} de ${formatDay(message.sentAt, this.timezone)}`;
+
+      const checklistItemId = textOf(file.checklistItemId);
+      if (checklistItemId) {
+        const item = itemsById.get(checklistItemId);
+        if (!item) {
+          throw new NotFoundException(
+            `Item ${checklistItemId} não é desta venda.`,
+          );
+        }
+        links.push({
+          messageId,
+          fileName,
+          checklistItemId: item.id,
+          checklistItemTitle: item.title,
+          newItemParty: null,
+        });
+        continue;
+      }
+
+      const newItemTitle = textOf(file.newItemTitle);
+      const newItemParty = textOf(file.newItemParty);
+      if (!newItemTitle || !newItemParty || !DEAL_PARTIES.has(newItemParty)) {
+        throw new BadRequestException(
+          "Para um item novo informe newItemTitle e newItemParty.",
+        );
+      }
+      links.push({
+        messageId,
+        fileName,
+        checklistItemId: null,
+        checklistItemTitle: newItemTitle.substring(0, 255),
+        newItemParty: newItemParty as DealParty,
+      });
+    }
+
+    const dealTitle = this.dealTitleOf(deal);
+    return this.propose(
+      user,
+      context,
+      AssistantActionKind.LINK_DEAL_DOCUMENTS,
+      links.length === 1
+        ? `Guardar "${links[0].fileName}" na venda de ${dealTitle}`
+        : `Guardar ${links.length} arquivos na venda de ${dealTitle}`,
+      { dealId: deal.id, dealTitle, files: links },
+    );
+  }
+
+  private dealTitleOf(deal: Deal) {
+    return [
+      deal.customer?.name,
+      deal.property ? propertyTitleOf(deal.property) : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
   }
 
   private async listFiles(user: User, parameters: ToolArguments) {

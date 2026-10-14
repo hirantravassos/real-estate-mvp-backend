@@ -1,8 +1,11 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { EvolutionApiService } from "../../../infrastructure/evolution/services/evolution-api.service";
-import { EvolutionChat } from "../../../infrastructure/evolution/types/evolution.type";
+import {
+  EvolutionChat,
+  EvolutionContact,
+} from "../../../infrastructure/evolution/types/evolution.type";
 import { GooglePeopleService } from "../../../infrastructure/google/services/google-people.service";
 import { Customer } from "../../customers/entities/customer.entity";
 import { CustomerMapper } from "../../customers/mappers/customer.mapper";
@@ -14,6 +17,7 @@ import {
 } from "../../inbox/helpers/evolution-message.parser";
 import {
   isPersonalJid,
+  onlyDigits,
   phoneMatchingKey,
   toCustomerPhone,
 } from "../../inbox/helpers/whatsapp-phone.helper";
@@ -29,7 +33,11 @@ import {
   PhotoAvatarService,
 } from "../../avatars/services/photo-avatar.service";
 import { User } from "../../users/entities/user.entity";
-import { ContactImportDto, ContactSource } from "../dtos/contact-import.dto";
+import {
+  ContactAddDto,
+  ContactImportDto,
+  ContactSource,
+} from "../dtos/contact-import.dto";
 
 export interface ContactCandidate {
   /** Area code and number, as a customer keeps it. */
@@ -50,12 +58,66 @@ export interface ContactCandidate {
 
 export type SkipReason = "invalid_phone" | "already_customer" | "failed";
 
+interface WhatsappSnapshot {
+  contacts: EvolutionContact[];
+  chats: EvolutionChat[];
+  expiresAt: number;
+}
+
+/** How long a read of the phone serves the searches. */
+const WHATSAPP_SNAPSHOT_MILLISECONDS = 5 * 60 * 1000;
+/** Brokers whose phone read stays in memory, the oldest leaves first. */
+const WHATSAPP_SNAPSHOT_USERS = 200;
+const DIRECTORY_RESULTS = 20;
+const MINIMUM_SEARCH_LENGTH = 2;
+
+const emptySnapshot = (): WhatsappSnapshot => ({
+  contacts: [],
+  chats: [],
+  expiresAt: 0,
+});
+
+/** Lowercase and without accents, so "joao" finds "João". */
+const searchableText = (text: string) =>
+  text
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+
+const candidateNames = (candidate: ContactCandidate) =>
+  [candidate.name, candidate.customerName]
+    .filter((name): name is string => Boolean(name))
+    .map(searchableText);
+
+const candidateMatches = (
+  candidate: ContactCandidate,
+  term: string,
+  digits: string,
+) => {
+  if (
+    term.length >= MINIMUM_SEARCH_LENGTH &&
+    candidateNames(candidate).some((name) => name.includes(term))
+  ) {
+    return true;
+  }
+  if (digits.length < 3) return false;
+  return (
+    candidate.phone.includes(digits) || `55${candidate.phone}`.includes(digits)
+  );
+};
+
+const nameStartsWith = (candidate: ContactCandidate, term: string) =>
+  Boolean(term) &&
+  candidateNames(candidate).some((name) => name.startsWith(term));
+
 const BRAZIL_JID_PREFIX = "55";
 const WHATSAPP_USER_SUFFIX = "@s.whatsapp.net";
 
 @Injectable()
 export class ContactImportService {
   private readonly logger = new Logger(ContactImportService.name);
+  /** The last read of each broker's phone, so searches stay fast. */
+  private readonly whatsappSnapshots = new Map<string, WhatsappSnapshot>();
 
   constructor(
     private readonly customerRepository: CustomerRepository,
@@ -74,17 +136,110 @@ export class ContactImportService {
   /** Every contact and chat of the connected WhatsApp, chats first. */
   async whatsappCandidates(user: User) {
     const connection = await this.connectionService.requireConnected(user.id);
-    const ownPhone = toCustomerPhone(connection.phone);
+    const snapshot = await this.loadWhatsappSnapshot(
+      user.id,
+      connection.instanceName,
+    );
+    const candidates = await this.collectWhatsappCandidates(
+      user.id,
+      toCustomerPhone(connection.phone),
+      snapshot,
+    );
+    return this.withCustomers(user.id, candidates);
+  }
 
-    const [contacts, chats] = await Promise.all([
-      this.evolutionApiService
-        .findContacts(connection.instanceName)
-        .catch(() => []),
-      this.evolutionApiService
-        .findChats(connection.instanceName)
-        .catch(() => []),
-    ]);
+  /**
+   * Finds people by name or number among the WhatsApp contacts and the chats
+   * already open in the inbox, saved as customers or not, so the broker can
+   * pick anyone they talk to without importing the whole list first.
+   */
+  async searchDirectory(user: User, search: string) {
+    const term = searchableText(search.trim());
+    const digits = onlyDigits(search);
+    if (term.length < MINIMUM_SEARCH_LENGTH && digits.length < 3) return [];
 
+    const connection = await this.connectionService
+      .requireConnected(user.id)
+      .catch(() => null);
+    const snapshot = connection
+      ? await this.cachedWhatsappSnapshot(user.id, connection.instanceName)
+      : emptySnapshot();
+    const candidates = await this.collectWhatsappCandidates(
+      user.id,
+      toCustomerPhone(connection?.phone),
+      snapshot,
+    );
+
+    const matches = candidates.filter((candidate) =>
+      candidateMatches(candidate, term, digits),
+    );
+    const sorted = await this.withCustomers(user.id, matches);
+    return sorted
+      .sort(
+        (first, second) =>
+          Number(nameStartsWith(second, term)) -
+          Number(nameStartsWith(first, term)),
+      )
+      .slice(0, DIRECTORY_RESULTS);
+  }
+
+  /**
+   * Saves one contact as a customer right from a search. A number already in
+   * the base returns that customer instead of a duplicate.
+   */
+  async addContact(user: User, dto: ContactAddDto) {
+    const phone = toCustomerPhone(dto.phone);
+    if (!phone) throw new BadRequestException("Número de WhatsApp inválido.");
+    const name = dto.name.trim();
+    if (!name) throw new BadRequestException("Informe o nome do contato.");
+
+    const key = phoneMatchingKey(phone);
+    const known = (await this.activeCustomers(user.id)).find(
+      (customer) => phoneMatchingKey(customer.phone) === key,
+    );
+    if (known) {
+      return CustomerMapper.toDto(
+        await this.customerRepository.findOneByOrFail({
+          id: known.id,
+          userId: user.id,
+          active: true,
+        }),
+      );
+    }
+
+    const entity = CustomerMapper.toEntity({
+      name,
+      phone,
+      kanbanId: null,
+      comment: null,
+      roles: dto.role ? [dto.role] : undefined,
+    });
+    entity.user = user;
+    const customer =
+      (await this.restoreRemoved(user.id, entity)) ??
+      (await this.customerRepository.save(entity));
+
+    const connection = await this.connectionService
+      .requireConnected(user.id)
+      .catch(() => null);
+    if (connection) {
+      await this.linkConversation(user.id, customer, null, false).catch(
+        (error: unknown) => {
+          this.logger.warn(`Chat link failed: ${String(error)}`);
+        },
+      );
+    }
+    this.forgetWhatsappSnapshot(user.id);
+
+    return CustomerMapper.toDto(customer);
+  }
+
+  /** The contacts and chats of the phone, merged with the inbox chats. */
+  private async collectWhatsappCandidates(
+    userId: string,
+    ownPhone: string | null,
+    snapshot: WhatsappSnapshot,
+  ) {
     const candidates = new Map<string, ContactCandidate>();
     const add = (candidate: ContactCandidate) => {
       if (candidate.phone === ownPhone) return;
@@ -105,12 +260,12 @@ export class ContactImportService {
       }
     };
 
-    for (const chat of chats) {
+    for (const chat of snapshot.chats) {
       const candidate = this.fromChat(chat);
       if (candidate) add(candidate);
     }
 
-    for (const contact of contacts) {
+    for (const contact of snapshot.contacts) {
       const jid = contact.remoteJid ?? contact.id;
       if (!isPersonalJid(jid)) continue;
       const phone = toCustomerPhone(jid);
@@ -123,14 +278,14 @@ export class ContactImportService {
     }
 
     const conversations = await this.conversationRepository.find({
-      where: { userId: user.id, active: true },
+      where: { userId, active: true },
     });
     for (const conversation of conversations) {
       const phone = toCustomerPhone(conversation.phone);
       if (!phone) continue;
       add({
         ...emptyCandidate(phone, "whatsapp"),
-        name: conversation.contactName,
+        name: conversation.contactName?.trim() || null,
         chatJid: conversation.remoteJid,
         hasHistory: Boolean(conversation.lastMessageAt),
         lastMessageAt: conversation.lastMessageAt,
@@ -138,10 +293,44 @@ export class ContactImportService {
         profilePictureUrl: conversation.profilePictureUrl,
       });
       const added = candidates.get(phoneMatchingKey(phone));
-      if (added && conversation.hidden) added.hiddenInInbox = true;
+      if (!added) continue;
+      // The name saved in the inbox wins over a missing push name.
+      added.name = added.name ?? (conversation.contactName?.trim() || null);
+      if (conversation.hidden) added.hiddenInInbox = true;
     }
 
-    return this.withCustomers(user.id, [...candidates.values()]);
+    return [...candidates.values()];
+  }
+
+  /** Reads the phone again and keeps the result for the searches after it. */
+  private async loadWhatsappSnapshot(userId: string, instanceName: string) {
+    const [contacts, chats] = await Promise.all([
+      this.evolutionApiService.findContacts(instanceName).catch(() => []),
+      this.evolutionApiService.findChats(instanceName).catch(() => []),
+    ]);
+    const snapshot: WhatsappSnapshot = {
+      contacts,
+      chats,
+      expiresAt: Date.now() + WHATSAPP_SNAPSHOT_MILLISECONDS,
+    };
+    this.whatsappSnapshots.delete(userId);
+    this.whatsappSnapshots.set(userId, snapshot);
+    while (this.whatsappSnapshots.size > WHATSAPP_SNAPSHOT_USERS) {
+      const [oldestUserId] = [...this.whatsappSnapshots.keys()];
+      this.whatsappSnapshots.delete(oldestUserId);
+    }
+    return snapshot;
+  }
+
+  /** Each keystroke of a search must not read the whole phone again. */
+  private async cachedWhatsappSnapshot(userId: string, instanceName: string) {
+    const cached = this.whatsappSnapshots.get(userId);
+    if (cached && cached.expiresAt > Date.now()) return cached;
+    return this.loadWhatsappSnapshot(userId, instanceName);
+  }
+
+  private forgetWhatsappSnapshot(userId: string) {
+    this.whatsappSnapshots.delete(userId);
   }
 
   /** The broker's Google contacts, marked with the WhatsApp chats they have. */

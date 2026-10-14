@@ -14,7 +14,14 @@ import { Customer } from "../../customers/entities/customer.entity";
 import { CustomerCommentService } from "../../customers/services/customer-comment.service";
 import { CustomerService } from "../../customers/services/customer.service";
 import { Conversation } from "../../inbox/entities/conversation.entity";
-import { MessageStatus } from "../../inbox/enums/inbox.enum";
+import {
+  MessageAttachmentTarget,
+  MessageStatus,
+} from "../../inbox/enums/inbox.enum";
+import { MessageAttachmentService } from "../../inbox/services/message-attachment.service";
+import { DealChecklistItem } from "../../deals/entities/deal-checklist-item.entity";
+import { DealParty } from "../../deals/enums/deal.enum";
+import { DealService } from "../../deals/services/deal.service";
 import { ConversationService } from "../../inbox/services/conversation.service";
 import {
   MessageService,
@@ -31,6 +38,7 @@ import {
   AddNotePayload,
   AssistantAction,
   AssistantAttachment,
+  LinkDealDocumentsPayload,
   MarkLostPayload,
   MoveStagePayload,
   ScheduleVisitPayload,
@@ -97,6 +105,8 @@ export class AssistantActionService {
     private readonly kanbanRepository: Repository<Kanban>,
     @InjectRepository(PropertyMedia)
     private readonly mediaRepository: Repository<PropertyMedia>,
+    @InjectRepository(DealChecklistItem)
+    private readonly checklistRepository: Repository<DealChecklistItem>,
     private readonly documentService: DocumentService,
     private readonly conversationService: ConversationService,
     private readonly messageService: MessageService,
@@ -106,6 +116,8 @@ export class AssistantActionService {
     private readonly customerCommentService: CustomerCommentService,
     private readonly realtimeGateway: RealtimeGateway,
     private readonly paidActionService: AssistantPaidActionService,
+    private readonly dealService: DealService,
+    private readonly messageAttachmentService: MessageAttachmentService,
   ) {}
 
   async confirm(user: User, actionId: string, dto: AssistantActionConfirmDto) {
@@ -215,6 +227,12 @@ export class AssistantActionService {
       case AssistantActionKind.MOVE_STAGE:
         await this.moveStage(user, action.payload as MoveStagePayload);
         break;
+      case AssistantActionKind.LINK_DEAL_DOCUMENTS:
+        await this.linkDealDocuments(
+          user,
+          action.payload as LinkDealDocumentsPayload,
+        );
+        return;
       case AssistantActionKind.MARK_LOST: {
         const payload = action.payload as MarkLostPayload;
         if (payload.lost) {
@@ -226,6 +244,74 @@ export class AssistantActionService {
       }
     }
     this.realtimeGateway.emitToUser(user.id, "customers.updated", {});
+  }
+
+  /**
+   * Copies each chat file into its checklist item, opening the new items
+   * first. One file that fails does not stop the others, the error lists it.
+   */
+  private async linkDealDocuments(
+    user: User,
+    payload: LinkDealDocumentsPayload,
+  ) {
+    const createdItems = new Map<string, string>();
+    const failed: string[] = [];
+
+    for (const file of payload.files) {
+      try {
+        let checklistItemId = file.checklistItemId;
+        if (!checklistItemId && file.newItemParty) {
+          const key = `${file.newItemParty}:${file.checklistItemTitle}`;
+          checklistItemId =
+            createdItems.get(key) ??
+            (await this.addChecklistItem(
+              user,
+              payload.dealId,
+              file.checklistItemTitle,
+              file.newItemParty,
+            ));
+          createdItems.set(key, checklistItemId);
+        }
+        if (!checklistItemId) throw new BadRequestException("Item inválido.");
+
+        await this.messageAttachmentService.save(user, file.messageId, {
+          target: MessageAttachmentTarget.DEAL_ITEM,
+          recordId: payload.dealId,
+          checklistItemId,
+          displayName: file.fileName,
+        });
+      } catch (error) {
+        if (!(error instanceof HttpException)) {
+          this.logger.warn(`Deal document link failed: ${String(error)}`);
+        }
+        failed.push(file.fileName);
+      }
+    }
+
+    this.realtimeGateway.emitToUser(user.id, "deal.updated", {
+      dealId: payload.dealId,
+    });
+    if (failed.length) {
+      throw new ConflictException(
+        `Não consegui guardar: ${failed.join(", ")}`.substring(0, 255),
+      );
+    }
+  }
+
+  /** Opens an item in the sale checklist and returns its id. */
+  private async addChecklistItem(
+    user: User,
+    dealId: string,
+    title: string,
+    party: DealParty,
+  ) {
+    await this.dealService.addChecklistItem(user, dealId, { party, title });
+    const item = await this.checklistRepository.findOne({
+      where: { dealId, title, party, active: true, deal: { userId: user.id } },
+      order: { createdAt: "DESC" },
+    });
+    if (!item) throw new NotFoundException("Item da venda não encontrado.");
+    return item.id;
   }
 
   private async sendMessage(user: User, payload: SendMessagePayload) {
