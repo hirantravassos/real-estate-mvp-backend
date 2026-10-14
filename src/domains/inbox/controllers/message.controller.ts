@@ -18,9 +18,11 @@ import {
   MessageListDto,
   MessageMediaSendDto,
   MessageTextSendDto,
+  ProfileCardSendDto,
 } from "../dtos/inbox.dto";
 import { MessageAttachmentService } from "../services/message-attachment.service";
 import { MessageService } from "../services/message.service";
+import { ProfileCardSenderService } from "../services/profile-card-sender.service";
 
 @Controller("inbox")
 @UseGuards(JwtGuard)
@@ -28,7 +30,14 @@ export class MessageController {
   constructor(
     private readonly messageService: MessageService,
     private readonly messageAttachmentService: MessageAttachmentService,
+    private readonly profileCardSenderService: ProfileCardSenderService,
   ) {}
+
+  /** Sends the broker's profile card to the chosen chats, paced by the safety queue. */
+  @Post("profile-card")
+  sendProfileCard(@GetUser() user: User, @Body() dto: ProfileCardSendDto) {
+    return this.profileCardSenderService.send(user, dto);
+  }
 
   @Get("conversations/:conversationId/messages")
   findAll(

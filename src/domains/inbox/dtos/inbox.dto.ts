@@ -1,6 +1,9 @@
 import { Type } from "class-transformer";
 import {
   ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
+  IsBase64,
   IsNumberString,
   IsArray,
   IsBoolean,
@@ -217,6 +220,38 @@ export class PresentationSendDto {
 
   @IsBoolean()
   aiGenerated: boolean;
+}
+
+/** Most contacts one profile card goes to at once, more looks like a blast. */
+export const PROFILE_CARD_MAXIMUM_CONTACTS = 20;
+
+/** About 3 MB of image, a 1080 px card is far below it. */
+const PROFILE_CARD_MAXIMUM_BASE64_LENGTH = 4 * 1024 * 1024;
+
+/**
+ * The broker's own card, drawn in the browser, sent from their WhatsApp to
+ * the chosen chats. "{nome}" in the text becomes each contact's first name.
+ */
+export class ProfileCardSendDto {
+  @IsBase64()
+  @MaxLength(PROFILE_CARD_MAXIMUM_BASE64_LENGTH, {
+    message: "A imagem do cartão está grande demais.",
+  })
+  image: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(1024)
+  caption: string;
+
+  @IsArray()
+  @ArrayMinSize(1, { message: "Escolha pelo menos um contato." })
+  @ArrayMaxSize(PROFILE_CARD_MAXIMUM_CONTACTS, {
+    message: `Escolha no máximo ${PROFILE_CARD_MAXIMUM_CONTACTS} contatos por vez.`,
+  })
+  @ArrayUnique()
+  @IsUUID("all", { each: true })
+  conversationIds: string[];
 }
 
 /** Keeps the photo or file of a message in a customer, property or sale. */

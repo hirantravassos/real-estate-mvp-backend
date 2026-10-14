@@ -73,3 +73,18 @@ export const toCustomerPhone = (value: string | null | undefined) => {
   }
   return digits;
 };
+
+/**
+ * The connected WhatsApp number as the profile keeps it: Brazilian numbers
+ * as area code and number ("5511912345678" becomes "11912345678"), foreign
+ * ones with "+" and the country code ("351912345678" becomes "+351912345678").
+ */
+export const toProfilePhone = (whatsappNumber: string | null | undefined) => {
+  const digits = onlyDigits(whatsappNumber ?? "");
+  if (!digits) return null;
+  const isBrazilian =
+    digits.startsWith(BRAZIL_COUNTRY_CODE) &&
+    (digits.length === 12 || digits.length === 13);
+  if (isBrazilian) return toCustomerPhone(digits);
+  return digits.length >= 8 && digits.length <= 15 ? `+${digits}` : null;
+};
