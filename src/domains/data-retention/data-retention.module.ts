@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { AccessLogModule } from "../access-logs/access-log.module";
+import { AuditLogModule } from "../audit-logs/audit-log.module";
 import { AccountDeletionModule } from "../account-deletions/account-deletion.module";
 import { NotificationModule } from "../notifications/notification.module";
 import { Subscription } from "../subscriptions/entities/subscription.entity";
@@ -14,6 +15,7 @@ import { DataRetentionSchedulerService } from "./services/data-retention-schedul
     ConfigModule,
     TypeOrmModule.forFeature([Subscription, User]),
     AccessLogModule,
+    AuditLogModule,
     AccountDeletionModule,
     SubscriptionModule,
     NotificationModule,

@@ -141,6 +141,18 @@ export class AuthService {
    * for a bad credential.
    */
   private async verifyGoogleIdToken(idToken: string): Promise<TokenPayload> {
+    const payload = await this.readVerifiedGoogleIdentity(idToken);
+    if (!payload) throw new UnauthorizedException("Invalid Google token");
+    return payload;
+  }
+
+  /**
+   * The Google identity of the token, or null when Google did not sign it
+   * for this app, it has no email or the email is not verified by Google.
+   */
+  async readVerifiedGoogleIdentity(
+    idToken: string,
+  ): Promise<TokenPayload | null> {
     try {
       const ticket = await this.googleClient.verifyIdToken({
         idToken: idToken,
@@ -161,9 +173,9 @@ export class AuthService {
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       this.logger.warn(
-        `[AuthService.verifyGoogleIdToken]: Google rejected the token, ${reason}`,
+        `[AuthService.readVerifiedGoogleIdentity]: Google rejected the token, ${reason}`,
       );
-      throw new UnauthorizedException("Invalid Google token");
+      return null;
     }
   }
 

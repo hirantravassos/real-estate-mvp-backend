@@ -11,6 +11,7 @@ import dayjs from "dayjs";
 import { Equal, IsNull, LessThan, Not, Or, Repository } from "typeorm";
 import { dataRetentionConfig } from "../../../config/data-retention.config";
 import { AccessLogService } from "../../access-logs/services/access-log.service";
+import { AuditLogService } from "../../audit-logs/services/audit-log.service";
 import { ACCOUNT_DELETION_CONFIRMATION } from "../../account-deletions/dtos/account-deletion.dto";
 import { AccountDeletionReason } from "../../account-deletions/mails/account-deletion.mails";
 import { AccountDeletionService } from "../../account-deletions/services/account-deletion.service";
@@ -55,6 +56,7 @@ export class DataRetentionSchedulerService
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly accessLogService: AccessLogService,
+    private readonly auditLogService: AuditLogService,
     private readonly accountDeletionService: AccountDeletionService,
     private readonly subscriptionService: SubscriptionService,
     private readonly brokerMailService: BrokerMailService,
@@ -87,10 +89,11 @@ export class DataRetentionSchedulerService
     this.sweeping = true;
     try {
       const logs = await this.accessLogService.purgeExpired(now);
+      const auditLogs = await this.auditLogService.purgeExpired(now);
       const warnings = await this.warnUpcomingErasures(now);
       const accounts = await this.purgeExpiredAccounts(now);
       this.logger.log(
-        `Retention sweep: ${logs} access logs and ${accounts} expired accounts removed, ${warnings} erasure warnings sent`,
+        `Retention sweep: ${logs} access logs, ${auditLogs} audit logs and ${accounts} expired accounts removed, ${warnings} erasure warnings sent`,
       );
     } catch (error) {
       this.logger.error(`Retention sweep failed: ${String(error)}`);
