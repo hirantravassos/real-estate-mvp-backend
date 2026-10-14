@@ -3,6 +3,7 @@ import { UserService } from "../../users/services/user.service";
 import { PropertyService } from "../../properties/services/property.service";
 import { PropertyMediaService } from "../../properties/services/property-media.service";
 import { publicAddressOf } from "../../properties/helpers/customer-safe.helper";
+import { profileImagePathOf } from "../../users/helpers/profile-image.helper";
 
 const MAXIMUM_LISTED_PROPERTIES = 60;
 
@@ -32,7 +33,7 @@ export class BrokerPageService {
     return {
       slug: broker.slug,
       name: broker.name,
-      profileImage: broker.profileImage,
+      profileImage: profileImagePathOf(broker.profileImage),
       avatar: broker.avatar ?? null,
       city: broker.city ?? null,
       phone: broker.phone ?? null,

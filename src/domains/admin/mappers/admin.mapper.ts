@@ -2,6 +2,7 @@ import { DateHelper } from "../../../shared/utils/date.util";
 import { AuditLog } from "../../audit-logs/entities/audit-log.entity";
 import { User } from "../../users/entities/user.entity";
 import { AdminAuditLogDto, AdminUserDto } from "../dtos/admin.dto";
+import { profileImagePathOf } from "../../users/helpers/profile-image.helper";
 
 export class AdminMapper {
   static toUserDto(user: User, lastAccessAt: Date | null): AdminUserDto {
@@ -11,7 +12,7 @@ export class AdminMapper {
       email: user.email,
       city: user.city ?? null,
       creci: user.creci ?? null,
-      profileImage: user.profileImage ?? null,
+      profileImage: profileImagePathOf(user.profileImage),
       createdAt: DateHelper.formatUtcToIso(user.createdAt),
       lastAccessAt: lastAccessAt
         ? DateHelper.formatUtcToIso(lastAccessAt)

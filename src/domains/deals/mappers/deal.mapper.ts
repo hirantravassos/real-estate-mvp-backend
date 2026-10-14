@@ -14,6 +14,7 @@ import {
   DealParticipantRole,
   DealSignerStatus,
 } from "../enums/deal.enum";
+import { profileImagePathOf } from "../../users/helpers/profile-image.helper";
 
 export interface DealProgressDto {
   checklistTotal: number;
@@ -401,7 +402,7 @@ export class DealMapper {
       broker: {
         name: deal.user.name,
         phone: deal.user.phone ?? null,
-        profileImage: deal.user.profileImage,
+        profileImage: profileImagePathOf(deal.user.profileImage),
         avatar: deal.user.avatar ?? null,
       },
       property: this.toProperty(deal.property),
@@ -493,7 +494,7 @@ export class DealMapper {
       },
       broker: {
         name: deal.user.name,
-        profileImage: deal.user.profileImage,
+        profileImage: profileImagePathOf(deal.user.profileImage),
         avatar: deal.user.avatar ?? null,
       },
       property: deal.property
