@@ -1,23 +1,21 @@
 import {
   Body,
   Controller,
-  ForbiddenException,
   Get,
-  Headers,
   NotFoundException,
   Param,
   ParseUUIDPipe,
   Post,
   Query,
+  Req,
   UseGuards,
-  Inject,
 } from "@nestjs/common";
-import type { ConfigType } from "@nestjs/config";
-import { timingSafeEqual } from "crypto";
-import { creditsConfig } from "../../../config/credits.config";
+import type { Request } from "express";
 import { OpenaiService } from "../../../infrastructure/openai/services/openai.service";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
+import { AdminOnly } from "../../admin/decorators/admin-only.decorator";
+import { attachAuditDetail } from "../../audit-logs/helpers/audit-detail.helper";
 import { JwtGuard } from "../../auth/guards/jwt.guard";
 import { User } from "../../users/entities/user.entity";
 import { UserRepository } from "../../users/repositories/user.repository";
@@ -32,8 +30,6 @@ import { CreditWalletService } from "../services/credit-wallet.service";
 @Controller("credits")
 export class CreditController {
   constructor(
-    @Inject(creditsConfig.KEY)
-    private readonly configuration: ConfigType<typeof creditsConfig>,
     private readonly walletService: CreditWalletService,
     private readonly purchaseService: CreditPurchaseService,
     private readonly pricingService: CreditPricingService,
@@ -80,34 +76,24 @@ export class CreditController {
     return this.purchaseService.findOne(user, id);
   }
 
-  /** Manual top up by the platform owner, protected by CREDITS_ADMIN_KEY. */
+  /** Manual top up by the platform owner, from the backoffice only. */
   @Post("grants")
-  async grant(
-    @Headers("x-admin-key") adminKey: string | undefined,
-    @Body() dto: CreditGrantDto,
-  ) {
-    if (!this.isAdminKeyValid(adminKey)) {
-      throw new ForbiddenException("Chave de administrador inválida.");
-    }
-
-    const user = await this.userRepository.findOneBy({ email: dto.email });
+  @AdminOnly()
+  async grant(@Body() dto: CreditGrantDto, @Req() request: Request) {
+    const user = await this.userRepository.findOneBy({
+      email: dto.email,
+      active: true,
+    });
     if (!user) throw new NotFoundException("Usuário não encontrado.");
 
+    attachAuditDetail(
+      request,
+      `${dto.credits} créditos para ${user.email} (${user.id}).`,
+    );
     return this.walletService.add(user.id, {
       kind: CreditTransactionKind.GRANT,
       amount: dto.credits,
       description: dto.description,
     });
-  }
-
-  private isAdminKeyValid(adminKey: string | undefined) {
-    const expected = this.configuration.adminKey;
-    if (!expected || !adminKey) return false;
-    const expectedBuffer = Buffer.from(expected);
-    const receivedBuffer = Buffer.from(adminKey);
-    return (
-      expectedBuffer.length === receivedBuffer.length &&
-      timingSafeEqual(expectedBuffer, receivedBuffer)
-    );
   }
 }

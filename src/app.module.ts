@@ -21,6 +21,7 @@ import { mongoConfig } from "./config/mongo.config";
 import { evolutionConfig } from "./config/evolution.config";
 import { openaiConfig } from "./config/openai.config";
 import { creditsConfig } from "./config/credits.config";
+import { adminConfig } from "./config/admin.config";
 import { CreditModule } from "./domains/credits/credit.module";
 import { InboxModule } from "./domains/inbox/inbox.module";
 import { DealModule } from "./domains/deals/deal.module";
@@ -40,6 +41,8 @@ import { dataRetentionConfig } from "./config/data-retention.config";
 import { DailyBriefingModule } from "./domains/daily-briefings/daily-briefing.module";
 import { AccountDeletionModule } from "./domains/account-deletions/account-deletion.module";
 import { DataRetentionModule } from "./domains/data-retention/data-retention.module";
+import { AuditLogModule } from "./domains/audit-logs/audit-log.module";
+import { AdminModule } from "./domains/admin/admin.module";
 import { buildDatabaseOptions } from "./database/database-options";
 
 /** Loose default, only the routes with UserThrottlerGuard are counted. */
@@ -66,6 +69,7 @@ const THROTTLE_LIMIT = 240;
         subscriptionsConfig,
         dailyBriefingConfig,
         dataRetentionConfig,
+        adminConfig,
       ],
       envFilePath: ".env",
     }),
@@ -110,6 +114,8 @@ const THROTTLE_LIMIT = 240;
     DailyBriefingModule,
     AccountDeletionModule,
     DataRetentionModule,
+    AuditLogModule,
+    AdminModule,
   ],
   // Per broker when signed in, per address otherwise (request.ip is the
   // real client behind the proxy, see trust proxy in main.ts). Webhooks and

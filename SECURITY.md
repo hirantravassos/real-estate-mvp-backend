@@ -98,6 +98,24 @@ their own data. Treat a cross tenant leak as a release blocker.
 - Never log secrets, tokens, full request bodies, or more than a short, scrubbed
   slice of an upstream error.
 
+## 8. Backoffice and audit
+
+- A backoffice route uses `@AdminOnly()` (JwtGuard + AdminGuard), never a
+  shared key alone. The AdminGuard checks, on every call, that the account's
+  email is in `ADMIN_ALLOWED_EMAILS` and that it carries a live admin session
+  bound to that account and its `tokenVersion`.
+- An admin session opens only when the three checks pass together: the email
+  is allowlisted, a fresh Google ID token (`email_verified`, same `sub` and
+  email as the signed in account, at most 5 minutes old) and the
+  `ADMIN_ACCESS_KEY` (32+ characters, compared on SHA 256 digests with
+  `timingSafeEqual`). Every refusal returns the same message.
+- Brute force is stopped by the route throttler and by lockouts counted from
+  `audit_logs` (per account, per IP and overall), so they hold across restarts
+  and servers.
+- Every broker change and every backoffice call or attempt goes to
+  `audit_logs`: route pattern, id acted on, status, IP and browser. Never the
+  request body, a secret or a token. Six months of retention.
+
 ## Checklist for any PR that touches data access, auth, money, uploads or crypto
 
 - [ ] Every route param and body id is scoped or validated against `user.id`.
@@ -106,6 +124,7 @@ their own data. Treat a cross tenant leak as a release blocker.
 - [ ] Secrets read from env, no fallback, startup fails if missing.
 - [ ] User supplied files served as `attachment` unless inline safe.
 - [ ] Spends are atomic; webhooks verify signatures and refetch state.
+- [ ] Backoffice routes use `@AdminOnly()`; nothing admin is reachable with a key alone.
 - [ ] `npm audit --omit=dev` is clean of critical and high.
 - [ ] A cross tenant test exists: a second user cannot read or mutate the first
       user's new resource.

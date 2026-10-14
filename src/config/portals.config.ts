@@ -26,6 +26,4 @@ export const portalsConfig = registerAs("portals", () => ({
     1,
     parseInt(process.env.PORTAL_CONCURRENT_HUNTS || "1", 10),
   ),
-  /** Manages the platform accounts, shared by every broker. */
-  adminKey: process.env.CREDITS_ADMIN_KEY ?? "",
 }));

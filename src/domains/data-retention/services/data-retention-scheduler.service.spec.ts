@@ -1,5 +1,6 @@
 import { Repository } from "typeorm";
 import { AccessLogService } from "../../access-logs/services/access-log.service";
+import { AuditLogService } from "../../audit-logs/services/audit-log.service";
 import { AccountDeletionReason } from "../../account-deletions/mails/account-deletion.mails";
 import { AccountDeletionService } from "../../account-deletions/services/account-deletion.service";
 import { BrokerMailService } from "../../notifications/services/broker-mail.service";
@@ -52,6 +53,9 @@ const buildService = (
     {
       purgeExpired: jest.fn().mockResolvedValue(0),
     } as unknown as AccessLogService,
+    {
+      purgeExpired: jest.fn().mockResolvedValue(0),
+    } as unknown as AuditLogService,
     { deleteAccount } as unknown as AccountDeletionService,
     {
       billingEnabled,

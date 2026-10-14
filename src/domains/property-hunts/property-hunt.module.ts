@@ -4,6 +4,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { RealtimeModule } from "../../infrastructure/realtime/realtime.module";
 import { StorageModule } from "../../infrastructure/storage/storage.module";
 import { AiModule } from "../ai/ai.module";
+import { AdminModule } from "../admin/admin.module";
 import { CreditModule } from "../credits/credit.module";
 import { Customer } from "../customers/entities/customer.entity";
 import { CustomerModule } from "../customers/customer.module";
@@ -48,6 +49,7 @@ import { PropertyMatchService } from "./services/property-match.service";
     StorageModule,
     AiModule,
     CreditModule,
+    AdminModule,
     CustomerModule,
     InboxModule,
   ],

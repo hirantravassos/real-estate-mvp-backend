@@ -10,7 +10,6 @@ export const creditsConfig = registerAs("credits", () => ({
   ),
   /** Keep it a bit above the real rate, it protects the margin from the dollar. */
   usdToBrlRate: parseFloat(process.env.CREDITS_USD_TO_BRL_RATE || "6"),
-  adminKey: process.env.CREDITS_ADMIN_KEY ?? "",
   mercadoPagoAccessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN ?? "",
   /** Public key of the same account, loads the secure card form in the browser. */
   mercadoPagoPublicKey: process.env.MERCADO_PAGO_PUBLIC_KEY ?? "",
