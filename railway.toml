@@ -1,2 +1,17 @@
 [build]
 builder = "RAILPACK"
+# Only code that ships rebuilds the service, docs and markdown commits do not.
+watchPatterns = [
+  "src/**",
+  "assets/**",
+  "package.json",
+  "package-lock.json",
+  "tsconfig.json",
+  "tsconfig.build.json",
+  "nest-cli.json",
+  "railway.toml",
+]
+
+[deploy]
+# Runs the compiled dist, "npm start" would recompile with the Nest CLI on boot.
+startCommand = "npm run start:prod"
