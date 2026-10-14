@@ -11,6 +11,7 @@ import { Customer } from "../customers/entities/customer.entity";
 import { CustomerModule } from "../customers/customer.module";
 import { DealChecklistItem } from "../deals/entities/deal-checklist-item.entity";
 import { Deal } from "../deals/entities/deal.entity";
+import { DealModule } from "../deals/deal.module";
 import { DocumentLookupModule } from "../document-lookups/document-lookup.module";
 import { DocumentModule } from "../documents/document.module";
 import { Document } from "../documents/entities/document.entity";
@@ -66,6 +67,7 @@ import { AssistantService } from "./services/assistant.service";
     OwnerFinderModule,
     ContactImportModule,
     DocumentLookupModule,
+    DealModule,
   ],
   controllers: [AssistantController],
   providers: [

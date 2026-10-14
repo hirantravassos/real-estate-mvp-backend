@@ -23,6 +23,9 @@ export type AssistantToolName =
   | "search_conversations"
   | "get_conversation"
   | "list_files"
+  | "list_conversation_files"
+  | "list_deals"
+  | "propose_deal_documents"
   | "generate_document"
   | "propose_whatsapp_message"
   | "propose_visit"
@@ -138,6 +141,62 @@ export const ASSISTANT_TOOLS: (OpenaiTool & { name: AssistantToolName })[] = [
     parameters: objectOf({
       customerId: nullable("string", "Id do cliente."),
       propertyId: nullable("string", "Id do imóvel."),
+    }),
+  },
+  {
+    name: "list_conversation_files",
+    description:
+      "Lista os arquivos (documentos, fotos e vídeos) que chegaram ou foram enviados numa conversa do WhatsApp, com nome do arquivo, legenda, data, quem mandou e o messageId. Use para achar documentos que o cliente ou um parceiro mandou pelo WhatsApp.",
+    parameters: objectOf({
+      conversationId: nullable("string", "Id da conversa."),
+      customerId: nullable(
+        "string",
+        "Id do cliente, quando não souber a conversa.",
+      ),
+      days: nullable("integer", "Quantos dias para trás olhar. Padrão: 90."),
+    }),
+  },
+  {
+    name: "list_deals",
+    description:
+      "Lista as vendas (salas de fechamento) do corretor com a lista de documentos de cada uma (checklist): id, título, de quem é (buyer = comprador, seller = vendedor, property = imóvel), situação e quantos arquivos já tem.",
+    parameters: objectOf({
+      customerId: nullable("string", "Só as vendas deste cliente."),
+      includeClosed: nullable(
+        "boolean",
+        "true inclui vendas concluídas ou canceladas. Padrão: false.",
+      ),
+    }),
+  },
+  {
+    name: "propose_deal_documents",
+    description:
+      "Prepara guardar arquivos que chegaram pelo WhatsApp nos documentos de uma venda, cada um no item certo do checklist. Só guarda depois que o corretor confirmar. Use list_conversation_files para os messageId e list_deals para os itens. Fotos e documentos, não vídeos.",
+    parameters: objectOf({
+      dealId: { type: "string", description: "Id da venda." },
+      files: {
+        type: "array",
+        description: "Arquivos e onde guardar cada um, até 20.",
+        items: objectOf({
+          messageId: {
+            type: "string",
+            description: "messageId do arquivo na conversa.",
+          },
+          checklistItemId: nullable(
+            "string",
+            "Item do checklist que o arquivo cumpre. Null para criar um item novo.",
+          ),
+          newItemTitle: nullable(
+            "string",
+            "Título do item novo, só quando nenhum item do checklist serve.",
+          ),
+          newItemParty: {
+            type: ["string", "null"],
+            enum: ["buyer", "seller", "property", null],
+            description: "De quem é o item novo.",
+          },
+        }),
+      },
     }),
   },
   {

@@ -10,6 +10,8 @@ export enum AssistantActionKind {
   ADD_NOTE = "add_note",
   MOVE_STAGE = "move_stage",
   MARK_LOST = "mark_lost",
+  /** Keeps files that arrived in a WhatsApp chat in a sale checklist. */
+  LINK_DEAL_DOCUMENTS = "link_deal_documents",
   /** The paid ones run a paid feature and charge it like the broker clicked it. */
   PROPERTY_HUNT = "property_hunt",
   OWNER_SEARCH = "owner_search",

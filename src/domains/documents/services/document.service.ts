@@ -6,6 +6,7 @@ import {
   DocumentOwnerDomain,
   StorageService,
 } from "../../../infrastructure/storage/services/storage.service";
+import { repairFileName } from "../../../shared/utils/file-name.util";
 
 @Injectable()
 export class DocumentService {
@@ -45,10 +46,11 @@ export class DocumentService {
     file: Express.Multer.File,
     category: string | null = null,
   ): Promise<Document> {
+    const fileName = repairFileName(file.originalname);
     const { s3Key, mimeType, sizeBytes } =
       await this.storageService.uploadDocument(
         file.buffer,
-        file.originalname,
+        fileName,
         file.mimetype,
         userId,
         ownerDomain,
@@ -59,7 +61,7 @@ export class DocumentService {
     document.userId = userId;
     document.ownerType = ownerType;
     document.ownerId = ownerId;
-    document.displayName = file.originalname.substring(0, 255);
+    document.displayName = fileName.substring(0, 255);
     document.s3Key = s3Key;
     document.mimeType = mimeType;
     document.sizeBytes = sizeBytes;

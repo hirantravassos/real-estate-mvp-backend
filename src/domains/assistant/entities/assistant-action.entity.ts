@@ -1,5 +1,6 @@
 import { Column, Entity, Index, JoinColumn, ManyToOne } from "typeorm";
 import { BaseEntity } from "../../../shared/entities/base.entity";
+import { DealParty } from "../../deals/enums/deal.enum";
 import { PortalKey } from "../../property-hunts/enums/property-hunt.enum";
 import { User } from "../../users/entities/user.entity";
 import {
@@ -58,6 +59,23 @@ export interface MarkLostPayload {
   lost: boolean;
 }
 
+/** One chat file and the checklist item of the sale it goes to. */
+export interface DealDocumentLink {
+  messageId: string;
+  fileName: string;
+  /** Null when the file opens a new item, named by checklistItemTitle. */
+  checklistItemId: string | null;
+  checklistItemTitle: string;
+  /** Whose paperwork the new item is, only for a new item. */
+  newItemParty: DealParty | null;
+}
+
+export interface LinkDealDocumentsPayload {
+  dealId: string;
+  dealTitle: string;
+  files: DealDocumentLink[];
+}
+
 /** Every paid action carries the price the broker sees before confirming. */
 interface PaidActionPayload {
   estimatedCredits: number;
@@ -111,6 +129,7 @@ export interface AssistantActionPayloads {
   [AssistantActionKind.ADD_NOTE]: AddNotePayload;
   [AssistantActionKind.MOVE_STAGE]: MoveStagePayload;
   [AssistantActionKind.MARK_LOST]: MarkLostPayload;
+  [AssistantActionKind.LINK_DEAL_DOCUMENTS]: LinkDealDocumentsPayload;
   [AssistantActionKind.PROPERTY_HUNT]: PropertyHuntPayload;
   [AssistantActionKind.OWNER_SEARCH]: OwnerSearchPayload;
   [AssistantActionKind.CONTACT_IMPORT]: ContactImportPayload;

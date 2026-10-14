@@ -1,6 +1,9 @@
-import { Transform } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
+  ArrayMaxSize,
+  ArrayUnique,
   Equals,
+  IsArray,
   IsBoolean,
   IsDateString,
   IsEmail,
@@ -15,6 +18,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateNested,
 } from "class-validator";
 import { ValidateCurrency } from "../../../shared/decorators/validation/currency.decorator";
 import { normalizePhoneNumber } from "../../../shared/decorators/validation/phone-number.decorator";
@@ -294,6 +298,34 @@ export class DealPartnerUpdateDto {
   @IsOptional()
   @IsBoolean()
   signsContract?: boolean;
+}
+
+export class DealCommissionShareDto {
+  @IsUUID()
+  partnerId: string;
+
+  /** Part of the commission that goes to the partner, from 0 to 100. */
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(100)
+  commissionShare: number | null;
+}
+
+/** The whole commission and every partner's share, saved at once. */
+export class DealCommissionSplitDto {
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(100)
+  commissionPercentage?: number | null;
+
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ArrayUnique((share: DealCommissionShareDto) => share.partnerId)
+  @ValidateNested({ each: true })
+  @Type(() => DealCommissionShareDto)
+  partners: DealCommissionShareDto[];
 }
 
 export class DealSignerReviewDto {

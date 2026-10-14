@@ -1,9 +1,11 @@
-import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Post, Query, UseGuards } from "@nestjs/common";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { JwtGuard } from "../../auth/guards/jwt.guard";
 import { User } from "../../users/entities/user.entity";
 import {
+  ContactAddDto,
   ContactAnalysisDto,
+  ContactDirectoryFilterDto,
   ContactImportDto,
   GoogleContactsDto,
 } from "../dtos/contact-import.dto";
@@ -24,6 +26,19 @@ export class ContactImportController {
   @Get("whatsapp")
   whatsapp(@GetUser() user: User) {
     return this.contactImportService.whatsappCandidates(user);
+  }
+
+  /** Searches the WhatsApp contacts and open chats, imported or not. */
+  @Get("directory")
+  directory(@GetUser() user: User, @Query() filter: ContactDirectoryFilterDto) {
+    return this.contactImportService.searchDirectory(user, filter.search);
+  }
+
+  /** Saves one contact as a customer, or returns the one already saved. */
+  @Post("contact")
+  @PlanLimit(PlanLimitResource.CUSTOMERS)
+  addContact(@GetUser() user: User, @Body() dto: ContactAddDto) {
+    return this.contactImportService.addContact(user, dto);
   }
 
   @Post("google")

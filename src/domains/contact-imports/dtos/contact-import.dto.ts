@@ -4,6 +4,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
+  IsEnum,
   IsIn,
   IsNumberString,
   IsOptional,
@@ -13,6 +14,7 @@ import {
   MinLength,
   ValidateNested,
 } from "class-validator";
+import { CustomerRole } from "../../customers/enums/customer.enum";
 
 export const CONTACT_SOURCES = ["whatsapp", "google"] as const;
 export type ContactSource = (typeof CONTACT_SOURCES)[number];
@@ -108,4 +110,27 @@ export class ContactImportDto {
   @ValidateNested({ each: true })
   @Type(() => ContactImportItemDto)
   contacts: ContactImportItemDto[];
+}
+
+export class ContactDirectoryFilterDto {
+  @IsString()
+  @MaxLength(80)
+  search: string;
+}
+
+/** One contact of the WhatsApp or the address book, saved as a customer now. */
+export class ContactAddDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  name: string;
+
+  @IsString()
+  @MaxLength(30)
+  phone: string;
+
+  /** Role of a brand new customer, an existing one keeps its roles. */
+  @IsOptional()
+  @IsEnum(CustomerRole)
+  role?: CustomerRole | null;
 }

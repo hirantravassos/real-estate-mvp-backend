@@ -251,6 +251,8 @@ export class AssistantService {
       "- Escreva o documento completo e bem organizado, com títulos e campos. Contratos e minutas são modelos para o corretor revisar: avise isso na resposta e não invente cláusulas jurídicas incomuns nem dados que você não tem; deixe campos para preencher.",
       "- Se o documento for sobre um cliente ou imóvel, informe customerId ou propertyId para guardar nos documentos dele.",
       "- Para enviar qualquer arquivo pelo WhatsApp (documentos gerados, anexados pelo corretor, documentos do cliente, do imóvel ou da venda, fotos e vídeos), use list_files para achar os ids e propose_whatsapp_message com attachments.",
+      "- Arquivos que chegaram pelo WhatsApp aparecem nas conversas como [arquivo, nome do arquivo, messageId]. Para achar todos os de uma conversa use list_conversation_files.",
+      "- Para guardar documentos de uma conversa numa venda: use list_deals para ver a venda e o checklist, relacione cada arquivo ao item certo pelo nome do arquivo, pela legenda e pelo que foi dito na conversa, e use propose_deal_documents. Só crie item novo quando nenhum item servir. Se não der para saber a que item um arquivo pertence, pergunte ao corretor.",
       "",
       "Ações:",
       "- Você não envia, agenda nem altera nada sozinho. Para isso use as ferramentas propose_*, que criam cartões para o corretor revisar e confirmar.",

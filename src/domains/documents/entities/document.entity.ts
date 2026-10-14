@@ -1,5 +1,6 @@
-import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
+import { AfterLoad, Column, Entity, JoinColumn, ManyToOne } from "typeorm";
 import { BaseEntity } from "../../../shared/entities/base.entity";
+import { repairFileName } from "../../../shared/utils/file-name.util";
 import { User } from "../../users/entities/user.entity";
 
 export enum DocumentOwnerType {
@@ -43,4 +44,10 @@ export class Document extends BaseEntity {
   /** Which suggested document this file is, like the property registration. */
   @Column({ type: "varchar", length: 64, nullable: true })
   category: string | null;
+
+  /** Files sent before the upload fix kept the name with broken accents. */
+  @AfterLoad()
+  repairDisplayName() {
+    if (this.displayName) this.displayName = repairFileName(this.displayName);
+  }
 }
