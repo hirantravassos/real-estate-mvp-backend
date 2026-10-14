@@ -43,31 +43,17 @@ export interface HuntCriteria {
   extraWishes: string[];
 }
 
-export const ADVERTISER_KINDS = [
-  "owner",
-  "broker",
-  "agency",
-  "unknown",
-] as const;
-export type AdvertiserKind = (typeof ADVERTISER_KINDS)[number];
-
-export interface ListingAdvertiser {
-  name: string | null;
-  kind: AdvertiserKind;
-  phones: string[];
-  emails: string[];
-  creci: string | null;
-  company: string | null;
-}
-
-/** Everything read from one listing, kept with the match. */
+/**
+ * What is kept of one portal listing: the property's features, the
+ * neighborhood and city, and a short description without contacts. No
+ * street address, photos, videos nor anything about the advertiser.
+ */
 export interface ListingSnapshot {
   kind: PropertyKindEnum | null;
   transaction: HuntTransaction | null;
   price: number | null;
   maintenanceFee: number | null;
   propertyTax: number | null;
-  address: string | null;
   neighborhood: string | null;
   city: string | null;
   state: string | null;
@@ -78,11 +64,8 @@ export interface ListingSnapshot {
   area: number | null;
   floor: number | null;
   beachDistanceMeters: number | null;
-  /** True when the AI guessed the distance from the address or the text. */
+  /** True when the AI guessed the distance from the text. */
   beachDistanceEstimated: boolean;
   amenities: HuntAmenity[];
   description: string | null;
-  photos: string[];
-  videos: string[];
-  advertiser: ListingAdvertiser;
 }

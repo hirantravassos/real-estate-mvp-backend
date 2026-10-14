@@ -1,36 +1,15 @@
-import { PORTALS } from "../constants/portals.constant";
-import { PortalAccount } from "../entities/portal-account.entity";
+import dayjs from "dayjs";
+import { LISTING_RETENTION_DAYS } from "../constants/portals.constant";
+import { ListingShortcut } from "../entities/listing-shortcut.entity";
 import { PropertyHunt } from "../entities/property-hunt.entity";
 import { PropertyMatch } from "../entities/property-match.entity";
-import { PortalKey } from "../enums/property-hunt.enum";
+import { PropertyMatchOrigin } from "../enums/property-hunt.enum";
+
+/** When a portal suggestion or shortcut is erased, null for the catalog. */
+const expiresAtOf = (createdAt: Date) =>
+  dayjs(createdAt).add(LISTING_RETENTION_DAYS, "day").toDate();
 
 export class PropertyHuntMapper {
-  static toPortalDto(
-    portal: PortalKey,
-    account: PortalAccount | null,
-    platformAccountReady: boolean,
-  ) {
-    const definition = PORTALS[portal];
-    return {
-      portal,
-      label: definition.label,
-      homeUrl: definition.homeUrl,
-      loginHint: definition.loginHint,
-      passwordless: definition.passwordless,
-      platformAccountReady,
-      account: account
-        ? {
-            id: account.id,
-            login: account.login,
-            status: account.status,
-            statusMessage: account.statusMessage,
-            connectedAt: account.connectedAt,
-            lastUsedAt: account.lastUsedAt,
-          }
-        : null,
-    };
-  }
-
   static toHuntDto(hunt: PropertyHunt) {
     return {
       id: hunt.id,
@@ -79,8 +58,33 @@ export class PropertyHuntMapper {
       warnings: match.warnings,
       status: match.status,
       note: match.note,
+      expiresAt:
+        match.origin === PropertyMatchOrigin.PORTAL
+          ? expiresAtOf(match.createdAt)
+          : null,
       createdAt: match.createdAt,
       updatedAt: match.updatedAt,
+    };
+  }
+
+  static toShortcutDto(shortcut: ListingShortcut) {
+    return {
+      id: shortcut.id,
+      matchId: shortcut.matchId,
+      portal: shortcut.portal,
+      externalUrl: shortcut.externalUrl,
+      title: shortcut.title,
+      kind: shortcut.kind,
+      transaction: shortcut.transaction,
+      price: shortcut.price,
+      bedrooms: shortcut.bedrooms,
+      area: shortcut.area,
+      neighborhood: shortcut.neighborhood,
+      city: shortcut.city,
+      state: shortcut.state,
+      summary: shortcut.summary,
+      expiresAt: expiresAtOf(shortcut.createdAt),
+      createdAt: shortcut.createdAt,
     };
   }
 }

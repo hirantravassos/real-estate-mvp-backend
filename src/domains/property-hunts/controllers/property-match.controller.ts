@@ -21,8 +21,6 @@ import {
   PropertyMatchUpdateDto,
 } from "../dtos/property-hunt.dto";
 import { PropertyMatchService } from "../services/property-match.service";
-import { PlanLimit } from "../../subscriptions/decorators/subscription.decorator";
-import { PlanLimitResource } from "../../subscriptions/enums/subscription.enum";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -68,15 +66,6 @@ export class PropertyMatchController {
     @Body() dto: PropertyMatchUpdateDto,
   ) {
     return this.matchService.update(user, id, dto);
-  }
-
-  @Post(":id/import")
-  @PlanLimit(PlanLimitResource.PROPERTIES)
-  importToCatalog(
-    @GetUser() user: User,
-    @Param("id", ParseUUIDPipe) id: string,
-  ) {
-    return this.matchService.importToCatalog(user, id);
   }
 
   @Delete(":id")

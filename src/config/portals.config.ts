@@ -1,11 +1,6 @@
 import { registerAs } from "@nestjs/config";
 
 export const portalsConfig = registerAs("portals", () => ({
-  /**
-   * Encrypts the portal passwords and sessions. No fallback: without it the
-   * platform accounts cannot be saved nor opened.
-   */
-  credentialsSecret: process.env.PORTAL_CREDENTIALS_SECRET?.trim() ?? "",
   /** A remote Chrome (Browserless and the like), preferred when set. */
   browserWebSocketEndpoint: process.env.PORTAL_BROWSER_WS_ENDPOINT ?? "",
   /** A local Chrome or Chromium, found on its own when left empty. */
@@ -16,7 +11,7 @@ export const portalsConfig = registerAs("portals", () => ({
     30,
     Math.max(1, parseInt(process.env.PORTAL_LISTINGS_PER_PORTAL || "10", 10)),
   ),
-  /** Pause between two pages of the same portal, to browse like a person. */
+  /** Pause between two pages of the same portal, so it is never hit in a burst. */
   pageDelayMilliseconds: Math.max(
     500,
     parseInt(process.env.PORTAL_PAGE_DELAY_MILLISECONDS || "2500", 10),
@@ -26,6 +21,4 @@ export const portalsConfig = registerAs("portals", () => ({
     1,
     parseInt(process.env.PORTAL_CONCURRENT_HUNTS || "1", 10),
   ),
-  /** Manages the platform accounts, shared by every broker. */
-  adminKey: process.env.CREDITS_ADMIN_KEY ?? "",
 }));

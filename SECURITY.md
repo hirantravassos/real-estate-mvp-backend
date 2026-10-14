@@ -31,8 +31,7 @@ their own data. Treat a cross tenant leak as a release blocker.
 ## 2. Authentication and tokens
 
 - Every secret comes from the environment with no insecure fallback. Fail
-  startup if `JWT_SECRET`, `JWT_REFRESH_SECRET` or `PORTAL_CREDENTIALS_SECRET`
-  is missing. Assert `JWT_REFRESH_SECRET !== JWT_SECRET`. No literal secret ever
+  startup if `JWT_SECRET` or `JWT_REFRESH_SECRET` is missing. Assert `JWT_REFRESH_SECRET !== JWT_SECRET`. No literal secret ever
   ships in code or in `.env.example` beyond an obvious placeholder.
 - Access and refresh tokens carry a `typ` claim (`access` / `refresh`) that is
   verified, so they are never interchangeable.

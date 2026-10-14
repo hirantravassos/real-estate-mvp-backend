@@ -39,8 +39,8 @@ const playwrightBrowsers = () => {
 };
 
 /**
- * One shared Chrome for every hunt and login. Each job gets its own
- * context (cookies and tabs), closed as soon as the job ends.
+ * One shared Chrome for every hunt. Each job gets its own clean context
+ * (no cookies, never signed in), closed as soon as the job ends.
  */
 @Injectable()
 export class PortalBrowserService implements OnApplicationShutdown {
@@ -62,7 +62,7 @@ export class PortalBrowserService implements OnApplicationShutdown {
     );
   }
 
-  async newContext(storageState?: string | null): Promise<BrowserContext> {
+  async newContext(): Promise<BrowserContext> {
     const browser = await this.ensureBrowser();
     this.openContexts += 1;
     this.clearIdleTimer();
@@ -73,7 +73,6 @@ export class PortalBrowserService implements OnApplicationShutdown {
         timezoneId: "America/Sao_Paulo",
         viewport: { width: 1366, height: 900 },
         userAgent: USER_AGENT,
-        storageState: parseStorageState(storageState),
       });
       context.setDefaultTimeout(20_000);
       context.setDefaultNavigationTimeout(45_000);
@@ -161,17 +160,3 @@ export class PortalBrowserService implements OnApplicationShutdown {
     this.idleTimer = null;
   }
 }
-
-type StorageState = Exclude<
-  Parameters<Browser["newContext"]>[0],
-  undefined
->["storageState"];
-
-const parseStorageState = (value?: string | null): StorageState => {
-  if (!value) return undefined;
-  try {
-    return JSON.parse(value) as StorageState;
-  } catch {
-    return undefined;
-  }
-};

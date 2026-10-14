@@ -18,12 +18,7 @@ export const factsFromSnapshot = (snapshot: ListingSnapshot): MatchFacts => ({
   transaction: snapshot.transaction,
   price: snapshot.price,
   maintenanceFee: snapshot.maintenanceFee,
-  location: [
-    snapshot.address,
-    snapshot.neighborhood,
-    snapshot.city,
-    snapshot.state,
-  ]
+  location: [snapshot.neighborhood, snapshot.city, snapshot.state]
     .filter(Boolean)
     .join(", "),
   bedrooms: snapshot.bedrooms,

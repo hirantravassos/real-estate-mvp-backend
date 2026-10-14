@@ -28,10 +28,7 @@ import {
   OwnerContactSaveDto,
   OwnerContactSearchDto,
 } from "../dtos/owner-finder.dto";
-import {
-  advertiserSignalOf,
-  phoneFromContacts,
-} from "../helpers/advertiser-signals.helper";
+import { advertiserSignalOf } from "../helpers/advertiser-signals.helper";
 
 /** Most owner contacts the AI brings back for one property. */
 const MAXIMUM_CONTACTS = 5;
@@ -72,7 +69,7 @@ interface OwnerTarget {
   price: number | null;
   details: string | null;
   /** Ads of this property already known, usually posted by a broker. */
-  originListings: { url: string | null; advertiser: string | null }[];
+  originListings: { url: string | null }[];
   /** Digits of the contacts already saved on the property. */
   savedPhones: string[];
 }
@@ -224,7 +221,7 @@ export class OwnerFinderService {
       candidates.push({ contact, source });
     }
 
-    // Opens each ad to confirm who posted it and press "ver telefone".
+    // Opens each ad, signed out, to confirm who posted it.
     const pages = await this.pageReader.readPages(
       candidates.map(({ contact }) => contact.sourceUrl),
       {
@@ -236,7 +233,7 @@ export class OwnerFinderService {
     const contacts = new Map<string, OwnerContact>();
     for (const { contact, source } of candidates) {
       const page = pages.get(contact.sourceUrl);
-      let phone = this.normalizePhone(contact.phone);
+      const phone = this.normalizePhone(contact.phone);
       let evidence = contact.evidence.trim();
       let verified = false;
 
@@ -253,7 +250,6 @@ export class OwnerFinderService {
           verified = true;
           evidence = `Conferido no anúncio: ${signal.reason ?? evidence}`;
         }
-        phone ??= phoneFromContacts(page.contacts, signal.type === "owner");
       }
       if (!phone) continue;
 
@@ -351,10 +347,7 @@ export class OwnerFinderService {
         floor: property.infoFloor,
         price: Number(property.price) || null,
         details: dto.details?.trim() || null,
-        originListings: matches.map((match) => ({
-          url: match.externalUrl,
-          advertiser: this.describeAdvertiser(match),
-        })),
+        originListings: matches.map((match) => ({ url: match.externalUrl })),
         savedPhones: (property.contacts ?? [])
           .map((contact) => this.normalizePhone(contact.phone))
           .filter((phone): phone is string => Boolean(phone)),
@@ -408,17 +401,6 @@ export class OwnerFinderService {
       });
   }
 
-  private describeAdvertiser(match: PropertyMatch) {
-    const advertiser = match.listing?.advertiser;
-    if (!advertiser || advertiser.kind === "owner") return null;
-    const parts = [
-      advertiser.name,
-      advertiser.company,
-      advertiser.creci ? `CRECI ${advertiser.creci}` : null,
-    ].filter(Boolean);
-    return parts.length ? parts.join(", ") : null;
-  }
-
   private describe(target: OwnerTarget) {
     const lines = [
       `Imóvel: ${target.kind ? kindWords[target.kind] : "imóvel"}.`,
@@ -435,9 +417,6 @@ export class OwnerFinderService {
       ...target.originListings.map((listing) =>
         [
           "Anúncio já conhecido deste imóvel",
-          listing.advertiser
-            ? `, intermediário a ignorar: ${listing.advertiser}`
-            : "",
           listing.url ? ` (${listing.url})` : "",
           ".",
         ].join(""),

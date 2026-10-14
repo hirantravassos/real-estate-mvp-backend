@@ -7,13 +7,6 @@ export enum PortalKey {
   IMOVELWEB = "imovelweb",
 }
 
-export enum PortalAccountStatus {
-  UNCHECKED = "unchecked",
-  AWAITING_CODE = "awaiting_code",
-  CONNECTED = "connected",
-  FAILED = "failed",
-}
-
 export enum PropertyHuntStatus {
   QUEUED = "queued",
   RUNNING = "running",

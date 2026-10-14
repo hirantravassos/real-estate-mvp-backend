@@ -1,15 +1,11 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { BrowserContext } from "playwright-core";
-import { PORTAL_KEYS, PORTALS } from "../constants/portals.constant";
-import { PortalKey } from "../enums/property-hunt.enum";
 import {
-  humanPause,
   isChallenge,
   ListingPage,
+  politePause,
   readListingPage,
-  revealContacts,
 } from "../helpers/page-reader.helper";
-import { PortalAccountService } from "./portal-account.service";
 import { PortalBrowserService } from "./portal-browser.service";
 
 const PAUSE_BETWEEN_PAGES_MILLISECONDS = 1200;
@@ -22,18 +18,14 @@ export interface ReadPagesOptions {
 }
 
 /**
- * Opens a few listing links in the browser and reads them, signed in with the
- * platform accounts, pressing "ver telefone" on each one. Shared
- * with other features that need to check a listing for real.
+ * Opens a few listing links in the browser and reads their public text,
+ * signed out. Shared with other features that need to check a listing.
  */
 @Injectable()
 export class ListingPageReaderService {
   private readonly logger = new Logger(ListingPageReaderService.name);
 
-  constructor(
-    private readonly browserService: PortalBrowserService,
-    private readonly accountService: PortalAccountService,
-  ) {}
+  constructor(private readonly browserService: PortalBrowserService) {}
 
   get isAvailable() {
     return this.browserService.isAvailable;
@@ -67,25 +59,20 @@ export class ListingPageReaderService {
     deadline: number,
     pages: Map<string, ListingPage>,
   ) {
-    const portal = portalOfHost(host);
-    const session = portal
-      ? await this.accountService.sessionFor(portal).catch(() => null)
-      : null;
     let context: BrowserContext | null = null;
 
     try {
-      context = await this.browserService.newContext(session?.storageState);
+      context = await this.browserService.newContext();
       const tab = await context.newPage();
       for (const [index, url] of urls.entries()) {
         if (Date.now() > deadline) break;
-        if (index > 0) await humanPause(PAUSE_BETWEEN_PAGES_MILLISECONDS);
+        if (index > 0) await politePause(PAUSE_BETWEEN_PAGES_MILLISECONDS);
         try {
           await tab.goto(url, { waitUntil: "domcontentloaded" });
           await tab
             .waitForLoadState("networkidle", { timeout: 6000 })
             .catch(() => undefined);
           if (await isChallenge(tab)) break;
-          await revealContacts(tab);
           pages.set(url, await readListingPage(tab));
         } catch (error) {
           this.logger.debug(`Could not read ${url}: ${String(error)}`);
@@ -109,12 +96,3 @@ const hostOf = (url: string) => {
     return null;
   }
 };
-
-const portalOfHost = (host: string): PortalKey | null =>
-  PORTAL_KEYS.find((key) => {
-    const portalHost = new URL(PORTALS[key].homeUrl).hostname.replace(
-      /^www\./,
-      "",
-    );
-    return host === portalHost || host.endsWith(`.${portalHost}`);
-  }) ?? null;

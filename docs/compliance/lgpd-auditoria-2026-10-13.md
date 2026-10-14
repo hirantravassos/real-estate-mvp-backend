@@ -183,13 +183,13 @@ Incidente com dado pessoal: comunicar ANPD e titulares em **3 dias úteis**
 * [Eixos de fiscalização 2026/2027](https://www.brasilemfolhas.com.br/2026/10/anpd-define-eixos-de-fiscalizacao-de-dados-para-o-bienio-2026-2027/)
 * [Google, verificação de escopos sensíveis](https://developers.google.com/identity/protocols/oauth2/production-readiness/sensitive-scope-verification)
 
-## Status das correções (13/10/2026)
+## Status das correções (atualizado em 14/10/2026)
 
 | Item | Situação |
 | --- | --- |
 | Textos para pessoa física (CPF) e rodapé | Feito. Falta preencher as variáveis `NEXT_PUBLIC_COMPANY_*` em produção |
-| 4.1 Importação de anúncios para o catálogo | Travada como "Em breve" (`LISTING_IMPORT_ENABLED`) |
-| 4.1 Busca nos portais com contas da plataforma | Travada como "Em breve" (`PORTAL_SEARCH_ENABLED`), a caçada procura só na carteira |
+| 4.1 Importação de anúncios para o catálogo | Refeita em 14/10/2026: virou "atalho" (`listing_shortcuts`), só link e cartão com quartos, área, preço, bairro, cidade e resumo sem contatos. Não copia foto, não carimba, não vira imóvel do catálogo e nunca aparece em página pública. Some em 90 dias |
+| 4.1 Busca nos portais com contas da plataforma | Religada em 14/10/2026 (`PORTAL_SEARCH_ENABLED`) sem contas: lê só a página pública, deslogada, sem clicar em "ver telefone". Tabela `portal_accounts` e senhas apagadas. Texto vai à OpenAI sem telefones, e-mails nem CRECI. Sugestões dos portais somem em 90 dias. Pendente: o navegador ainda se apresenta como um Chrome comum (user agent) |
 | 4.2 Achar proprietário com raspagem logada | Busca paga travada como "Em breve" (`OWNER_CONTACT_SEARCH_ENABLED`), links gratuitos mantidos |
 | 4.3 Tom de pele lido da foto | Feito: sorteado pelo id do cliente. Avatares antigos não foram refeitos |
 | Exclusão da conta e anonimização | Feito (`DELETE /users/me` e botão em Ajustes) |
