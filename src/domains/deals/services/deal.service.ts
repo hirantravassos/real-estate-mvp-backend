@@ -19,6 +19,8 @@ import { Deal } from "../entities/deal.entity";
 import { DealChecklistItem } from "../entities/deal-checklist-item.entity";
 import { DealSigner } from "../entities/deal-signer.entity";
 import { DealMilestone } from "../entities/deal-milestone.entity";
+import { DealParticipant } from "../entities/deal-participant.entity";
+import { CustomerRole } from "../../customers/enums/customer.enum";
 import {
   DEAL_SELLER_TYPE_LABELS,
   DEAL_STAGE_LABELS,
@@ -26,6 +28,7 @@ import {
   DealChecklistStatus,
   DealEventActor,
   DealEventKind,
+  DealParticipantRole,
   DealParty,
   DealPaymentMethod,
   DealSellerType,
@@ -70,6 +73,7 @@ const DEAL_DETAIL_RELATIONS = {
   milestones: true,
   events: true,
   partners: true,
+  participants: { customer: true },
 } as const;
 
 const formatMoney = (value: string | number | null) =>
@@ -124,9 +128,17 @@ export class DealService {
     return deals.map((deal) => DealMapper.toListDto(deal));
   }
 
+  /** Sales where the contact is the main buyer, another buyer or a seller. */
   async findAllByCustomer(user: User, customerId: string) {
     const deals = await this.dealRepository.find({
-      where: { userId: user.id, customerId, active: true },
+      where: [
+        { userId: user.id, customerId, active: true },
+        {
+          userId: user.id,
+          active: true,
+          participants: { customerId, active: true },
+        },
+      ],
       relations: {
         customer: true,
         property: true,
@@ -158,6 +170,20 @@ export class DealService {
 
     const propertyId = dto.propertyId ?? null;
     if (propertyId) await this.findPropertyOrThrow(user.id, propertyId);
+
+    const sellerCustomer = dto.sellerCustomerId
+      ? await this.customerRepository.findOne({
+          where: { id: dto.sellerCustomerId, userId: user.id, active: true },
+        })
+      : null;
+    if (dto.sellerCustomerId && !sellerCustomer) {
+      throw new NotFoundException("Vendedor não encontrado.");
+    }
+    if (sellerCustomer?.id === customer.id) {
+      throw new BadRequestException(
+        "O vendedor precisa ser outra pessoa, não o comprador.",
+      );
+    }
 
     const duplicate = await this.dealRepository.findOne({
       where: {
@@ -208,6 +234,29 @@ export class DealService {
             }),
         ),
       );
+
+      if (sellerCustomer) {
+        // The seller picked now takes the seller paperwork of the sale.
+        const seller = await manager.getRepository(DealParticipant).save(
+          manager.getRepository(DealParticipant).create({
+            dealId: deal.id,
+            role: DealParticipantRole.SELLER,
+            customerId: sellerCustomer.id,
+            name: sellerCustomer.name,
+          }),
+        );
+        await checklistRepository.update(
+          { dealId: deal.id, party: DealParty.SELLER },
+          { participantId: seller.id },
+        );
+        if (!sellerCustomer.roles.includes(CustomerRole.SELLER)) {
+          await manager.update(
+            Customer,
+            { id: sellerCustomer.id, userId: user.id },
+            { roles: [...sellerCustomer.roles, CustomerRole.SELLER] },
+          );
+        }
+      }
 
       const milestoneRepository = manager.getRepository(DealMilestone);
       await milestoneRepository.save(
@@ -414,14 +463,30 @@ export class DealService {
     dto: DealChecklistItemCreateDto,
   ) {
     const deal = await this.findOwnedOrThrow(user.id, id);
+    let party = dto.party;
+    let participantId: string | null = null;
+    if (dto.participantId) {
+      const participant = await this.dataSource
+        .getRepository(DealParticipant)
+        .findOne({
+          where: { id: dto.participantId, dealId: deal.id, active: true },
+        });
+      if (!participant) throw new NotFoundException("Pessoa não encontrada.");
+      participantId = participant.id;
+      party =
+        participant.role === DealParticipantRole.BUYER
+          ? DealParty.BUYER
+          : DealParty.SELLER;
+    }
     const lastItem = await this.checklistRepository.findOne({
       where: { dealId: deal.id },
       order: { sortOrder: "DESC" },
     });
-    await this.checklistRepository.save(
+    const item = await this.checklistRepository.save(
       this.checklistRepository.create({
         dealId: deal.id,
-        party: dto.party,
+        party,
+        participantId,
         title: dto.title,
         description: dto.description || null,
         requestedFromCustomer: dto.requestedFromCustomer ?? false,
@@ -429,7 +494,7 @@ export class DealService {
         sortOrder: (lastItem?.sortOrder ?? -1) + 1,
       }),
     );
-    return this.findOne(user, id);
+    return { ...(await this.findOne(user, id)), createdItemId: item.id };
   }
 
   async updateChecklistItem(
@@ -877,23 +942,35 @@ export class DealService {
         );
       }
 
-      const existingTitles = new Set(sellerItems.map((item) => item.title));
+      // Each seller keeps their own papers: the missing ones are added per
+      // seller, and the sale without named sellers keeps one shared set.
+      const owners = [
+        ...new Set(sellerItems.map((item) => item.participantId ?? null)),
+      ];
       const lastItem = await repository.findOne({
         where: { dealId: deal.id },
         order: { sortOrder: "DESC" },
       });
-      const firstSortOrder = (lastItem?.sortOrder ?? -1) + 1;
-      await repository.save(
-        nextTemplates
-          .filter((template) => !existingTitles.has(template.title))
-          .map((template, templateIndex) =>
-            repository.create({
-              ...template,
-              dealId: deal.id,
-              sortOrder: firstSortOrder + templateIndex,
-            }),
-          ),
-      );
+      let nextSortOrder = (lastItem?.sortOrder ?? -1) + 1;
+      for (const owner of owners.length ? owners : [null]) {
+        const existingTitles = new Set(
+          sellerItems
+            .filter((item) => (item.participantId ?? null) === owner)
+            .map((item) => item.title),
+        );
+        await repository.save(
+          nextTemplates
+            .filter((template) => !existingTitles.has(template.title))
+            .map((template) =>
+              repository.create({
+                ...template,
+                dealId: deal.id,
+                participantId: owner,
+                sortOrder: nextSortOrder++,
+              }),
+            ),
+        );
+      }
 
       await this.activityService.record(
         {

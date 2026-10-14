@@ -847,7 +847,7 @@ export class AssistantToolService {
 
     const deals = await this.dealRepository.find({
       where,
-      relations: { customer: true, property: true },
+      relations: { customer: true, property: true, participants: true },
       order: { updatedAt: "DESC" },
       take: 10,
     });
@@ -874,12 +874,24 @@ export class AssistantToolService {
         customerId: deal.customerId,
         stage: DEAL_STAGE_LABELS[deal.stage],
         status: deal.status,
+        people: (deal.participants ?? [])
+          .filter((participant) => participant.active)
+          .map((participant) => ({
+            participantId: participant.id,
+            role: participant.role,
+            name: participant.name,
+          })),
         checklist: items
           .filter((item) => item.dealId === deal.id)
           .map((item) => ({
             checklistItemId: item.id,
             title: item.title,
             party: item.party,
+            person:
+              (deal.participants ?? []).find(
+                (participant) =>
+                  participant.active && participant.id === item.participantId,
+              )?.name ?? null,
             status: item.status,
             files: filesByItem.get(item.id) ?? 0,
           })),
@@ -902,7 +914,7 @@ export class AssistantToolService {
         userId: user.id,
         active: true,
       },
-      relations: { customer: true, property: true },
+      relations: { customer: true, property: true, participants: true },
     });
     if (!deal) throw new NotFoundException("Venda não encontrada.");
     if (deal.status !== DealStatus.OPEN) {
@@ -975,12 +987,26 @@ export class AssistantToolService {
           "Para um item novo informe newItemTitle e newItemParty.",
         );
       }
+      const participantId = textOf(file.newItemParticipantId);
+      const participant = participantId
+        ? (deal.participants ?? []).find(
+            (person) => person.active && person.id === participantId,
+          )
+        : null;
+      if (participantId && !participant) {
+        throw new NotFoundException(
+          `Pessoa ${participantId} não é desta venda.`,
+        );
+      }
       links.push({
         messageId,
         fileName,
         checklistItemId: null,
         checklistItemTitle: newItemTitle.substring(0, 255),
-        newItemParty: newItemParty as DealParty,
+        newItemParty: participant
+          ? (participant.role as string as DealParty)
+          : (newItemParty as DealParty),
+        newItemParticipantId: participant?.id ?? null,
       });
     }
 

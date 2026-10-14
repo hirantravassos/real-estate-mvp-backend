@@ -159,7 +159,7 @@ export const ASSISTANT_TOOLS: (OpenaiTool & { name: AssistantToolName })[] = [
   {
     name: "list_deals",
     description:
-      "Lista as vendas (salas de fechamento) do corretor com a lista de documentos de cada uma (checklist): id, título, de quem é (buyer = comprador, seller = vendedor, property = imóvel), situação e quantos arquivos já tem.",
+      "Lista as vendas (salas de fechamento) do corretor com as pessoas da venda (compradores e vendedores além do cliente principal) e a lista de documentos de cada uma (checklist): id, título, de quem é (buyer = comprador, seller = vendedor, property = imóvel), de qual pessoa, situação e quantos arquivos já tem.",
     parameters: objectOf({
       customerId: nullable("string", "Só as vendas deste cliente."),
       includeClosed: nullable(
@@ -195,6 +195,10 @@ export const ASSISTANT_TOOLS: (OpenaiTool & { name: AssistantToolName })[] = [
             enum: ["buyer", "seller", "property", null],
             description: "De quem é o item novo.",
           },
+          newItemParticipantId: nullable(
+            "string",
+            "participantId da pessoa dona do item novo, de list_deals. Null para o comprador principal, o vendedor sem nome ou o imóvel.",
+          ),
         }),
       },
     }),

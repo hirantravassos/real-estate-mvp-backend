@@ -23,6 +23,7 @@ import { DealSigner } from "./deal-signer.entity";
 import { DealMilestone } from "./deal-milestone.entity";
 import { DealEvent } from "./deal-event.entity";
 import { DealPartner } from "./deal-partner.entity";
+import { DealParticipant } from "./deal-participant.entity";
 
 /**
  * The closing room of one sale: proposal, paperwork, contract signatures and
@@ -122,4 +123,7 @@ export class Deal extends BaseEntity {
 
   @OneToMany(() => DealPartner, (partner) => partner.deal)
   partners: DealPartner[];
+
+  @OneToMany(() => DealParticipant, (participant) => participant.deal)
+  participants: DealParticipant[];
 }

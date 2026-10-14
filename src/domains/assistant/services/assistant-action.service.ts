@@ -19,7 +19,6 @@ import {
   MessageStatus,
 } from "../../inbox/enums/inbox.enum";
 import { MessageAttachmentService } from "../../inbox/services/message-attachment.service";
-import { DealChecklistItem } from "../../deals/entities/deal-checklist-item.entity";
 import { DealParty } from "../../deals/enums/deal.enum";
 import { DealService } from "../../deals/services/deal.service";
 import { ConversationService } from "../../inbox/services/conversation.service";
@@ -105,8 +104,6 @@ export class AssistantActionService {
     private readonly kanbanRepository: Repository<Kanban>,
     @InjectRepository(PropertyMedia)
     private readonly mediaRepository: Repository<PropertyMedia>,
-    @InjectRepository(DealChecklistItem)
-    private readonly checklistRepository: Repository<DealChecklistItem>,
     private readonly documentService: DocumentService,
     private readonly conversationService: ConversationService,
     private readonly messageService: MessageService,
@@ -261,7 +258,7 @@ export class AssistantActionService {
       try {
         let checklistItemId = file.checklistItemId;
         if (!checklistItemId && file.newItemParty) {
-          const key = `${file.newItemParty}:${file.checklistItemTitle}`;
+          const key = `${file.newItemParty}:${file.newItemParticipantId ?? ""}:${file.checklistItemTitle}`;
           checklistItemId =
             createdItems.get(key) ??
             (await this.addChecklistItem(
@@ -269,6 +266,7 @@ export class AssistantActionService {
               payload.dealId,
               file.checklistItemTitle,
               file.newItemParty,
+              file.newItemParticipantId ?? null,
             ));
           createdItems.set(key, checklistItemId);
         }
@@ -304,14 +302,14 @@ export class AssistantActionService {
     dealId: string,
     title: string,
     party: DealParty,
+    participantId: string | null,
   ) {
-    await this.dealService.addChecklistItem(user, dealId, { party, title });
-    const item = await this.checklistRepository.findOne({
-      where: { dealId, title, party, active: true, deal: { userId: user.id } },
-      order: { createdAt: "DESC" },
-    });
-    if (!item) throw new NotFoundException("Item da venda não encontrado.");
-    return item.id;
+    const { createdItemId } = await this.dealService.addChecklistItem(
+      user,
+      dealId,
+      { party, title, participantId },
+    );
+    return createdItemId;
   }
 
   private async sendMessage(user: User, payload: SendMessagePayload) {

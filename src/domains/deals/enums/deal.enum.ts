@@ -37,6 +37,12 @@ export enum DealPaymentMethod {
 }
 
 /** Whose paperwork a checklist item is about. */
+/** A person of the sale besides the main customer. */
+export enum DealParticipantRole {
+  BUYER = "buyer",
+  SELLER = "seller",
+}
+
 export enum DealParty {
   BUYER = "buyer",
   SELLER = "seller",

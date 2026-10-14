@@ -2,6 +2,7 @@ import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
 import { BaseEntity } from "../../../shared/entities/base.entity";
 import { ColumnBoolean } from "../../../shared/decorators/columns/column-boolean.decorator";
 import { DealChecklistStatus, DealParty } from "../enums/deal.enum";
+import { DealParticipant } from "./deal-participant.entity";
 import { Deal } from "./deal.entity";
 
 /** One piece of paperwork the sale needs, like the buyer's ID. */
@@ -19,6 +20,17 @@ export class DealChecklistItem extends BaseEntity {
 
   @Column({ type: "enum", enum: DealParty, nullable: false })
   party: DealParty;
+
+  /**
+   * The buyer or seller this paper belongs to. Empty means the main buyer
+   * (the deal customer) or the seller, when no seller was named.
+   */
+  @ManyToOne(() => DealParticipant, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "participantId" })
+  participant: DealParticipant | null;
+
+  @Column({ type: "uuid", nullable: true })
+  participantId: string | null;
 
   @Column({ type: "varchar", length: 255, nullable: false })
   title: string;
