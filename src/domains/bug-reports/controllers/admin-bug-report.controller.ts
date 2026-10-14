@@ -2,10 +2,12 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   ParseUUIDPipe,
   Patch,
   Query,
+  StreamableFile,
 } from "@nestjs/common";
 import { AdminOnly } from "../../admin/decorators/admin-only.decorator";
 import {
@@ -35,6 +37,19 @@ export class AdminBugReportController {
   @AdminOnly()
   detail(@Param("id", ParseUUIDPipe) id: string) {
     return this.bugReportService.detail(id);
+  }
+
+  /** Inline is safe: the type comes from the real bytes, checked on upload. */
+  @Get(":id/screenshot")
+  @AdminOnly()
+  @Header("Cache-Control", "private, no-store")
+  async screenshot(@Param("id", ParseUUIDPipe) id: string) {
+    const file = await this.bugReportService.screenshot(id);
+    return new StreamableFile(file.buffer, {
+      type: file.contentType,
+      disposition: `inline; filename="${file.fileName}"`,
+      length: file.buffer.length,
+    });
   }
 
   @Patch(":id")

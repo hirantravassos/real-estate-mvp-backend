@@ -42,6 +42,7 @@ export class BugReportMapper {
       errorMessage: bugReport.errorMessage,
       pagePath: bugReport.pagePath,
       appVersion: bugReport.appVersion,
+      hasScreenshot: Boolean(bugReport.screenshotKey),
       reporter: bugReport.user
         ? {
             id: bugReport.user.id,

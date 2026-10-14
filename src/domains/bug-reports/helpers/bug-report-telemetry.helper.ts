@@ -46,6 +46,9 @@ export interface BugReportTelemetry {
     path: string | null;
     title: string | null;
     referrerPath: string | null;
+    /** Where the broker was on the page, to place the print. */
+    scrollY: number | null;
+    documentHeight: number | null;
   };
   app: {
     version: string | null;
@@ -240,6 +243,8 @@ export const sanitizeBugReportTelemetry = (
       path: pathOf(page.path),
       title: textOf(page.title, SHORT_TEXT * 2),
       referrerPath: pathOf(page.referrerPath),
+      scrollY: numberOf(page.scrollY, 0, 1_000_000),
+      documentHeight: numberOf(page.documentHeight, 0, 1_000_000),
     },
     app: {
       version: textOf(app.version, 64),

@@ -1,7 +1,9 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { randomUUID } from "crypto";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import dayjs from "dayjs";
 import { In, LessThan, MoreThanOrEqual, Repository } from "typeorm";
+import { StorageService } from "../../../infrastructure/storage/services/storage.service";
 import { PaginationMapper } from "../../../shared/mappers/pagination.mapper";
 import { RequestEvidence } from "../../../shared/utils/request-evidence.util";
 import { escapeLikePattern } from "../../admin/helpers/like-pattern.helper";
@@ -22,6 +24,10 @@ import {
   CLOSED_BUG_REPORT_STATUSES,
   UNRESOLVED_BUG_REPORT_STATUSES,
 } from "../enums/bug-report.enum";
+import {
+  decodeScreenshot,
+  screenshotContentTypeOf,
+} from "../helpers/bug-report-screenshot.helper";
 import { severityOf } from "../helpers/bug-report-severity.helper";
 import {
   leadingErrorOf,
@@ -37,13 +43,24 @@ const AUDIT_TRAIL_LIMIT = 60;
 const RECENT_REPORTS_DAYS = 30;
 /** Closed reports carry an IP and a device, gone after six months. */
 export const CLOSED_BUG_REPORT_RETENTION_MONTHS = 6;
+/** Expired reports removed per sweep, with their prints. */
+const PURGE_BATCH = 500;
+
+export interface BugReportScreenshotFile {
+  buffer: Buffer;
+  contentType: string;
+  fileName: string;
+}
 
 @Injectable()
 export class BugReportService {
+  private readonly logger = new Logger(BugReportService.name);
+
   constructor(
     @InjectRepository(BugReport)
     private readonly bugReportRepository: Repository<BugReport>,
     private readonly auditLogService: AuditLogService,
+    private readonly storageService: StorageService,
   ) {}
 
   /**
@@ -73,6 +90,7 @@ export class BugReportService {
       errorMessage: leadingErrorOf(telemetry),
       ip: evidence.ip,
       userAgent: evidence.userAgent,
+      screenshotKey: await this.storeScreenshot(user.id, dto.screenshot),
       telemetry,
       resolutionNote: null,
       resolvedAt: null,
@@ -225,16 +243,77 @@ export class BugReportService {
     };
   }
 
-  /** Closed reports past the retention period, returns how many went. */
+  /** The print of the screen, read through the API so every view is audited. */
+  async screenshot(id: string): Promise<BugReportScreenshotFile> {
+    const bugReport = await this.bugReportRepository.findOne({
+      where: { id },
+      select: { id: true, screenshotKey: true },
+    });
+    if (!bugReport?.screenshotKey) {
+      throw new NotFoundException("Este reporte não tem print da tela");
+    }
+    const extension = bugReport.screenshotKey.split(".").pop() ?? "jpg";
+    return {
+      buffer: await this.storageService.downloadObject(bugReport.screenshotKey),
+      contentType: screenshotContentTypeOf(bugReport.screenshotKey),
+      fileName: `bug-${bugReport.id.substring(0, 8)}.${extension}`,
+    };
+  }
+
+  /** Closed reports past the retention period and their prints. */
   async purgeExpired(now = new Date()): Promise<number> {
     const limit = dayjs(now)
       .subtract(CLOSED_BUG_REPORT_RETENTION_MONTHS, "month")
       .toDate();
+    const expired = await this.bugReportRepository.find({
+      where: {
+        status: In([...CLOSED_BUG_REPORT_STATUSES]),
+        updatedAt: LessThan(limit),
+      },
+      select: { id: true, screenshotKey: true },
+      take: PURGE_BATCH,
+    });
+    if (expired.length === 0) return 0;
+
+    for (const bugReport of expired) {
+      if (!bugReport.screenshotKey) continue;
+      try {
+        await this.storageService.deleteObject(bugReport.screenshotKey);
+      } catch (error) {
+        this.logger.warn(
+          `Print ${bugReport.screenshotKey} not deleted: ${String(error)}`,
+        );
+      }
+    }
     const result = await this.bugReportRepository.delete({
-      status: In([...CLOSED_BUG_REPORT_STATUSES]),
-      updatedAt: LessThan(limit),
+      id: In(expired.map((bugReport) => bugReport.id)),
     });
     return result.affected ?? 0;
+  }
+
+  /**
+   * Keeps the print under the broker's own folder with a random name and
+   * the extension of the real bytes. A print that fails to store never
+   * blocks the report, it arrives without it.
+   */
+  private async storeScreenshot(
+    userId: string,
+    dataUrl: string | undefined,
+  ): Promise<string | null> {
+    const screenshot = decodeScreenshot(dataUrl);
+    if (!screenshot) return null;
+    const key = `bug-reports/${userId}/${randomUUID()}.${screenshot.extension}`;
+    try {
+      await this.storageService.uploadBuffer(
+        key,
+        screenshot.buffer,
+        screenshot.mimeType,
+      );
+      return key;
+    } catch (error) {
+      this.logger.warn(`Print of a bug report not stored: ${String(error)}`);
+      return null;
+    }
   }
 
   private async findOrFail(id: string) {

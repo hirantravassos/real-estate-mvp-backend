@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { MailModule } from "../../infrastructure/mail/mail.module";
+import { StorageModule } from "../../infrastructure/storage/storage.module";
 import { AdminModule } from "../admin/admin.module";
 import { UserThrottlerGuard } from "../subscriptions/guards/user-throttler.guard";
 import { AdminBugReportController } from "./controllers/admin-bug-report.controller";
@@ -21,6 +22,7 @@ import { BugReportService } from "./services/bug-report.service";
     TypeOrmModule.forFeature([BugReport, BugReportDigest]),
     AdminModule,
     MailModule,
+    StorageModule,
   ],
   controllers: [BugReportController, AdminBugReportController],
   providers: [

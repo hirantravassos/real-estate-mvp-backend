@@ -64,6 +64,10 @@ export class BugReport extends BaseEntity {
   @Column({ type: "varchar", length: 500, nullable: true })
   userAgent: string | null;
 
+  /** Print of the screen in the storage, bug-reports/{userId}/{uuid}.ext. */
+  @Column({ type: "varchar", length: 200, nullable: true })
+  screenshotKey: string | null;
+
   /** Sanitized on the way in, see sanitizeBugReportTelemetry. */
   @Column({ type: "json", nullable: true })
   telemetry: BugReportTelemetry | null;

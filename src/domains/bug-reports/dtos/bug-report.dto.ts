@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   MaxLength,
 } from "class-validator";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
@@ -14,6 +15,10 @@ import {
   BugReportSource,
   BugReportStatus,
 } from "../enums/bug-report.enum";
+import {
+  MAXIMUM_SCREENSHOT_DATA_URL_LENGTH,
+  SCREENSHOT_DATA_URL_PATTERN,
+} from "../helpers/bug-report-screenshot.helper";
 import type { BugReportTelemetry } from "../helpers/bug-report-telemetry.helper";
 
 export const MAXIMUM_DESCRIPTION_LENGTH = 4000;
@@ -39,6 +44,15 @@ export class BugReportCreateDto {
   @IsOptional()
   @IsObject()
   readonly telemetry?: Record<string, unknown>;
+
+  /** Print of the screen as a jpeg, png or webp data URL. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(MAXIMUM_SCREENSHOT_DATA_URL_LENGTH)
+  @Matches(SCREENSHOT_DATA_URL_PATTERN, {
+    message: "O print da tela precisa ser uma imagem jpeg, png ou webp",
+  })
+  readonly screenshot?: string;
 }
 
 export interface BugReportReceiptDto {
@@ -105,6 +119,7 @@ export interface AdminBugReportListItemDto {
   errorMessage: string | null;
   pagePath: string | null;
   appVersion: string | null;
+  hasScreenshot: boolean;
   reporter: AdminBugReportReporterDto | null;
 }
 

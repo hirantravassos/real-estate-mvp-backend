@@ -1,5 +1,6 @@
 import { NotFoundException, ValidationPipe } from "@nestjs/common";
 import { Repository } from "typeorm";
+import { StorageService } from "../../../infrastructure/storage/services/storage.service";
 import { AuditLogService } from "../../audit-logs/services/audit-log.service";
 import { User } from "../../users/entities/user.entity";
 import {
@@ -35,11 +36,15 @@ const buildService = (stored: BugReport | null = null) => {
   const auditLogService = {
     findForUserBetween: jest.fn().mockResolvedValue([]),
   };
+  const storageService = {
+    uploadBuffer: jest.fn().mockResolvedValue(undefined),
+  };
   const service = new BugReportService(
     repository as unknown as Repository<BugReport>,
     auditLogService as unknown as AuditLogService,
+    storageService as unknown as StorageService,
   );
-  return { service, repository };
+  return { service, repository, storageService };
 };
 
 const validationPipe = new ValidationPipe({
@@ -125,5 +130,45 @@ describe("BugReportService", () => {
     await service.update(stored.id, { status: BugReportStatus.OPEN });
     expect(stored.resolvedAt).toBeNull();
     expect(repository.save).toHaveBeenCalledTimes(2);
+  });
+
+  it("stores a real image under the broker's folder and drops a fake one", async () => {
+    const { service, repository, storageService } = buildService();
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]).toString(
+      "base64",
+    );
+
+    await service.create(
+      firstBroker,
+      {
+        source: BugReportSource.BUTTON,
+        description: "Tela travou",
+        screenshot: `data:image/png;base64,${jpeg}`,
+      },
+      evidence,
+    );
+    const [key, , mimeType] = storageService.uploadBuffer.mock.calls[0] as [
+      string,
+      Buffer,
+      string,
+    ];
+    expect(key).toMatch(
+      new RegExp(`^bug-reports/${firstBroker.id}/[0-9a-f-]{36}\\.jpg$`),
+    );
+    expect(mimeType).toBe("image/jpeg");
+    expect(repository.create.mock.calls[0][0].screenshotKey).toBe(key);
+
+    const html = Buffer.from("<script>alert(1)</script>").toString("base64");
+    await service.create(
+      firstBroker,
+      {
+        source: BugReportSource.BUTTON,
+        description: "Outro",
+        screenshot: `data:image/png;base64,${html}`,
+      },
+      evidence,
+    );
+    expect(storageService.uploadBuffer).toHaveBeenCalledTimes(1);
+    expect(repository.create.mock.calls[1][0].screenshotKey).toBeNull();
   });
 });

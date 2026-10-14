@@ -20,6 +20,8 @@ describe("bug report telemetry", () => {
       path: "/customers/abc",
       title: "Clientes",
       referrerPath: null,
+      scrollY: null,
+      documentHeight: null,
     });
     expect(telemetry.device.viewportWidth).toBe(390);
     expect(telemetry.device.touch).toBe(true);
