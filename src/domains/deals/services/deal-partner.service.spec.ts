@@ -1,7 +1,11 @@
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { DataSource, EntityManager, Repository } from "typeorm";
 import { Customer } from "../../customers/entities/customer.entity";
-import { DocumentService } from "../../documents/services/document.service";
+import type { ConfigType } from "@nestjs/config";
+import { appConfig } from "../../../config/app.config";
+import { ConversationService } from "../../inbox/services/conversation.service";
+import { MessageService } from "../../inbox/services/message.service";
+import { WhatsappConnectionService } from "../../inbox/services/whatsapp-connection.service";
 import { User } from "../../users/entities/user.entity";
 import { Deal } from "../entities/deal.entity";
 import { DealChecklistItem } from "../entities/deal-checklist-item.entity";
@@ -48,8 +52,11 @@ const buildService = () => {
     dealRepository,
     {} as Repository<Customer>,
     dealService,
-    {} as DocumentService,
     { record: jest.fn() } as unknown as DealActivityService,
+    { frontendUrl: "https://app.test" } as ConfigType<typeof appConfig>,
+    {} as WhatsappConnectionService,
+    {} as ConversationService,
+    {} as MessageService,
   );
   return { service, managerUpdate };
 };

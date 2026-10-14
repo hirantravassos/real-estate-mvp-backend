@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  Headers,
   Param,
   ParseUUIDPipe,
   Post,
@@ -15,8 +17,13 @@ import { Throttle } from "@nestjs/throttler";
 import type { Request } from "express";
 import { DealPortalService } from "../services/deal-portal.service";
 import { DealSignatureService } from "../services/deal-signature.service";
-import { DealPartnerService } from "../services/deal-partner.service";
-import { DealGovbrCopyDto, DealSignDto } from "../dtos/deal.dto";
+import { DealPartnerAreaService } from "../services/deal-partner-area.service";
+import {
+  DealGovbrCopyDto,
+  DealPartnerChecklistItemDto,
+  DealPartnerVerifyDto,
+  DealSignDto,
+} from "../dtos/deal.dto";
 import { CustomerAvatarDto } from "../../customers/dtos/customer-avatar.dto";
 import {
   dealContractUploadOptions,
@@ -31,6 +38,12 @@ const publicWriteLimit = {
   default: { limit: PUBLIC_WRITES_PER_MINUTE, ttl: 60_000 },
 };
 
+/** Number checks per address and minute, the partner lock covers the rest. */
+const verifyLimit = { default: { limit: 5, ttl: 60_000 } };
+
+/** Where the partner area session travels, never in the URL. */
+const PARTNER_SESSION_HEADER = "x-partner-session";
+
 /**
  * Public routes for the customer area, the partner area and the signing page. No login, the
  * long random token in the link is the key. The global throttler covers the
@@ -41,7 +54,7 @@ export class DealPortalController {
   constructor(
     private readonly portalService: DealPortalService,
     private readonly signatureService: DealSignatureService,
-    private readonly partnerService: DealPartnerService,
+    private readonly partnerAreaService: DealPartnerAreaService,
   ) {}
 
   @Get("portal/:token")
@@ -81,9 +94,38 @@ export class DealPortalController {
     return this.portalService.getDocumentUrl(token, documentId);
   }
 
+  /** Before the number is confirmed the link only greets the partner. */
+  @Get("partners/:token/gate")
+  getPartnerGate(@Param("token") token: string) {
+    return this.partnerAreaService.getGate(token);
+  }
+
+  /** Opens the area on this device when the number is the saved one. */
+  @Post("partners/:token/verify")
+  @Throttle(verifyLimit)
+  verifyPartner(
+    @Param("token") token: string,
+    @Body() dto: DealPartnerVerifyDto,
+  ) {
+    return this.partnerAreaService.verify(token, dto.phone);
+  }
+
   @Get("partners/:token")
-  getPartnerArea(@Param("token") token: string) {
-    return this.partnerService.getArea(token);
+  getPartnerArea(
+    @Param("token") token: string,
+    @Headers(PARTNER_SESSION_HEADER) session?: string,
+  ) {
+    return this.partnerAreaService.getArea(token, session);
+  }
+
+  @Post("partners/:token/checklist")
+  @Throttle(publicWriteLimit)
+  addPartnerChecklistItem(
+    @Param("token") token: string,
+    @Body() dto: DealPartnerChecklistItemDto,
+    @Headers(PARTNER_SESSION_HEADER) session?: string,
+  ) {
+    return this.partnerAreaService.addChecklistItem(token, session, dto);
   }
 
   @Post("partners/:token/checklist/:itemId/documents")
@@ -92,21 +134,35 @@ export class DealPortalController {
   uploadPartnerChecklistDocument(
     @Param("token") token: string,
     @Param("itemId", ParseUUIDPipe) itemId: string,
+    @Headers(PARTNER_SESSION_HEADER) session?: string,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.partnerService.uploadChecklistDocument(
+    return this.partnerAreaService.uploadChecklistDocument(
       token,
+      session,
       itemId,
       requireFile(file),
     );
+  }
+
+  /** Only files the partner sent, never the broker's or another partner's. */
+  @Delete("partners/:token/documents/:documentId")
+  @Throttle(publicWriteLimit)
+  removePartnerDocument(
+    @Param("token") token: string,
+    @Param("documentId", ParseUUIDPipe) documentId: string,
+    @Headers(PARTNER_SESSION_HEADER) session?: string,
+  ) {
+    return this.partnerAreaService.removeDocument(token, session, documentId);
   }
 
   @Get("partners/:token/documents/:documentId/url")
   getPartnerDocumentUrl(
     @Param("token") token: string,
     @Param("documentId", ParseUUIDPipe) documentId: string,
+    @Headers(PARTNER_SESSION_HEADER) session?: string,
   ) {
-    return this.partnerService.getDocumentUrl(token, documentId);
+    return this.partnerAreaService.getDocumentUrl(token, session, documentId);
   }
 
   @Get("signatures/:token")

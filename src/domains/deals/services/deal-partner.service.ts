@@ -1,33 +1,37 @@
 import {
   BadRequestException,
+  ConflictException,
+  forwardRef,
+  Inject,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import type { ConfigType } from "@nestjs/config";
+import { appConfig } from "../../../config/app.config";
+import { toWhatsappNumber } from "../../inbox/helpers/whatsapp-phone.helper";
+import { ConversationService } from "../../inbox/services/conversation.service";
+import { MessageService } from "../../inbox/services/message.service";
+import { WhatsappConnectionService } from "../../inbox/services/whatsapp-connection.service";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, EntityManager, Repository } from "typeorm";
 import { User } from "../../users/entities/user.entity";
 import { Customer } from "../../customers/entities/customer.entity";
 import { CustomerRole } from "../../customers/enums/customer.enum";
-import { DocumentOwnerType } from "../../documents/entities/document.entity";
-import { DocumentService } from "../../documents/services/document.service";
 import { Deal } from "../entities/deal.entity";
 import { DealChecklistItem } from "../entities/deal-checklist-item.entity";
 import { DealPartner } from "../entities/deal-partner.entity";
 import { DealSigner } from "../entities/deal-signer.entity";
 import {
-  DealChecklistStatus,
   DealEventActor,
   DealEventKind,
   DealSignerRole,
   DealSignerStatus,
-  DealStatus,
 } from "../enums/deal.enum";
 import {
   DealCommissionSplitDto,
   DealPartnerCreateDto,
   DealPartnerUpdateDto,
 } from "../dtos/deal.dto";
-import { DealMapper } from "../mappers/deal.mapper";
 import { DealActivityService } from "./deal-activity.service";
 import { createPublicToken, DealService } from "./deal.service";
 
@@ -55,8 +59,15 @@ export class DealPartnerService {
     @InjectRepository(Customer)
     private readonly customerRepository: Repository<Customer>,
     private readonly dealService: DealService,
-    private readonly documentService: DocumentService,
     private readonly activityService: DealActivityService,
+    @Inject(appConfig.KEY)
+    private readonly applicationConfiguration: ConfigType<typeof appConfig>,
+    @Inject(forwardRef(() => WhatsappConnectionService))
+    private readonly connectionService: WhatsappConnectionService,
+    @Inject(forwardRef(() => ConversationService))
+    private readonly conversationService: ConversationService,
+    @Inject(forwardRef(() => MessageService))
+    private readonly messageService: MessageService,
   ) {}
 
   async addPartner(user: User, dealId: string, dto: DealPartnerCreateDto) {
@@ -253,6 +264,81 @@ export class DealPartnerService {
     return this.dealService.findOne(user, dealId);
   }
 
+  /**
+   * Sends the partner their access by the broker's own WhatsApp, only when
+   * the broker taps the button. The message explains every step, since the
+   * partner may have never used the app.
+   */
+  async sendAccess(user: User, dealId: string, partnerId: string) {
+    const partner = await this.findOwnedPartnerOrThrow(
+      user.id,
+      dealId,
+      partnerId,
+    );
+    if (!partner.phone) {
+      throw new BadRequestException(
+        "Cadastre o WhatsApp do parceiro antes de enviar o acesso.",
+      );
+    }
+    const connection = await this.connectionService
+      .requireConnected(user.id)
+      .catch(() => null);
+    if (!connection) {
+      throw new ConflictException(
+        "Conecte o seu WhatsApp para enviar pelo app, ou envie pelo seu celular.",
+      );
+    }
+
+    const deal = await this.dealService.findDetailedOrThrow({
+      id: partner.dealId,
+      userId: user.id,
+      active: true,
+    });
+    const conversation = await this.conversationService.findOrCreateByJid(
+      user.id,
+      `${toWhatsappNumber(partner.phone)}@s.whatsapp.net`,
+      partner.name,
+    );
+    await this.messageService.sendTextTo(
+      conversation,
+      this.accessMessage(deal, partner),
+      {},
+    );
+
+    await this.partnerRepository.update(
+      { id: partner.id },
+      { accessSentAt: new Date() },
+    );
+    await this.activityService.record({
+      dealId: partner.dealId,
+      kind: DealEventKind.PARTNER,
+      actor: DealEventActor.BROKER,
+      message: `Acesso da parceria enviado para ${partner.name}`,
+      visibleToCustomer: false,
+    });
+    return this.dealService.findOne(user, dealId);
+  }
+
+  private accessMessage(deal: Deal, partner: DealPartner) {
+    const property = deal.property
+      ? ` do imóvel ${deal.property.alias || deal.property.address}`
+      : "";
+    const link = `${this.applicationConfiguration.frontendUrl}/parceria/${partner.accessToken}`;
+    return [
+      `Oi ${firstNameOf(partner.name)}! 🤝 Aqui é ${deal.user.name}.`,
+      `Separei uma área só sua para a nossa parceria na venda${property}.`,
+      "",
+      "Como usar, sem precisar de cadastro:",
+      "1️⃣ Abra o link abaixo",
+      "2️⃣ Digite o seu número de WhatsApp, este mesmo em que você recebeu esta mensagem",
+      "3️⃣ Toque em Enviar arquivo no documento que você tiver e mande a foto ou o PDF",
+      "",
+      "Eu confiro cada arquivo e você acompanha tudo por lá. Você só consegue apagar o que você mesmo enviou.",
+      "",
+      `🔗 ${link}`,
+    ].join("\n");
+  }
+
   /** New partner link, the old one stops working right away. */
   async regenerateToken(user: User, dealId: string, partnerId: string) {
     const partner = await this.findOwnedPartnerOrThrow(
@@ -265,76 +351,6 @@ export class DealPartnerService {
       { accessToken: createPublicToken() },
     );
     return this.dealService.findOne(user, dealId);
-  }
-
-  async getArea(token: string) {
-    const partner = await this.findPartnerByTokenOrThrow(token);
-    const deal = await this.dealService.findDetailedOrThrow({
-      id: partner.dealId,
-      active: true,
-    });
-    const documents = await this.dealService.loadDocuments(deal);
-    return DealMapper.toPartnerAreaDto(deal, partner, documents);
-  }
-
-  /** Partners help with any paperwork, the broker still checks every file. */
-  async uploadChecklistDocument(
-    token: string,
-    itemId: string,
-    file: Express.Multer.File,
-  ) {
-    const partner = await this.findPartnerByTokenOrThrow(token);
-    const deal = await this.dealService.findDetailedOrThrow({
-      id: partner.dealId,
-      active: true,
-    });
-    if (deal.status !== DealStatus.OPEN) {
-      throw new BadRequestException("Esta negociação está encerrada.");
-    }
-
-    const item = await this.checklistRepository.findOne({
-      where: { id: itemId, dealId: deal.id, active: true },
-    });
-    if (!item) throw new NotFoundException("Documento não encontrado.");
-    if (item.status === DealChecklistStatus.APPROVED) {
-      throw new BadRequestException("Este documento já foi aprovado.");
-    }
-
-    await this.dealService.attachChecklistDocument(
-      deal,
-      item,
-      file,
-      DealEventActor.PARTNER,
-      firstNameOf(partner.name),
-    );
-    this.activityService.notifyBroker(deal.userId, deal.id);
-
-    return this.getArea(token);
-  }
-
-  /** The contract and any checklist file of the sale. */
-  async getDocumentUrl(token: string, documentId: string) {
-    const partner = await this.findPartnerByTokenOrThrow(token);
-    const deal = await this.dealService.findDetailedOrThrow({
-      id: partner.dealId,
-      active: true,
-    });
-    const document = await this.dealService.findDealDocumentOrThrow(
-      deal,
-      documentId,
-    );
-
-    const isContract = document.id === deal.contractDocumentId;
-    const isChecklistItem =
-      document.ownerType === DocumentOwnerType.DEAL_ITEM &&
-      deal.checklistItems.some(
-        (item) => item.id === document.ownerId && item.active,
-      );
-    if (!isContract && !isChecklistItem) {
-      throw new NotFoundException("Documento não encontrado.");
-    }
-
-    return this.documentService.getPresignedUrlForDocument(document);
   }
 
   private async createSigner(partner: DealPartner, manager?: EntityManager) {
@@ -405,16 +421,6 @@ export class DealPartnerService {
       },
     });
     if (!partner) throw new NotFoundException("Parceria não encontrada.");
-    return partner;
-  }
-
-  private async findPartnerByTokenOrThrow(token: string) {
-    const partner = await this.partnerRepository.findOne({
-      where: { accessToken: token, active: true, deal: { active: true } },
-    });
-    if (!partner) {
-      throw new NotFoundException("Esta área não está disponível.");
-    }
     return partner;
   }
 }

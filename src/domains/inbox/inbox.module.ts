@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { EvolutionModule } from "../../infrastructure/evolution/evolution.module";
@@ -45,7 +45,7 @@ import { WhatsappHistorySyncService } from "./services/whatsapp-history-sync.ser
     AiModule,
     AvatarModule,
     CustomerModule,
-    DealModule,
+    forwardRef(() => DealModule),
     DocumentModule,
     PropertyModule,
   ],

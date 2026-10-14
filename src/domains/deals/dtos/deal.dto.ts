@@ -374,6 +374,30 @@ export class DealParticipantUpdateDto {
   name?: string;
 }
 
+export class DealPartnerVerifyDto {
+  /** The partner's own WhatsApp number, as they type it. */
+  @IsString()
+  @MinLength(8)
+  @MaxLength(30)
+  phone: string;
+}
+
+/** A paper the partner adds to the list, for the broker to check. */
+export class DealPartnerChecklistItemDto {
+  @IsEnum(DealParty)
+  party: DealParty;
+
+  @IsOptional()
+  @IsUUID()
+  participantId?: string | null;
+
+  @Transform(trimText)
+  @IsString()
+  @MinLength(2)
+  @MaxLength(255)
+  title: string;
+}
+
 export class DealSignerReviewDto {
   @IsBoolean()
   approved: boolean;
