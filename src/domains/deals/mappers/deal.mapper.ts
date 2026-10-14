@@ -8,7 +8,12 @@ import { DealSigner } from "../entities/deal-signer.entity";
 import { DealMilestone } from "../entities/deal-milestone.entity";
 import { DealEvent } from "../entities/deal-event.entity";
 import { DealPartner } from "../entities/deal-partner.entity";
-import { DealChecklistStatus, DealSignerStatus } from "../enums/deal.enum";
+import { DealParticipant } from "../entities/deal-participant.entity";
+import {
+  DealChecklistStatus,
+  DealParticipantRole,
+  DealSignerStatus,
+} from "../enums/deal.enum";
 
 export interface DealProgressDto {
   checklistTotal: number;
@@ -68,6 +73,27 @@ const shortName = (name: string) => {
   const last = rest.at(-1);
   return last ? `${first} ${last.charAt(0).toUpperCase()}.` : first;
 };
+
+const activeParticipants = (deal: Deal) =>
+  (deal.participants ?? [])
+    .filter((participant) => participant.active)
+    .sort(byOrder);
+
+/** Whose paper it is, by name, when it belongs to one buyer or seller. */
+const participantNameOf = (
+  item: DealChecklistItem,
+  participants: Map<string, DealParticipant>,
+  roles: DealParticipantRole[],
+) => {
+  const participant = item.participantId
+    ? participants.get(item.participantId)
+    : null;
+  return participant && roles.includes(participant.role)
+    ? participant.name
+    : null;
+};
+
+const ALL_ROLES = [DealParticipantRole.BUYER, DealParticipantRole.SELLER];
 
 const activePartners = (deal: Deal) =>
   (deal.partners ?? [])
@@ -192,10 +218,10 @@ export class DealMapper {
             uploadedAt: deal.contractUploadedAt,
           }
         : null,
-      checklist: (deal.checklistItems ?? [])
-        .filter((item) => item.active)
-        .sort(byOrder)
-        .map((item) => this.toChecklistItem(item, documents)),
+      participants: activeParticipants(deal).map((participant) =>
+        this.toParticipant(participant),
+      ),
+      checklist: this.toChecklist(deal, documents, ALL_ROLES),
       signers: (deal.signers ?? [])
         .filter((signer) => signer.active)
         .sort(byCreation)
@@ -233,10 +259,52 @@ export class DealMapper {
     };
   }
 
+  static toParticipant(participant: DealParticipant) {
+    return {
+      id: participant.id,
+      role: participant.role,
+      name: participant.name,
+      customerId: participant.customerId,
+      customer: participant.customer
+        ? {
+            id: participant.customer.id,
+            name: participant.customer.name,
+            phone: participant.customer.phone,
+          }
+        : null,
+    };
+  }
+
+  /**
+   * The active papers in order. Names of the people they belong to only go
+   * out for the roles given, so a buyer never reads the seller's name.
+   */
+  static toChecklist(
+    deal: Deal,
+    documents: DealDocumentsDto,
+    namedRoles: DealParticipantRole[],
+    filter: (item: DealChecklistItem) => boolean = () => true,
+  ) {
+    const participants = new Map(
+      activeParticipants(deal).map((participant) => [
+        participant.id,
+        participant,
+      ]),
+    );
+    return (deal.checklistItems ?? [])
+      .filter((item) => item.active && filter(item))
+      .sort(byOrder)
+      .map((item) => ({
+        ...this.toChecklistItem(item, documents),
+        participantName: participantNameOf(item, participants, namedRoles),
+      }));
+  }
+
   static toChecklistItem(item: DealChecklistItem, documents: DealDocumentsDto) {
     return {
       id: item.id,
       party: item.party,
+      participantId: item.participantId ?? null,
       title: item.title,
       description: item.description,
       status: item.status,
@@ -329,10 +397,7 @@ export class DealMapper {
       },
       property: this.toProperty(deal.property),
       progress: this.toProgress(deal),
-      checklist: (deal.checklistItems ?? [])
-        .filter((item) => item.active)
-        .sort(byOrder)
-        .map((item) => this.toChecklistItem(item, documents)),
+      checklist: this.toChecklist(deal, documents, ALL_ROLES),
       contract: contractDocument
         ? {
             document: DocumentMapper.toDto(contractDocument),
@@ -403,10 +468,17 @@ export class DealMapper {
         ? { ...this.toProperty(deal.property), coverUrl }
         : null,
       progress: this.toProgress(deal),
-      checklist: (deal.checklistItems ?? [])
-        .filter((item) => item.active && item.requestedFromCustomer)
-        .sort(byOrder)
-        .map((item) => this.toChecklistItem(item, documents)),
+      checklist: this.toChecklist(
+        deal,
+        documents,
+        [DealParticipantRole.BUYER],
+        (item) => item.requestedFromCustomer,
+      ).map((item) => ({
+        ...item,
+        // The shared customer area never says which seller a paper is from.
+        participantId:
+          item.participantName === null ? null : item.participantId,
+      })),
       contract: contractDocument
         ? {
             document: DocumentMapper.toDto(contractDocument),

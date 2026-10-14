@@ -20,6 +20,7 @@ import { User } from "../../users/entities/user.entity";
 import { DealService } from "../services/deal.service";
 import { DealSignatureService } from "../services/deal-signature.service";
 import { DealPartnerService } from "../services/deal-partner.service";
+import { DealParticipantService } from "../services/deal-participant.service";
 import {
   DealCancelDto,
   DealChecklistItemCreateDto,
@@ -31,6 +32,8 @@ import {
   DealMilestoneCreateDto,
   DealMilestoneUpdateDto,
   DealCommissionSplitDto,
+  DealParticipantCreateDto,
+  DealParticipantUpdateDto,
   DealPartnerCreateDto,
   DealPartnerUpdateDto,
   DealPortalDto,
@@ -55,6 +58,7 @@ export class DealController {
     private readonly dealService: DealService,
     private readonly signatureService: DealSignatureService,
     private readonly partnerService: DealPartnerService,
+    private readonly participantService: DealParticipantService,
   ) {}
 
   @Get()
@@ -280,6 +284,40 @@ export class DealController {
     @Param("signerId", ParseUUIDPipe) signerId: string,
   ) {
     return this.signatureService.resetSignature(user, id, signerId);
+  }
+
+  /** Another buyer or seller, from a contact or only a nickname. */
+  @Post(":id/participants")
+  addParticipant(
+    @GetUser() user: User,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: DealParticipantCreateDto,
+  ) {
+    return this.participantService.addParticipant(user, id, dto);
+  }
+
+  @Patch(":id/participants/:participantId")
+  updateParticipant(
+    @GetUser() user: User,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Param("participantId", ParseUUIDPipe) participantId: string,
+    @Body() dto: DealParticipantUpdateDto,
+  ) {
+    return this.participantService.updateParticipant(
+      user,
+      id,
+      participantId,
+      dto,
+    );
+  }
+
+  @Delete(":id/participants/:participantId")
+  removeParticipant(
+    @GetUser() user: User,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Param("participantId", ParseUUIDPipe) participantId: string,
+  ) {
+    return this.participantService.removeParticipant(user, id, participantId);
   }
 
   /** The whole commission and each partner's share, in one go. */

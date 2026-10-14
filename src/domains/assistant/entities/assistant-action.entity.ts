@@ -68,6 +68,8 @@ export interface DealDocumentLink {
   checklistItemTitle: string;
   /** Whose paperwork the new item is, only for a new item. */
   newItemParty: DealParty | null;
+  /** The buyer or seller of the sale the new item belongs to. */
+  newItemParticipantId?: string | null;
 }
 
 export interface LinkDealDocumentsPayload {

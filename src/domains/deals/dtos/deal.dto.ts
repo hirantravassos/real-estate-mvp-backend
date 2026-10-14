@@ -24,6 +24,7 @@ import { ValidateCurrency } from "../../../shared/decorators/validation/currency
 import { normalizePhoneNumber } from "../../../shared/decorators/validation/phone-number.decorator";
 import {
   DealChecklistStatus,
+  DealParticipantRole,
   DealParty,
   DealPaymentMethod,
   DealSellerType,
@@ -49,6 +50,11 @@ export class DealFilterDto {
 export class DealCreateDto {
   @IsUUID()
   customerId: string;
+
+  /** The seller contact, optional. Takes the seller paperwork of the sale. */
+  @IsOptional()
+  @IsUUID()
+  sellerCustomerId?: string | null;
 
   @IsOptional()
   @IsUUID()
@@ -135,6 +141,11 @@ export class DealPortalDto {
 export class DealChecklistItemCreateDto {
   @IsEnum(DealParty)
   party: DealParty;
+
+  /** The buyer or seller of the sale this paper belongs to. */
+  @IsOptional()
+  @IsUUID()
+  participantId?: string | null;
 
   @Transform(trimText)
   @IsString()
@@ -326,6 +337,41 @@ export class DealCommissionSplitDto {
   @ValidateNested({ each: true })
   @Type(() => DealCommissionShareDto)
   partners: DealCommissionShareDto[];
+}
+
+export class DealParticipantCreateDto {
+  @IsEnum(DealParticipantRole)
+  role: DealParticipantRole;
+
+  /** The contact this person is, optional. */
+  @IsOptional()
+  @IsUUID()
+  customerId?: string | null;
+
+  /** The name or a nickname, like "Vendedor 2". Defaults to the contact's. */
+  @IsOptional()
+  @Transform(trimText)
+  @IsString()
+  @MaxLength(255)
+  name?: string | null;
+
+  /** Adds the usual paperwork of a buyer or a seller for this person. */
+  @IsOptional()
+  @IsBoolean()
+  withChecklist?: boolean;
+}
+
+export class DealParticipantUpdateDto {
+  @IsOptional()
+  @IsUUID()
+  customerId?: string | null;
+
+  @IsOptional()
+  @Transform(trimText)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  name?: string;
 }
 
 export class DealSignerReviewDto {
