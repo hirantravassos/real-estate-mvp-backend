@@ -6,6 +6,7 @@ import {
   WebSocketServer,
 } from "@nestjs/websockets";
 import { Server, Socket } from "socket.io";
+import { resolveCorsOrigins } from "../../shared/utils/cors-origins.util";
 import { UserRepository } from "../../domains/users/repositories/user.repository";
 import {
   SESSIONS_ENDED_EVENT,
@@ -34,7 +35,7 @@ const userRoom = (userId: string) => `user:${userId}`;
 @WebSocketGateway({
   namespace: "/realtime",
   cors: {
-    origin: process.env.APP_CORS_ORIGIN || "http://localhost:3000",
+    origin: resolveCorsOrigins(),
     credentials: true,
   },
 })

@@ -4,6 +4,7 @@ import { ValidationPipe } from "@nestjs/common";
 import { AppModule } from "./app.module.js";
 import { GlobalExceptionFilter } from "./shared/filters/global-exception.filter.js";
 import { assertDataEncryptionSecret } from "./shared/utils/data-cipher.util.js";
+import { resolveCorsOrigins } from "./shared/utils/cors-origins.util.js";
 import type { Request, Response, NextFunction } from "express";
 
 async function bootstrap(): Promise<void> {
@@ -30,10 +31,10 @@ async function bootstrap(): Promise<void> {
   // WhatsApp webhooks carry message thumbnails, bigger than the 100 KB default.
   app.useBodyParser("json", { limit: "10mb" });
 
-  const cors = process.env.APP_CORS_ORIGIN || "http://localhost:3000";
+  const corsOrigins = resolveCorsOrigins();
 
   app.enableCors({
-    origin: cors,
+    origin: corsOrigins,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true,
   });
@@ -54,7 +55,7 @@ async function bootstrap(): Promise<void> {
   const port = parseInt(process.env.APP_PORT || "3001", 10);
   await app.listen(port, "0.0.0.0");
   console.log(`🚀 Backend running on http://localhost:${port}/api`);
-  console.log(`🚀 Cors allowed for: ${cors}`);
+  console.log(`🚀 Cors allowed for: ${corsOrigins.join(", ")}`);
 }
 
 void bootstrap();
