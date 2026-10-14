@@ -4,6 +4,7 @@ import { UserCreateDto } from "../dtos/user-create.dto";
 import { TokenPayload } from "google-auth-library";
 import { UserResponseDto } from "../dtos/user-response.dto";
 import { CURRENT_TERMS_VERSION } from "../../../shared/constants/legal.constant";
+import { profileImagePathOf } from "../helpers/profile-image.helper";
 
 export class UserMapper {
   static toDto(user: User): UserResponseDto {
@@ -11,7 +12,7 @@ export class UserMapper {
       id: user.id,
       email: user.email,
       name: user.name,
-      profileImage: user.profileImage,
+      profileImage: profileImagePathOf(user.profileImage),
       avatar: user.avatar ?? null,
       terms: {
         acceptedVersion: user.termsVersion ?? null,

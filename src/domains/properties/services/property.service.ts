@@ -33,6 +33,7 @@ import {
   PropertyLiftEnum,
   PropertyMapper,
 } from "../mappers/property.mapper";
+import { profileImagePathOf } from "../../users/helpers/profile-image.helper";
 
 export class PropertyContactCreateDto {
   @ValidatePhoneNumber()
@@ -441,7 +442,8 @@ export class PropertyService {
       address2: "",
       agent: {
         name: entity.user.name,
-        profileImage: entity.user.profileImage,
+        profileImage: profileImagePathOf(entity.user.profileImage),
+        avatar: entity.user.avatar ?? null,
         slug: entity.user.slug ?? null,
       },
     };
