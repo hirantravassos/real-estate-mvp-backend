@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Post,
+  Query,
+  UseGuards,
+} from "@nestjs/common";
 import { GetUser } from "../../../shared/decorators/get-user.decorator";
 import { JwtGuard } from "../../auth/guards/jwt.guard";
 import { User } from "../../users/entities/user.entity";
@@ -13,6 +21,9 @@ import { ContactAiAnalysisService } from "../services/contact-ai-analysis.servic
 import { ContactImportService } from "../services/contact-import.service";
 import { PlanLimit } from "../../subscriptions/decorators/subscription.decorator";
 import { PlanLimitResource } from "../../subscriptions/enums/subscription.enum";
+
+/** Google address book import, off for now; the frontend hides it too. */
+const GOOGLE_CONTACTS_IMPORT_ENABLED = false;
 
 /** Brings the broker's existing contacts in, the first step of onboarding. */
 @Controller("contact-imports")
@@ -43,6 +54,11 @@ export class ContactImportController {
 
   @Post("google")
   google(@GetUser() user: User, @Body() dto: GoogleContactsDto) {
+    if (!GOOGLE_CONTACTS_IMPORT_ENABLED) {
+      throw new ForbiddenException(
+        "A importação da agenda do Google está desativada.",
+      );
+    }
     return this.contactImportService.googleCandidates(user, dto.accessToken);
   }
 
