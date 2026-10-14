@@ -118,7 +118,6 @@ export class UserService {
       { id },
       {
         city: dto.city,
-        phone: dto.phone ? dto.phone.replaceAll(/\D/g, "") : null,
         creci: dto.creci ?? null,
         bio: dto.bio ?? null,
         workingCities: dto.workingCities ?? [],
@@ -129,6 +128,11 @@ export class UserService {
       },
     );
     return this.findByIdWithSlug(id);
+  }
+
+  /** The profile number is always the connected WhatsApp's, never typed. */
+  async syncWhatsappPhone(id: string, phone: string): Promise<void> {
+    await this.userRepository.update({ id }, { phone });
   }
 
   /** The name as an address, with a number at the end when it is taken. */

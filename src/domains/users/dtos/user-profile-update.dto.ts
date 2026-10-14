@@ -47,6 +47,10 @@ export class UserProfileUpdateDto {
   @MaxLength(120)
   city: string;
 
+  /**
+   * Ignored: the profile number is the connected WhatsApp's. Still accepted
+   * so screens opened before the change keep saving.
+   */
   @IsOptional()
   @Transform(trimOrNull)
   @ValidatePhoneNumber({ isOptional: true })
