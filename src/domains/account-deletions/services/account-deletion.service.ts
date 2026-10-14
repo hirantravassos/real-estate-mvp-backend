@@ -15,6 +15,7 @@ import {
   CreditTransaction,
   CreditTransactionKind,
 } from "../../credits/entities/credit-transaction.entity";
+import { BugReport } from "../../bug-reports/entities/bug-report.entity";
 import { CreditPurchase } from "../../credits/entities/credit-purchase.entity";
 import { Customer } from "../../customers/entities/customer.entity";
 import { DailyBriefing } from "../../daily-briefings/entities/daily-briefing.entity";
@@ -56,6 +57,7 @@ import {
  * signers identifiable. Children first, the foreign keys cascade the rest.
  */
 const THIRD_PARTY_ENTITIES = [
+  BugReport,
   Message,
   Conversation,
   WhatsappConnection,
