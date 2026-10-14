@@ -581,7 +581,7 @@ export class DealService {
     item: DealChecklistItem,
     file: Express.Multer.File,
     actor: DealEventActor,
-    partnerName?: string,
+    partner?: { id: string; name: string },
   ) {
     await this.documentService.upload(
       deal.userId,
@@ -589,8 +589,10 @@ export class DealService {
       item.id,
       "deals",
       file,
+      null,
+      partner?.id ?? null,
     );
-    await this.markChecklistReceived(deal, item, actor, partnerName);
+    await this.markChecklistReceived(deal, item, actor, partner?.name);
   }
 
   /** Keeps a file the server already holds, like a photo from the inbox, in a checklist item. */
@@ -620,12 +622,18 @@ export class DealService {
     partnerName?: string,
   ) {
     const sentByBroker = actor === DealEventActor.BROKER;
-    item.status = sentByBroker
-      ? DealChecklistStatus.APPROVED
-      : DealChecklistStatus.SUBMITTED;
+    // A restriction is the broker's call: a file from someone else joins
+    // the item but never lifts it.
+    const keepsRestriction =
+      !sentByBroker && item.status === DealChecklistStatus.RESTRICTED;
+    if (!keepsRestriction) {
+      item.status = sentByBroker
+        ? DealChecklistStatus.APPROVED
+        : DealChecklistStatus.SUBMITTED;
+      item.reviewedAt = sentByBroker ? new Date() : null;
+      item.rejectionReason = null;
+    }
     item.submittedAt = new Date();
-    item.reviewedAt = sentByBroker ? new Date() : null;
-    item.rejectionReason = null;
     await this.checklistRepository.save(item);
 
     await this.activityService.record({

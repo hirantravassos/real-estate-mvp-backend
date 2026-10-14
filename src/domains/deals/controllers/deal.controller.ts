@@ -358,6 +358,16 @@ export class DealController {
     return this.partnerService.removePartner(user, id, partnerId);
   }
 
+  /** Sends the partner area by the broker's WhatsApp, only on demand. */
+  @Post(":id/partners/:partnerId/send-access")
+  sendPartnerAccess(
+    @GetUser() user: User,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Param("partnerId", ParseUUIDPipe) partnerId: string,
+  ) {
+    return this.partnerService.sendAccess(user, id, partnerId);
+  }
+
   @Post(":id/partners/:partnerId/regenerate")
   regeneratePartnerLink(
     @GetUser() user: User,

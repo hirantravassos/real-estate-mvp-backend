@@ -45,6 +45,7 @@ export class DocumentService {
     ownerDomain: DocumentOwnerDomain,
     file: Express.Multer.File,
     category: string | null = null,
+    uploadedByPartnerId: string | null = null,
   ): Promise<Document> {
     const fileName = repairFileName(file.originalname);
     const { s3Key, mimeType, sizeBytes } =
@@ -66,6 +67,7 @@ export class DocumentService {
     document.mimeType = mimeType;
     document.sizeBytes = sizeBytes;
     document.category = category;
+    document.uploadedByPartnerId = uploadedByPartnerId;
 
     return this.documentRepository.save(document);
   }

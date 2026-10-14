@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { RealtimeModule } from "../../infrastructure/realtime/realtime.module";
 import { Customer } from "../customers/entities/customer.entity";
@@ -20,7 +20,9 @@ import { DealSignatureService } from "./services/deal-signature.service";
 import { DealPortalService } from "./services/deal-portal.service";
 import { DealPartnerService } from "./services/deal-partner.service";
 import { DealParticipantService } from "./services/deal-participant.service";
+import { DealPartnerAreaService } from "./services/deal-partner-area.service";
 import { NotificationModule } from "../notifications/notification.module";
+import { InboxModule } from "../inbox/inbox.module";
 
 @Module({
   imports: [
@@ -39,6 +41,7 @@ import { NotificationModule } from "../notifications/notification.module";
     PropertyModule,
     RealtimeModule,
     NotificationModule,
+    forwardRef(() => InboxModule),
   ],
   controllers: [DealController, DealPortalController],
   providers: [
@@ -48,6 +51,7 @@ import { NotificationModule } from "../notifications/notification.module";
     DealPortalService,
     DealPartnerService,
     DealParticipantService,
+    DealPartnerAreaService,
   ],
   exports: [DealService],
 })

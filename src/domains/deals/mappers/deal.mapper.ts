@@ -221,7 +221,14 @@ export class DealMapper {
       participants: activeParticipants(deal).map((participant) =>
         this.toParticipant(participant),
       ),
-      checklist: this.toChecklist(deal, documents, ALL_ROLES),
+      checklist: this.toChecklist(deal, documents, ALL_ROLES).map((item) => ({
+        ...item,
+        documents: item.documents.map((document) => ({
+          ...document,
+          uploadedByPartnerId:
+            documents.byId.get(document.id)?.uploadedByPartnerId ?? null,
+        })),
+      })),
       signers: (deal.signers ?? [])
         .filter((signer) => signer.active)
         .sort(byCreation)
@@ -252,6 +259,7 @@ export class DealMapper {
       creci: partner.creci,
       commissionShare: toNumberOrNull(partner.commissionShare),
       accessToken: partner.accessToken,
+      accessSentAt: partner.accessSentAt ?? null,
       signer: signer
         ? { id: signer.id, status: signer.status, signedAt: signer.signedAt }
         : null,
@@ -392,12 +400,36 @@ export class DealMapper {
       customer: { name: shortName(deal.customer.name) },
       broker: {
         name: deal.user.name,
+        phone: deal.user.phone ?? null,
         profileImage: deal.user.profileImage,
         avatar: deal.user.avatar ?? null,
       },
       property: this.toProperty(deal.property),
       progress: this.toProgress(deal),
-      checklist: this.toChecklist(deal, documents, ALL_ROLES),
+      people: activeParticipants(deal).map((participant) => ({
+        id: participant.id,
+        role: participant.role,
+        name: participant.name,
+      })),
+      checklist: this.toChecklist(deal, documents, ALL_ROLES).map((item) => ({
+        ...item,
+        // A partner learns only whether a file is theirs, never which
+        // other partner sent it.
+        documents: item.documents.map((document) => {
+          const sender =
+            documents.byId.get(document.id)?.uploadedByPartnerId ?? null;
+          return {
+            ...document,
+            mine: sender === partner.id,
+            sentBy:
+              sender === partner.id
+                ? "you"
+                : sender
+                  ? "another_partner"
+                  : "broker_or_customer",
+          };
+        }),
+      })),
       contract: contractDocument
         ? {
             document: DocumentMapper.toDto(contractDocument),

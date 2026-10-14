@@ -47,4 +47,16 @@ export class DealPartner extends BaseEntity {
   @Index({ unique: true })
   @Column({ type: "varchar", length: 64, nullable: false })
   accessToken: string;
+
+  /** Wrong numbers typed in a row to open the area. */
+  @Column({ type: "int", default: 0 })
+  failedVerifications: number;
+
+  /** Too many wrong numbers: the area stays shut until then. */
+  @Column({ type: "datetime", nullable: true })
+  verificationLockedUntil: Date | null;
+
+  /** When the broker last sent the access by WhatsApp. */
+  @Column({ type: "datetime", nullable: true })
+  accessSentAt: Date | null;
 }
