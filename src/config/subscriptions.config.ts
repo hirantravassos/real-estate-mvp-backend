@@ -16,7 +16,7 @@ const readPrice = (value: string | undefined, fallback: number) => {
 
 export const subscriptionsConfig = registerAs("subscriptions", () => ({
   /** Free days of every new account, without the monthly credits. */
-  trialDays: Math.round(readNumber(process.env.SUBSCRIPTION_TRIAL_DAYS, 7)),
+  trialDays: Math.round(readNumber(process.env.SUBSCRIPTION_TRIAL_DAYS, 14)),
   /** Gift credits of a new account's trial, so the AI can be tried. */
   trialCredits: Math.round(
     readNumber(process.env.SUBSCRIPTION_TRIAL_CREDITS, 200),
