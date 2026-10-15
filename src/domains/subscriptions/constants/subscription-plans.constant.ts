@@ -56,7 +56,7 @@ const PLAN_DEFINITIONS: Record<
       "Funil de vendas, agenda de visitas e lembretes",
       "Página pública do corretor e de cada imóvel",
       "Até 5 negociações abertas na sala de fechamento",
-      "Assistente de IA, busca de proprietários e certidões",
+      "Assistente de IA por texto e áudio e resumo diário grátis",
     ],
   },
   [SubscriptionPlanKey.RECOMMENDED]: {
@@ -75,7 +75,7 @@ const PLAN_DEFINITIONS: Record<
       "Até 2.000 clientes e 300 imóveis",
       "Negociações sem limite, com portal do cliente e assinaturas",
       "Caça imóveis com IA nos portais, 20 buscas por mês",
-      "Importação de contatos do WhatsApp e do Google",
+      "Importação de contatos do WhatsApp com IA",
     ],
   },
   [SubscriptionPlanKey.PREMIUM]: {
