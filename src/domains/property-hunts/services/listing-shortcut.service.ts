@@ -4,10 +4,8 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import dayjs from "dayjs";
-import { MoreThan, Repository } from "typeorm";
+import { Repository } from "typeorm";
 import { User } from "../../users/entities/user.entity";
-import { LISTING_RETENTION_DAYS } from "../constants/portals.constant";
 import { ListingShortcut } from "../entities/listing-shortcut.entity";
 import { PropertyMatch } from "../entities/property-match.entity";
 import {
@@ -36,11 +34,7 @@ export class ListingShortcutService {
 
   async findAll(user: User) {
     const shortcuts = await this.shortcutRepository.find({
-      where: {
-        userId: user.id,
-        active: true,
-        createdAt: MoreThan(retentionStart()),
-      },
+      where: { userId: user.id, active: true },
       order: { createdAt: "DESC" },
       take: MAXIMUM_SHORTCUTS,
     });
@@ -71,18 +65,13 @@ export class ListingShortcutService {
       userId: user.id,
       externalUrl: match.externalUrl,
       active: true,
-      createdAt: MoreThan(retentionStart()),
     });
     if (existing) {
       return { ...PropertyHuntMapper.toShortcutDto(existing), created: false };
     }
 
     const kept = await this.shortcutRepository.count({
-      where: {
-        userId: user.id,
-        active: true,
-        createdAt: MoreThan(retentionStart()),
-      },
+      where: { userId: user.id, active: true },
     });
     if (kept >= MAXIMUM_SHORTCUTS) {
       throw new BadRequestException(
@@ -132,7 +121,3 @@ export class ListingShortcutService {
     await this.shortcutRepository.delete({ id: shortcut.id, userId: user.id });
   }
 }
-
-/** Anything created before this is past the retention limit. */
-export const retentionStart = (now = new Date()) =>
-  dayjs(now).subtract(LISTING_RETENTION_DAYS, "day").toDate();

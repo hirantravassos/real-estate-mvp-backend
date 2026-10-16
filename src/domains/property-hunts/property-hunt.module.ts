@@ -22,7 +22,6 @@ import { PropertyMatch } from "./entities/property-match.entity";
 import { CatalogMatcherService } from "./services/catalog-matcher.service";
 import { HuntAiService } from "./services/hunt-ai.service";
 import { ListingPageReaderService } from "./services/listing-page-reader.service";
-import { ListingRetentionService } from "./services/listing-retention.service";
 import { ListingShortcutService } from "./services/listing-shortcut.service";
 import { PortalBrowserService } from "./services/portal-browser.service";
 import { PropertyHuntRunnerService } from "./services/property-hunt-runner.service";
@@ -60,7 +59,6 @@ import { PropertyMatchService } from "./services/property-match.service";
     HuntAiService,
     CatalogMatcherService,
     ListingShortcutService,
-    ListingRetentionService,
     PropertyHuntRunnerService,
     PropertyHuntService,
     PropertyMatchService,

@@ -18,7 +18,11 @@ import {
 } from "class-validator";
 import { PaginationRequestDto } from "../../../shared/dtos/pagination-request.dto";
 import { PropertyKindEnum } from "../../properties/mappers/property.mapper";
-import { PortalKey, PropertyMatchStatus } from "../enums/property-hunt.enum";
+import {
+  PortalKey,
+  PropertyMatchOrigin,
+  PropertyMatchStatus,
+} from "../enums/property-hunt.enum";
 import { HUNT_AMENITIES, HUNT_TRANSACTIONS } from "../types/hunt-criteria.type";
 import type {
   HuntAmenity,
@@ -185,6 +189,11 @@ export class PropertyMatchFilterDto extends PaginationRequestDto {
   @IsOptional()
   @IsEnum(PropertyMatchStatus)
   status?: PropertyMatchStatus;
+
+  /** "portal" lists what the AI hunt found on the listing portals. */
+  @IsOptional()
+  @IsEnum(PropertyMatchOrigin)
+  origin?: PropertyMatchOrigin;
 
   @IsOptional()
   @Transform(parseBoolean)

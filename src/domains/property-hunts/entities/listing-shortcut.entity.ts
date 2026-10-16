@@ -8,8 +8,8 @@ import { PortalKey } from "../enums/property-hunt.enum";
 /**
  * A portal listing kept at hand by the broker: only the link and a small
  * card (features, neighborhood and city, a short description). It is not a
- * property of the catalog, it never reaches a public page, and it expires
- * after LISTING_SHORTCUT_RETENTION_DAYS.
+ * property of the catalog, it never reaches a public page, and it is kept
+ * until the broker erases it or the account is erased.
  */
 @Entity("listing_shortcuts")
 @Index(["userId", "createdAt"])

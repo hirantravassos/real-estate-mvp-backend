@@ -220,9 +220,3 @@ export const PORTAL_SEARCH_ENABLED = true;
  * which the platform no longer collects. The free links stay.
  */
 export const OWNER_CONTACT_SEARCH_ENABLED = false;
-
-/**
- * Days a portal suggestion and a listing shortcut are kept. Listings go
- * stale, and the Privacy Policy promises this limit.
- */
-export const LISTING_RETENTION_DAYS = 90;

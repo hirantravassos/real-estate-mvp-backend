@@ -43,6 +43,7 @@ export class PropertyMatchService {
     };
     if (filter.customerId) where.customerId = filter.customerId;
     if (filter.huntId) where.huntId = filter.huntId;
+    if (filter.origin) where.origin = filter.origin;
     if (filter.status) where.status = filter.status;
     else if (!filter.includeDiscarded) {
       where.status = Not(PropertyMatchStatus.DISCARDED);

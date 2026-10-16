@@ -1,13 +1,6 @@
-import dayjs from "dayjs";
-import { LISTING_RETENTION_DAYS } from "../constants/portals.constant";
 import { ListingShortcut } from "../entities/listing-shortcut.entity";
 import { PropertyHunt } from "../entities/property-hunt.entity";
 import { PropertyMatch } from "../entities/property-match.entity";
-import { PropertyMatchOrigin } from "../enums/property-hunt.enum";
-
-/** When a portal suggestion or shortcut is erased, null for the catalog. */
-const expiresAtOf = (createdAt: Date) =>
-  dayjs(createdAt).add(LISTING_RETENTION_DAYS, "day").toDate();
 
 export class PropertyHuntMapper {
   static toHuntDto(hunt: PropertyHunt) {
@@ -58,10 +51,6 @@ export class PropertyHuntMapper {
       warnings: match.warnings,
       status: match.status,
       note: match.note,
-      expiresAt:
-        match.origin === PropertyMatchOrigin.PORTAL
-          ? expiresAtOf(match.createdAt)
-          : null,
       createdAt: match.createdAt,
       updatedAt: match.updatedAt,
     };
@@ -83,7 +72,6 @@ export class PropertyHuntMapper {
       city: shortcut.city,
       state: shortcut.state,
       summary: shortcut.summary,
-      expiresAt: expiresAtOf(shortcut.createdAt),
       createdAt: shortcut.createdAt,
     };
   }
