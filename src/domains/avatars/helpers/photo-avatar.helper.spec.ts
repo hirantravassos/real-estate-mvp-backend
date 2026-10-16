@@ -59,6 +59,32 @@ describe("parsePhotoAvatar", () => {
     expect(masculine?.outfitStyle).toBe("casual");
   });
 
+  it.each(["gown", "cocktail", "skirtSuit"])(
+    "never gives %s to a masculine look",
+    (outfitStyle) => {
+      const masculine = parsePhotoAvatar(
+        JSON.stringify({ ...person, gender: "masculine", outfitStyle }),
+        SEED,
+      );
+      expect(masculine?.outfitStyle).toBe("casual");
+      const feminine = parsePhotoAvatar(
+        JSON.stringify({ ...person, outfitStyle }),
+        SEED,
+      );
+      expect(feminine?.outfitStyle).toBe(outfitStyle);
+    },
+  );
+
+  it.each(["lowBun", "lowPonytail", "sleek", "undercut", "dreads"])(
+    "reads the %s hair style",
+    (hairStyle) => {
+      expect(
+        parsePhotoAvatar(JSON.stringify({ ...person, hairStyle }), SEED)
+          ?.hairStyle,
+      ).toBe(hairStyle);
+    },
+  );
+
   it("returns null for pictures without a person or with broken fields", () => {
     expect(
       parsePhotoAvatar(JSON.stringify({ ...person, isPerson: false }), SEED),

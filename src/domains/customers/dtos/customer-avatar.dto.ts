@@ -22,6 +22,17 @@ export const CUSTOMER_AVATAR_HAIR_STYLES = [
   "bob",
   "braids",
   "pigtails",
+  "pixie",
+  "wavy",
+  "sleek",
+  "lowBun",
+  "lowPonytail",
+  "halfUp",
+  "slickedBack",
+  "sidePart",
+  "undercut",
+  "buzz",
+  "dreads",
 ] as const;
 export const CUSTOMER_AVATAR_HAIR_COLORS = [
   "black",
@@ -52,6 +63,17 @@ export const CUSTOMER_AVATAR_OUTFIT_STYLES = [
   "sweater",
   "hawaiian",
   "tuxedo",
+  "gown",
+  "cocktail",
+  "skirtSuit",
+  "waistcoat",
+] as const;
+/** Outfits drawn on a feminine body, with a skirt and high heels. */
+export const CUSTOMER_AVATAR_FEMININE_OUTFIT_STYLES = [
+  "dress",
+  "gown",
+  "cocktail",
+  "skirtSuit",
 ] as const;
 export const CUSTOMER_AVATAR_OUTFIT_COLORS = [
   "coral",

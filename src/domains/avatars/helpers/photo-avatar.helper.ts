@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import {
   CUSTOMER_AVATAR_EYEWEARS,
   CUSTOMER_AVATAR_FACIAL_HAIRS,
+  CUSTOMER_AVATAR_FEMININE_OUTFIT_STYLES,
   CUSTOMER_AVATAR_GENDERS,
   CUSTOMER_AVATAR_HAIR_COLORS,
   CUSTOMER_AVATAR_HAIR_STYLES,
@@ -14,7 +15,9 @@ import {
 } from "../../customers/dtos/customer-avatar.dto";
 
 /** Outfits a masculine character never gets from a photo. */
-const FEMININE_ONLY_OUTFITS = new Set(["dress"]);
+const FEMININE_ONLY_OUTFITS = new Set<string>(
+  CUSTOMER_AVATAR_FEMININE_OUTFIT_STYLES,
+);
 
 const oneOf = <T extends string>(
   options: readonly T[],
