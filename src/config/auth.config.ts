@@ -4,8 +4,14 @@ export const authConfig = registerAs("auth", () => ({
   jwtSecret: process.env.JWT_SECRET,
   jwtExpirationTime: parseInt(process.env.JWT_EXPIRATION_TIME || "3600", 10),
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
-  jwtRefreshExpirationTime: parseInt(
-    process.env.JWT_REFRESH_EXPIRATION_TIME || "604800",
+  /** A device unused this long signs in again, every refresh restarts it. */
+  refreshSessionIdleDays: parseInt(
+    process.env.REFRESH_SESSION_IDLE_DAYS || "60",
+    10,
+  ),
+  /** The most a device stays signed in, however often it is used. */
+  refreshSessionMaximumDays: parseInt(
+    process.env.REFRESH_SESSION_MAXIMUM_DAYS || "365",
     10,
   ),
   mfaTokenExpirationMinutes: parseInt(
