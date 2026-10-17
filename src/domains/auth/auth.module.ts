@@ -5,6 +5,8 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import { JwtModule, JwtModuleOptions } from "@nestjs/jwt";
 import { AuthController } from "./controllers/auth.controller";
 import { AuthService } from "./services/auth.service";
+import { RefreshSessionService } from "./services/refresh-session.service";
+import { RefreshSession } from "./entities/refresh-session.entity";
 import { UserModule } from "../users/user.module";
 import { User } from "../users/entities/user.entity";
 import { GoogleStrategy } from "./strategies/google.strategy";
@@ -37,13 +39,13 @@ import { NotificationModule } from "../notifications/notification.module";
       },
     }),
     PassportModule.register({ session: false }),
-    TypeOrmModule.forFeature([User, Kanban, Subscription]),
+    TypeOrmModule.forFeature([User, Kanban, Subscription, RefreshSession]),
     forwardRef(() => UserModule),
     AccessLogModule,
     NotificationModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, GoogleStrategy, JwtStrategy],
+  providers: [AuthService, RefreshSessionService, GoogleStrategy, JwtStrategy],
   exports: [AuthService, JwtModule, UserModule],
 })
 export class AuthModule {}

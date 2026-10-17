@@ -12,7 +12,6 @@ import { UserRepository } from "../../users/repositories/user.repository";
 import { UserMapper } from "../../users/mappers/user.mapper";
 import { JwtService } from "@nestjs/jwt";
 import { TokenDto } from "../dtos/token.dto";
-import { AccessTokenDto } from "../dtos/access-token.dto";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Kanban } from "../../kanbans/entities/kanban.entity";
@@ -25,6 +24,10 @@ import { announceSessionsEnded } from "../../../shared/utils/session-events.util
 import { subscriptionsConfig } from "../../../config/subscriptions.config";
 import { BrokerMailService } from "../../notifications/services/broker-mail.service";
 import { welcomeMail } from "../mails/auth.mails";
+import {
+  isRotatingRefreshToken,
+  RefreshSessionService,
+} from "./refresh-session.service";
 
 @Injectable()
 export class AuthService {
@@ -34,7 +37,6 @@ export class AuthService {
   private readonly googleClientId: string;
   private readonly refreshSecret: string;
   private readonly accessExpirationTime: number;
-  private readonly refreshExpirationTime: number;
 
   constructor(
     private readonly configService: ConfigService,
@@ -50,6 +52,7 @@ export class AuthService {
       typeof subscriptionsConfig
     >,
     private readonly brokerMailService: BrokerMailService,
+    private readonly refreshSessionService: RefreshSessionService,
   ) {
     const clientId = this.configService
       .get<string>("auth.googleClientId")
@@ -59,9 +62,6 @@ export class AuthService {
     );
     const accessExpiration = this.configService.get<number>(
       "auth.jwtExpirationTime",
-    );
-    const refreshExpiration = this.configService.get<number>(
-      "auth.jwtRefreshExpirationTime",
     );
 
     if (!clientId) {
@@ -84,7 +84,6 @@ export class AuthService {
     this.googleClient = new OAuth2Client(clientId);
     this.refreshSecret = refreshSecret;
     this.accessExpirationTime = accessExpiration ?? 3600;
-    this.refreshExpirationTime = refreshExpiration ?? 604800;
   }
 
   async authenticateWithGoogle(
@@ -127,6 +126,7 @@ export class AuthService {
    */
   async logout(user: User, evidence: RequestEvidence): Promise<void> {
     await this.userRepository.increment({ id: user.id }, "tokenVersion", 1);
+    await this.refreshSessionService.closeAll(user.id);
     announceSessionsEnded(user.id);
     await this.accessLogService.record(
       user.id,
@@ -179,83 +179,94 @@ export class AuthService {
     }
   }
 
+  /**
+   * Trades a refresh token for a new access token and the next refresh
+   * token. The one presented stops working after a short grace period.
+   */
   async refreshAccessToken(
     refreshToken: string,
     evidence: RequestEvidence,
-  ): Promise<AccessTokenDto> {
-    try {
-      const payload = this.jwtService.verify<{
-        id: string;
-        email: string;
-        typ?: string;
-        ver?: number;
-      }>(refreshToken, {
-        secret: this.refreshSecret,
-      });
+  ): Promise<TokenDto> {
+    const rotated = isRotatingRefreshToken(refreshToken)
+      ? await this.refreshSessionService.rotate(refreshToken)
+      : await this.exchangeLegacyRefreshToken(refreshToken);
 
-      if (payload.typ !== "refresh") {
-        throw new UnauthorizedException("Not a refresh token");
-      }
-
-      const user = await this.userRepository.findOneBy({
-        id: payload.id,
-        active: true,
-      });
-
-      if (!user) {
-        throw new UnauthorizedException("User not found");
-      }
-
-      if ((payload.ver ?? 0) !== user.tokenVersion) {
-        throw new UnauthorizedException("Session ended");
-      }
-
-      const accessToken = this.jwtService.sign(
-        {
-          id: user.id,
-          email: user.email,
-          typ: "access",
-          ver: user.tokenVersion,
-        },
-        { expiresIn: this.accessExpirationTime },
-      );
-
-      await this.accessLogService.record(
-        user.id,
-        AccessLogEvent.REFRESH,
-        evidence,
-      );
-      return { accessToken };
-    } catch {
+    if (!rotated) {
       throw new UnauthorizedException("Invalid or expired refresh token");
     }
+
+    const user = await this.userRepository.findOneBy({
+      id: rotated.userId,
+      active: true,
+    });
+
+    if (!user || rotated.tokenVersion !== user.tokenVersion) {
+      throw new UnauthorizedException("Invalid or expired refresh token");
+    }
+
+    await this.accessLogService.record(
+      user.id,
+      AccessLogEvent.REFRESH,
+      evidence,
+    );
+    return {
+      accessToken: this.signAccessToken(user),
+      refreshToken: rotated.refreshToken,
+    };
   }
 
-  private generateTokens(user: User): TokenDto {
-    const payload = {
-      id: user.id,
-      email: user.email,
-      ver: user.tokenVersion ?? 0,
-    };
-
-    const accessToken = this.jwtService.sign(
-      { ...payload, typ: "access" },
-      {
-        expiresIn: this.accessExpirationTime,
-      },
-    );
-
-    const refreshToken = this.jwtService.sign(
-      { ...payload, typ: "refresh" },
-      {
+  /**
+   * Refresh tokens issued before rotation existed are signed JWTs. A valid
+   * one opens a rotating session, so devices signed in before the deploy
+   * stay signed in. They all expire on their own within seven days of the
+   * deploy, then this path can go.
+   */
+  private async exchangeLegacyRefreshToken(refreshToken: string): Promise<{
+    userId: string;
+    tokenVersion: number;
+    refreshToken: string;
+  } | null> {
+    let payload: { id: string; typ?: string; ver?: number };
+    try {
+      payload = this.jwtService.verify(refreshToken, {
         secret: this.refreshSecret,
-        expiresIn: this.refreshExpirationTime,
-      },
-    );
+      });
+    } catch {
+      return null;
+    }
+
+    if (payload.typ !== "refresh") return null;
+
+    const user = await this.userRepository.findOneBy({
+      id: payload.id,
+      active: true,
+    });
+
+    if (!user || (payload.ver ?? 0) !== user.tokenVersion) return null;
 
     return {
-      accessToken,
-      refreshToken,
+      userId: user.id,
+      tokenVersion: user.tokenVersion,
+      refreshToken: await this.refreshSessionService.open(user),
+    };
+  }
+
+  private signAccessToken(user: User): string {
+    return this.jwtService.sign(
+      {
+        id: user.id,
+        email: user.email,
+        typ: "access",
+        ver: user.tokenVersion ?? 0,
+      },
+      { expiresIn: this.accessExpirationTime },
+    );
+  }
+
+  private async generateTokens(user: User): Promise<TokenDto> {
+    return {
+      accessToken: this.signAccessToken(user),
+      refreshToken: await this.refreshSessionService.open(user),
     };
   }
 
